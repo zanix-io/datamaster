@@ -65,7 +65,7 @@
     ".": "./mod.ts",
     "./database": "./src/modules/database/mod.ts",
     /** core module definitions */
-    "./core/database/mongo": "./src/modules/database/connector/core.ts"
+    "./core/database/mongo": "./src/modules/database/mongo/connector/core.ts"
   },
   "nodeModulesDir": "auto",
   "publish": {
