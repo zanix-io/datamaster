@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] - 2025-11-04
+
+### Added
+
+- ZanixMongoConnector core module definition
+
 ## [0.1.3] - 2025-11-04
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -63,7 +63,9 @@
   },
   "exports": {
     ".": "./mod.ts",
-    "./database": "./src/modules/database/mod.ts"
+    "./database": "./src/modules/database/mod.ts",
+    /** core module definitions */
+    "./core/database/mongo": "./src/modules/database/connector/core.ts"
   },
   "nodeModulesDir": "auto",
   "publish": {

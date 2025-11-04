@@ -7,8 +7,19 @@
  * \_____/ \__,_||_| |_||_|/_/\_\
  */
 
+import { ZanixMongoConnector } from './mod.ts'
+import { Connector } from '@zanix/server'
+
+/** Connector loader */
+const connectorLoader = () => {
+  if (!Deno.env.get('MONGO_URI')) return
+
+  @Connector('database')
+  class _ZanixMongoCoreConnector extends ZanixMongoConnector {}
+}
+
 /**
- * @fileoverview Core database connector loader for Zanix.
+ * Core database connector loader for Zanix.
  *
  * This module automatically registers the default MongoDB connector
  * (`_ZanixMongoCoreConnector`) if the environment variable `MONGO_URI` is set.
@@ -21,13 +32,9 @@
  * @requires Deno.env
  * @requires ZanixMongoConnector
  * @decorator Connector
+ *
+ * @module
  */
+const zanixMongoConnectorCore = connectorLoader()
 
-import { ZanixMongoConnector } from './mod.ts'
-import { Connector } from '@zanix/server'
-;(() => {
-  if (!Deno.env.get('MONGO_URI')) return
-
-  @Connector('database')
-  class _ZanixMongoCoreConnector extends ZanixMongoConnector {}
-})()
+export default zanixMongoConnectorCore
