@@ -8,6 +8,39 @@
  */
 
 /**
+ * This module provides database utilities and connectors for the Zanix project.
+ *
+ * It includes type definitions, schema utilities, data accessors, and transformation
+ * functions for working with MongoDB and other databases.
+ *
+ * The main export, `ZanixMongoConnector`, provides a MongoDB connection handler with
+ * support for schema transformation, data policies, and model definition utilities.
+ *
+ * @example
+ * ```ts
+ * import {
+ *   ZanixMongoConnector,
+ *   defineModelHOC,
+ *   transformRecursively,
+ *   dataAccessGetter
+ * } from 'jsr:@zanix/database@[version]/mod'
+ *
+ * const connector = new ZanixMongoConnector({
+ *  uri: 'mongodb://localhost:27017',
+ *  config: { dbName: 'my_database' },
+ *  onConnected: () => {
+ *    // Do something
+ *  },
+ *  onDisconnected: () => {
+ *    // Do something
+ *  },
+ * })
+ * ```
+ *
+ * @module zanixDatabase
+ */
+
+/**
  * MONGO DATABASE
  */
 
