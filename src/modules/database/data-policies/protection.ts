@@ -87,8 +87,6 @@ export const dataProtectionSetterDefinition = (
 }
 
 /**
- * @getter
- *
  * Applies the data protection settings for a given data field (string or string array), (e.g. `decrypt`, `unmask`) behind a getter.
  *
  * @param {DataProtectionMethodFull} protection - The data protection settings for the data field. This defines the
@@ -108,6 +106,8 @@ export const dataProtectionSetterDefinition = (
  * If not found, it falls back to `DATABASE_AES_KEY` and applies 'sym-encrypt' method.
  *
  * ⚠️ If no key is found for any method, no encryption/hashing/masking or decryption/unmasking is performed.
+ *
+ * @getter
  */
 export function dataProtectionGetter(
   this: void,

@@ -53,8 +53,6 @@ export function dataAccessGetterDefinition(
 }
 
 /**
- * @getter
- *
  * Set the access policy for a given data field (string or string array), applying the specified base getter function.
  *
  * ⚠️ This function requires that **AsyncLocalStorage (ALS)** is activated in the controller or handler
@@ -68,6 +66,8 @@ export function dataAccessGetterDefinition(
  *                                               Defaults to an identity function if not provided.
  *
  * @returns {SchemaAccessor} A new schema accessor function that incorporates the given access policy and base getter.
+ *
+ * @getter
  */
 export function dataAccessGetter(
   this: void,

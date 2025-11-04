@@ -7,4 +7,10 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-11-04
+
+### Added
+
+- Some modules JSDOC
+
 ## [0.1.0] - 2025-11-03

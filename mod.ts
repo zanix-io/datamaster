@@ -12,4 +12,4 @@ import ProgramModule from 'modules/program/public.ts'
 export { ProgramModule }
 
 export * from 'modules/database/mod.ts'
-export * from 'modules/cache/mod.ts'
+// export * from 'modules/cache/mod.ts'

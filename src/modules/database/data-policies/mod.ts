@@ -10,8 +10,6 @@ import { ProgramModule as Program } from '@zanix/server'
 import { dataAccessGetter } from './access.ts'
 
 /**
- * @getter
- *
  * Defines the data protection and access control behavior for a specific data field
  * (either a single string field or an array of strings).
  *
@@ -30,6 +28,8 @@ import { dataAccessGetter } from './access.ts'
  * @param {DataProtectionMethodFull} options.protection - The data protection policy to apply.
  * @param {SchemaAccessor} [baseGetter] - Optional base getter to wrap or extend.
  * @returns {SchemaAccessor} The configured schema accessor with data protection behavior.
+ *
+ * @getter
  */
 export const dataPoliciesGetter = (
   options: {
