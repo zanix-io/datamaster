@@ -17,16 +17,16 @@ import {
 } from '@zanix/server'
 
 /**
- * @class ZanixMongoConnector
- * @template T
- * @extends ZanixDatabaseConnector<T>
- *
  * Manages the connection lifecycle with a MongoDB database using Mongoose,
  * providing utilities for model retrieval, schema processing, and connector customization.
  *
  * This connector serves as the MongoDB integration layer within the Zanix framework,
  * handling configuration, replica set awareness, and AsyncLocalStorage (ALS) context support
  * when required.
+ *
+ * @class ZanixMongoConnector
+ * @template T
+ * @extends ZanixDatabaseConnector<T>
  *
  * @example
  * ```ts
