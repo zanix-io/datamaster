@@ -1,0 +1,98 @@
+import type { DataFieldAccess, DataProtectionMethod, Extensions } from 'database/typings/general.ts'
+import type { Model } from 'mongo/typings/models.ts'
+import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
+
+import { baseTransformations } from './schema/transforms/mod.ts'
+import { findPathsWithAccessorsDeep } from '../utils/accessors.ts'
+import { processInternalAccessors } from 'mongo/utils/accessors.ts'
+import { mainVirtuals } from './schema/virtuals.ts'
+import { sanitizeModel } from './model/sanitize.ts'
+import { statics } from './schema/statics/mod.ts'
+import { methods } from './schema/methods/mod.ts'
+import { hooks } from './middlewares/mod.ts'
+import ProgramModule from 'modules/program/mod.ts'
+
+/**
+ * Process a database model before use.
+ *
+ * This function expects a model factory (a function that returns a Mongoose model or similar)
+ * and applies processing steps such as sanitization, credential removal, or other setup logic
+ * before returning the final, ready-to-use model.
+ *
+ * It is commonly used to ensure that sensitive data (e.g., connection strings)
+ * are removed before exposing the model outside secure contexts.
+ *
+ * ⚠️ **Security Notice:**
+ * - Do not expose unsanitized models in logs or API responses.
+ * - If `sanitizeModel` mutates the model, this function will return the mutated version.
+ *
+ * @template T
+ * @param { T} Model - A factory function that creates and returns a model instance.
+ * @returns {T} The sanitized and preprocessed model ready for use.
+ */
+export const postBindModel = <T extends Model>(Model: T): T => {
+  sanitizeModel(Model)
+
+  return Model
+}
+
+/**
+ * Applies preprocessing steps to a Mongoose schema before model creation.
+ *
+ * This function is intended to standardize schema configuration by attaching
+ * common virtuals, hooks, or other shared logic via helper utilities such as
+ * {@link mainVirtuals} and {@link statics}. It ensures that all schemas maintain consistent behavior
+ * across the application before they are compiled into models.
+ *
+ * ⚙️ **Behavior:**
+ * - Modifies the provided `schema` in place by applying one or more transformations.
+ * - Returns the same schema instance for chaining or model compilation.
+ *
+ * ⚠️ **Notes:**
+ * - This function mutates the original schema (it does not clone it).
+ * - Use it before calling `mongoose.model()` or equivalent.
+ * - Avoid applying it multiple times to the same schema to prevent duplicate virtuals.
+ *
+ * @template T
+ * @param {T} schema - A Mongoose `Schema` instance to preprocess.
+ * @param {Omit<Extensions, 'seeders'>} extensions - Schema extensions options.
+ * @returns {T} The same schema instance after preprocessing.
+ */
+export const preprocessSchema = <T extends BaseCustomSchema>(
+  schema: T,
+  extensions: Omit<Extensions, 'seeders'> = {},
+): T => {
+  const accessorsInfo = findPathsWithAccessorsDeep(schema)
+  const dataProtection: Record<string, DataProtectionMethod> = {}
+  const dataAccess: Record<string, DataFieldAccess> = {}
+
+  processInternalAccessors(accessorsInfo.getterEntries, (result) => {
+    const dataAccessInfo = ProgramModule.accessors.consumeAccessorDataAccess(result.function)
+    const dataProtectionInfo = ProgramModule.accessors.consumeAccessorDataProtection(
+      result.function,
+    )
+    if (dataProtectionInfo) dataProtection[result.path] = dataProtectionInfo
+    if (dataAccessInfo) dataAccess[result.path] = dataAccessInfo
+  })
+
+  // virtuals
+  mainVirtuals(schema)
+
+  // statics
+  statics(schema)
+
+  // methods
+  methods(schema)
+
+  // base transformations accessors
+  // `toObject` and `toJSON`
+  baseTransformations(schema, dataAccess)
+
+  // triggers
+  extensions.triggers
+
+  // hooks
+  hooks(schema, dataProtection)
+
+  return schema
+}
