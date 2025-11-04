@@ -1,7 +1,9 @@
 import type { generateHash, validateHash } from '@zanix/helpers'
 import type { MaskingBaseOptions } from '@zanix/types'
 import type { ClientSession } from 'mongoose'
+import type { DataObject } from 'database/typings/models.ts'
 import type { Model } from './commons.ts'
+import type { AdaptedModel } from './models.ts'
 
 /**
  * Defines the shape of **static methods** attached to a schema (e.g., a Mongoose schema).
@@ -130,4 +132,33 @@ export type SchemaStatics = {
    * @returns {boolean} `true` if connected to a replica set or sharded cluster, otherwise `false`.
    */
   isReplicaSet: () => boolean | undefined
+
+  /**
+   * Finds a document by its `_id` and creates it if it does not exist.
+   *
+   * Performs an `updateOne` operation with `upsert: true`,
+   * ensuring the document exists without modifying it if already present.
+   *
+   * @this {Model<DataObject>} The Mongoose model.
+   * @param {DataObject} data - The data to insert if the document does not exist.
+   * @returns {Promise<void>}
+   */
+  upsertById: <M extends AdaptedModel>(this: M, data: DataObject) => Promise<void>
+  /**
+   * Finds multiple documents by their `_id` and creates them if they do not exist.
+   *
+   * This method performs a `bulkWrite` with `upsert: true` for each object,
+   * ensuring each document exists without modifying existing ones.
+   *
+   * @this {AdaptedModel} The Mongoose model.
+   * @param {DataObject[]} data - Array of documents to insert if missing.
+   * @returns {Promise<void>} A promise that resolves to the bulk write result.
+   *
+   * @example
+   * await User.upsertManyById([
+   *   { id: 'abc123', name: 'Alice' },
+   *   { id: 'def456', name: 'Bob' }
+   * ]);
+   */
+  upsertManyById: (this: AdaptedModel, data: DataObject[]) => Promise<void>
 }

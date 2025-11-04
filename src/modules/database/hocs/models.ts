@@ -1,4 +1,5 @@
 import type { ModelHOC } from 'database/typings/models.ts'
+import type { SeederHandler } from '../typings/general.ts'
 
 import ProgramModule from 'modules/program/mod.ts'
 
@@ -49,6 +50,6 @@ export const defineModelHOC: ModelHOC = ({ extensions = {}, ...model }, type) =>
   ProgramModule.models.addModel({ ...model, extensions: exts }, type)
   ProgramModule.seeders.addSeeder({
     model: type === 'mongo' ? model.name : model,
-    handlers: seeders,
+    handlers: seeders as SeederHandler[],
   })
 }

@@ -19,9 +19,14 @@
  * @module zanixDatamaster
  */
 
+// Main
 import ProgramModule from 'modules/program/public.ts'
 
 export { ProgramModule }
 
+// Global modules
 export * from 'modules/database/mod.ts'
 // export * from 'modules/cache/mod.ts'
+
+// general types
+export type { EncryptedString, HashedString } from 'typings/data.ts'

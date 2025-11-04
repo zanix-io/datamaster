@@ -1,14 +1,21 @@
 // deno-lint-ignore-file no-explicit-any
 import type { MongoModelDefinition } from 'mongo/typings/models.ts'
 import type { DatabaseTypes, Extensions } from './general.ts'
+import type { Primitive } from 'typings/system.ts'
 
-type ModelGeneralDefinition = Omit<ModelMetadata<unknown>, 'name'>
+type ModelGeneralDefinition = Omit<ModelMetadata<unknown>, 'name'> & {
+  /**
+   * Represents optional extensions that can be added to a model definition.
+   */
+  extensions?: Extensions
+}
+
 type BaseModelDefinition = {
   extensions?: Omit<Extensions, 'seeders'>
 }
 
 type ModelDefinition<T extends DatabaseTypes, Attrs extends object> = 'mongo' extends T
-  ? MongoModelDefinition<Attrs> & BaseModelDefinition
+  ? MongoModelDefinition<Attrs>
   : ModelGeneralDefinition
 
 /**
@@ -23,10 +30,6 @@ export type BaseModel<Attrs extends object, T extends DatabaseTypes> = {
    * and may represent a logical name or type of the model (e.g., 'User', 'Product').
    */
   name: string
-  /**
-   * Represents optional extensions that can be added to a model definition.
-   */
-  extensions?: Extensions
 } & ModelDefinition<T, Attrs>
 
 /**
@@ -72,3 +75,6 @@ export type ModelMetadata<T> = {
   callback?: (...args: any[]) => unknown
   options?: object
 } & BaseModelDefinition
+
+/** Basic data object to save in a model */
+export type DataObject = Record<string, Primitive | Primitive[]> & { id: string }

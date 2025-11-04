@@ -41,7 +41,8 @@ export class ZanixMongoConnector<T extends CoreConnectorTemplates = object>
   extends ZanixDatabaseConnector<T> {
   #database!: Mongoose
   #config: MongoConnectorOptions['config']
-  private isReplicaSet
+  private isReplicaSet?: boolean
+  protected name: string
   private defineModelBySchema = defineModelBySchema
 
   constructor(
@@ -54,6 +55,8 @@ export class ZanixMongoConnector<T extends CoreConnectorTemplates = object>
     const { onConnected, onDisconnected } = options
     super({ uri, onConnected, onDisconnected })
 
+    const targetName = this.constructor.name
+    this.name = targetName.startsWith('_Zanix') ? 'core database' : targetName
     this.isReplicaSet = uri?.includes('replicaSet=') || uri?.includes('mongodb+srv://')
     this.#config = options.config
   }
@@ -175,10 +178,7 @@ export class ZanixMongoConnector<T extends CoreConnectorTemplates = object>
 
       return connected
     } catch (error) {
-      logger.error(
-        `Failed to connect to MongoDB in '${this.constructor.name}' class`,
-        error,
-      )
+      logger.error(`Failed to connect to MongoDB in '${this.name}' class`, error)
       return false
     }
   }

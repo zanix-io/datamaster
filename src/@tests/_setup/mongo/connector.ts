@@ -6,7 +6,9 @@ import { ZanixMongoConnector } from 'mongo/connector/mod.ts'
 // mocks
 console.info = () => {}
 
-export const ignore = Deno.env.get('GITHUB_ACTIONS') === 'true'
+// Controls whether certain tests are skipped locally.
+// ⚠️ For local use only — do not commit with `ignore = true`.
+export const ignore = false
 
 // To avoid Leaks detected (on stop connection and drop collection) set to false
 export const sanitize = {

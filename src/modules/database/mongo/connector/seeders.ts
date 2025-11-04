@@ -20,9 +20,7 @@ export async function runSeedersOnStart(this: ZanixMongoConnector) {
 
   ProgramModule.deleteMetadata('seeders')
 
-  logger.success(
-    `MongoDB Connected Successfully in '${this.constructor.name}' class`,
-  )
+  logger.success(`MongoDB Connected Successfully in '${this.name}' class`)
 }
 
 /**

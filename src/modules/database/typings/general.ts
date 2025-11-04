@@ -68,19 +68,33 @@ export type DataFieldAccessFull = AccessTypes | DataFieldAccess
  */
 export type DatabaseTypes = 'mongo' | 'postgress'
 
+/** Seeder Handler array of functions */
+export type SeederHandlers = Seeders[0]['handlers']
+
+/**
+ * Type representing a single seeder handler function.
+ *
+ * A SeederHandler defines the signature of a function used to populate a model with initial data.
+ * It is typically passed to the model population system to insert or modify records during
+ * database initialization or testing.
+ */
+export type SeederHandler = SeederHandlers[0]
+
 /**
  * Represents optional extensions that can be added to a model definition.
  *
- * @property {Seeders[0]['handlers']} [seeders] - Optional array of seeder handler functions
+ * @property {SeederHandler} [seeders] - Optional array of seeder handler functions
  *   used to populate initial data in the model.
  * @property {Triggers} [triggers] - Optional triggers that define reactive behaviors or
  *   side effects tied to model events.
  */
+
 export type Extensions = {
   /**
    * Optional array of seeder handler functions used to populate initial data in the model.
+   * The seeders are executed **sequentially**.
    */
-  seeders?: Seeders[0]['handlers']
+  seeders?: SeederHandlers
   /**
    * Optional triggers that define reactive behaviors or side effects tied to model events.
    */

@@ -1,8 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
-import type { BaseAttributes, Extensions, SchemaAccessor } from 'database/typings/general.ts'
+import type { Document, Schema, SchemaDefinition, SchemaDefinitionProperty } from 'mongoose'
 import type { SchemaStatics } from './statics.ts'
 import type { Seeders } from '@zanix/server'
-import type { Document, Schema, SchemaDefinition, SchemaDefinitionProperty } from 'mongoose'
+import type {
+  BaseAttributes,
+  Extensions,
+  SchemaAccessor,
+  SeederHandlers,
+} from 'database/typings/general.ts'
 import type { SchemaMethods } from './commons.ts'
 
 export type SchemaWithPaths = Schema & { paths: Record<string, any> }
@@ -24,7 +29,7 @@ export interface SchemaModelExtensions extends Omit<Extensions, 'seeders'> {
   /**
    * Optional array of seeder handler functions used to populate initial data in the model.
    */
-  seeders?: Seeders | Seeders[0]['handlers']
+  seeders?: Seeders | SeederHandlers
 }
 
 /**

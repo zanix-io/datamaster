@@ -9,8 +9,8 @@ import type {
 } from 'mongoose'
 import type { BaseCustomSchema, MongoSchemaDefinition } from './schema.ts'
 import type { SchemaStatics } from './statics.ts'
-import type { BaseAttributes } from 'database/typings/general.ts'
-import type { Model, SchemaMethods } from './commons.ts'
+import type { BaseAttributes, Extensions } from 'database/typings/general.ts'
+import type { Model, MongoSeeder, SchemaMethods } from './commons.ts'
 
 /**
  * Defines the structure of a MongoDB model, including its schema definition, options, and an optional callback
@@ -37,6 +37,10 @@ export type MongoModelDefinition<
    * schema, such as validation, timestamps, and indexes.
    */
   options?: SchemaOptions
+  /**
+   * Represents optional extensions that can be added to a model definition.
+   */
+  extensions?: Omit<Extensions, 'seeders'> & { seeders: MongoSeeder[] }
   /**
    * Optional callback to modify the schema after it has been defined.
    * @param {Schema<MongoSchemaDefinition<Attrs>>} schema - The MongoDB schema to be modified.

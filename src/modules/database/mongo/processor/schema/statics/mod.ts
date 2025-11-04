@@ -3,6 +3,7 @@ import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
 import { decrypt, encrypt, mask, unmask } from 'database/utils/protection.ts'
 import { generateHash, validateHash } from '@zanix/helpers'
 import { transactions } from './transactions.ts'
+import { upsertById, upsertManyById } from './upsert.ts'
 
 /**
  * @function statics
@@ -30,4 +31,7 @@ export const statics = (
 
   schema.statics.hash ??= generateHash
   schema.statics.validateHash ??= validateHash
+
+  schema.statics.upsertById ??= upsertById
+  schema.statics.upsertManyById ??= upsertManyById
 }

@@ -1,5 +1,7 @@
 // deno-lint-ignore-file no-explicit-any ban-types
 import type { BaseAttributes } from 'database/typings/general.ts'
+import type { ZanixMongoConnector } from 'mongo/connector/mod.ts'
+import type { AdaptedModel } from './models.ts'
 import type { Session } from '@zanix/server'
 import type {
   LeanDocument,
@@ -57,3 +59,15 @@ export type DefaultSchema<Attrs extends BaseAttributes = any> = Schema<
   ResolveSchemaOptions<{}>,
   Attrs
 >
+
+/**
+ * Type representing a single seeder handler function for Mongo.
+ *
+ * A SeederHandler defines the signature of a function used to populate a model with initial data.
+ * It is typically passed to the model population system to insert or modify records during
+ * database initialization or testing.
+ */
+export type MongoSeeder = (
+  model: AdaptedModel,
+  context: typeof ZanixMongoConnector['prototype'],
+) => Promise<void> | void

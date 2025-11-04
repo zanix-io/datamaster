@@ -41,24 +41,8 @@
  */
 
 /**
- * MONGO DATABASE
+ * DATABASE COMMONS
  */
-
-// types
-export type { EncryptedString, HashedString } from 'typings/data.ts'
-export type { MongoConnectorOptions } from 'mongo/typings/process.ts'
-
-// utils
-export { getAllSubschemas } from 'mongo/utils/schemas.ts'
-export { findPathsWithAccessorsDeep } from 'mongo/utils/accessors.ts'
-
-//transforms
-export {
-  transformDeepByPaths,
-  transformRecursively,
-} from 'mongo/processor/schema/transforms/recursively.ts'
-export { transformByDataAccess } from 'mongo/processor/schema/transforms/data-access.ts'
-export { transformShallowByPaths } from 'mongo/processor/schema/transforms/shallow.ts'
 
 // models
 export { defineModelHOC } from './hocs/models.ts'
@@ -67,6 +51,29 @@ export { defineModelHOC } from './hocs/models.ts'
 export { dataProtectionGetter } from './data-policies/protection.ts'
 export { dataAccessGetter } from './data-policies/access.ts'
 export { dataPoliciesGetter } from './data-policies/mod.ts'
+
+/**
+ * MONGO DATABASE
+ */
+
+// types
+export type { MongoSeeder } from 'mongo/typings/commons.ts'
+export type { MongoConnectorOptions } from 'mongo/typings/process.ts'
+
+// utils
+export { getAllSubschemas } from 'mongo/utils/schemas.ts'
+export { findPathsWithAccessorsDeep } from 'mongo/utils/accessors.ts'
+
+// seeders
+export { seedByIdIfMissing, seedManyByIdIfMissing } from 'mongo/utils/seeders.ts'
+
+//transforms
+export {
+  transformDeepByPaths,
+  transformRecursively,
+} from 'mongo/processor/schema/transforms/recursively.ts'
+export { transformByDataAccess } from 'mongo/processor/schema/transforms/data-access.ts'
+export { transformShallowByPaths } from 'mongo/processor/schema/transforms/shallow.ts'
 
 // main
 export { ZanixMongoConnector } from 'mongo/connector/mod.ts'
