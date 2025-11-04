@@ -12,6 +12,7 @@
  */
 
 // types
+export type { DefaultSchema } from 'mongo/typings/schema.ts'
 export type { EncryptedString, HashedString } from 'typings/data.ts'
 export type { MongoConnectorOptions } from 'mongo/typings/process.ts'
 
