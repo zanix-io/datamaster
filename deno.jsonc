@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "compilerOptions": {
     "strict": true,
-    "noImplicitAny": true
+    "noImplicitAny": true,
+    // Temporary fix: Mongoose typings break when running `deno publish`.
+    // We'll migrate to a Deno-native (non-npm) MongoDB driver soon.
+    "skipLibCheck": true
   },
   "lint": {
     "rules": {
