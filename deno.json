@@ -62,6 +62,7 @@
     "mongo/": "./src/modules/database/mongo/"
   },
   "exports": {
+    ".": "./mod.ts",
     "./cache": "./src/modules/cache/mod.ts",
     "./database": "./src/modules/database/mod.ts"
   },
