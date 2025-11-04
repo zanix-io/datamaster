@@ -7,6 +7,16 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.6] - 2025-11-04
+
+### Fixed
+
+- Seeder virtualId conflicts
+
+### Added
+
+- Some types and mongoose objects exported
+
 ## [0.1.5] - 2025-11-04
 
 ### Added

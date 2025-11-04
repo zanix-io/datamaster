@@ -77,6 +77,7 @@ export { transformShallowByPaths } from 'mongo/processor/schema/transforms/shall
 
 // main
 export { ZanixMongoConnector } from 'mongo/connector/mod.ts'
+export { Schema } from 'mongoose'
 
 /**
  * OTHER DATABASES...

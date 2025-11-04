@@ -19,10 +19,10 @@ export async function upsertById(
   this: AdaptedModel,
   data: DataObject,
 ): Promise<void> {
-  const _id = data.id
+  const { id: _id, ...fields } = data
   await this.updateOne(
     { _id },
-    { $setOnInsert: { ...data, _id } },
+    { $setOnInsert: { ...fields, _id } },
     { upsert: true },
   )
 }
@@ -54,11 +54,11 @@ export async function upsertManyById(
   if (rest.length === 0) await this.upsertById(first)
 
   const ops = data.map((obj) => {
-    const _id = obj.id
+    const { id: _id, ...fields } = obj
     return {
       updateOne: {
         filter: { _id },
-        update: { $setOnInsert: { ...obj, _id } },
+        update: { $setOnInsert: { ...fields, _id } },
         upsert: true,
       },
     }
