@@ -35,6 +35,6 @@ const connectorLoader = () => {
  *
  * @module
  */
-const zanixMongoConnectorCore = connectorLoader()
+const zanixMongoConnectorCore: void = connectorLoader()
 
 export default zanixMongoConnectorCore
