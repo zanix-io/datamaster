@@ -1,4 +1,4 @@
-import type { SchemaStatics } from 'mongo/typings/schema.ts'
+import type { SchemaStatics } from 'mongo/typings/statics.ts'
 import type { EncryptedString, HashedString } from 'typings/data.ts'
 
 import {

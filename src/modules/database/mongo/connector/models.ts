@@ -1,5 +1,6 @@
 import type { AdaptedModelBySchema } from '../typings/models.ts'
-import type { DefaultSchema, SchemaModelInitOptions } from '../typings/schema.ts'
+import type { SchemaModelInitOptions } from '../typings/schema.ts'
+import type { DefaultSchema } from '../typings/commons.ts'
 import type { ZanixMongoConnector } from './mod.ts'
 
 import ProgramModule from 'modules/program/public.ts'

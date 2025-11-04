@@ -1,12 +1,8 @@
+import type { AdaptedModel, AdaptedModelBySchema, GetModelOptions } from '../typings/models.ts'
+import type { BaseCustomSchema, SchemaModelInitOptions } from '../typings/schema.ts'
 import type { BaseAttributes, Extensions } from 'database/typings/general.ts'
-import type { BaseCustomSchema, DefaultSchema, SchemaModelInitOptions } from '../typings/schema.ts'
-import type {
-  AdaptedModel,
-  AdaptedModelBySchema,
-  GetModelOptions,
-  Model,
-} from '../typings/models.ts'
 import type { MongoConnectorOptions } from '../typings/process.ts'
+import type { DefaultSchema, Model } from '../typings/commons.ts'
 
 import { postBindModel, preprocessSchema } from '../processor/mod.ts'
 import { Mongoose, Schema, type SchemaOptions } from 'mongoose'

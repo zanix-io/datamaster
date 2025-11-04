@@ -1,4 +1,5 @@
-import type { SchemaMethods, SchemaStatics } from 'mongo/typings/schema.ts'
+import type { SchemaMethods } from 'mongo/typings/commons.ts'
+import type { SchemaStatics } from 'mongo/typings/statics.ts'
 import type { HashedString } from 'typings/data.ts'
 
 import { dataPoliciesGetter } from 'modules/database/data-policies/mod.ts'

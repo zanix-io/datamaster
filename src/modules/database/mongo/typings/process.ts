@@ -1,8 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
+import type { NestedValue, Primitive } from 'typings/system.ts'
 import type { ConnectorOptions } from '@zanix/server'
 import type { ConnectOptions } from 'mongoose'
 import type { Document } from 'mongoose'
-import type { NestedValue, Primitive } from 'typings/system.ts'
 
 /**
  * Transformation functions to apply to data.

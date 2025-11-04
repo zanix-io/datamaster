@@ -1,4 +1,4 @@
-// deno-lint-ignore-file no-explicit-any ban-types
+// deno-lint-ignore-file no-explicit-any
 import type {
   InferSchemaType,
   Model as MongoModel,
@@ -7,14 +7,10 @@ import type {
   SchemaDefinition,
   SchemaOptions,
 } from 'mongoose'
+import type { BaseCustomSchema, MongoSchemaDefinition } from './schema.ts'
+import type { SchemaStatics } from './statics.ts'
 import type { BaseAttributes } from 'database/typings/general.ts'
-import type {
-  BaseCustomSchema,
-  DefaultSchema,
-  MongoSchemaDefinition,
-  SchemaMethods,
-  SchemaStatics,
-} from './schema.ts'
+import type { Model, SchemaMethods } from './commons.ts'
 
 /**
  * Defines the structure of a MongoDB model, including its schema definition, options, and an optional callback
@@ -75,15 +71,6 @@ export type ModelBySchema<S extends Schema> =
         S
       >['schema']
   }
-
-/**
- * Represents a generic MongoModel with attributes and a schema.
- *
- * @template Attrs - The attribute types extending BaseAttributes (default is any).
- * @template S - The schema type, defaults to DefaultSchema<Attrs>.
- */
-export type Model<Attrs extends BaseAttributes = any, S extends Schema = DefaultSchema<Attrs>> =
-  MongoModel<Attrs, {}, SchemaMethods, {}, S>
 
 /**
  * Represents a generic MongoModel with attributes, options and a schema.

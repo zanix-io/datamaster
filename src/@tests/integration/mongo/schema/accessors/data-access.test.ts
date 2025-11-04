@@ -1,4 +1,4 @@
-import type { SchemaStatics } from 'mongo/typings/schema.ts'
+import type { SchemaStatics } from 'mongo/typings/statics.ts'
 
 import { dataAccessGetter } from 'modules/database/data-policies/access.ts'
 import { statics } from 'mongo/processor/schema/statics/mod.ts'

@@ -1,6 +1,6 @@
 import type { DataFieldAccess, DataProtectionMethod, Extensions } from 'database/typings/general.ts'
-import type { Model } from 'mongo/typings/models.ts'
 import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
+import type { Model } from 'mongo/typings/commons.ts'
 
 import { baseTransformations } from './schema/transforms/mod.ts'
 import { findPathsWithAccessorsDeep } from '../utils/accessors.ts'
