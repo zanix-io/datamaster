@@ -7,6 +7,28 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-11-08
+
+### 🆕 Added
+
+- **Versioned data protection support:** Added support for versioned data protection strategies
+  (`mask`, `encrypt`). Environment variables can now be versioned (e.g. `DATA_AES_KEY_V1`,
+  `DATA_RSA_PUB_V2`, etc.), allowing controlled key rotation and migration via
+  `seedRotateProtectionKeys`. If no version is defined, the default (**v0**) non-suffixed variables
+  are used. Supported configurations:
+
+  - **Masking/unmasking:** `DATA_SECRET_KEY` (fallback: `DATA_AES_KEY`)
+  - **Symmetric encryption:** `DATA_AES_KEY`
+  - **Asymmetric encryption:** `DATA_RSA_PUB`, `DATA_RSA_KEY` (base64)
+
+- **Mongo seed registration:** Added database seeder to register processes in MongoDB (see
+  `seedModel` option in `ZanixMongoConnector`).
+
+### Fixed
+
+- Data policies options supported.
+- Data policies accessors fix.
+
 ## [0.1.6] - 2025-11-04
 
 ### Fixed

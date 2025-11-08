@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -48,6 +48,7 @@
   "imports": {
     "mongoose": "npm:mongoose@^6.7",
     "@std/assert": "jsr:@std/assert@0.224",
+    "@zanix/workers": "jsr:@zanix/utils@2.*/workers",
     "@zanix/errors": "jsr:@zanix/utils@2.*/errors",
     "@zanix/logger": "jsr:@zanix/utils@2.*/logger",
     "@zanix/types": "jsr:@zanix/utils@2.*/types",
@@ -59,13 +60,13 @@
     "utils/": "./src/utils/",
     "cache/": "./src/modules/cache/",
     "database/": "./src/modules/database/",
-    "mongo/": "./src/modules/database/mongo/"
+    "mongo/": "./src/modules/database/providers/mongo/"
   },
   "exports": {
     ".": "./mod.ts",
     "./database": "./src/modules/database/mod.ts",
     /** core module definitions */
-    "./core/database/mongo": "./src/modules/database/mongo/connector/core.ts"
+    "./core": "./src/modules/core.ts"
   },
   "nodeModulesDir": "auto",
   "publish": {

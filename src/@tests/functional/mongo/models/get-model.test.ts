@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { assertEquals } from '@std/assert'
-import { DropCollection, getDB, ignore, sanitize } from '../../../_setup/mongo/connector.ts'
+import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { defineModelHOC } from 'modules/database/hocs/models.ts'
 import { Schema } from 'mongoose'
 
@@ -45,7 +45,7 @@ Deno.test({
         },
       },
       extensions: {
-        seeders: [() => {}],
+        seeders: [function seeder() {}],
       },
       callback: (schema) => {
         schema.methods.myMethod = () => 'my value'

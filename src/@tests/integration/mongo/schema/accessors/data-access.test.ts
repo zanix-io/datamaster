@@ -1,10 +1,10 @@
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
 
-import { dataAccessGetter } from 'modules/database/data-policies/access.ts'
-import { statics } from 'mongo/processor/schema/statics/mod.ts'
+import { dataAccessGetter } from 'modules/database/policies/access.ts'
 import { model, Schema } from 'mongoose'
 import { assert, assertEquals } from '@std/assert'
 import { ProgramModule } from '@zanix/server'
+import { preprocessSchema } from 'mongo/processor/mod.ts'
 
 // mockups
 console.warn = () => {}
@@ -23,15 +23,15 @@ const userSchema = new Schema({
       phones: {
         type: [String],
         get: dataAccessGetter({
-          type: 'protected',
-          virtualMask: { startAfter: 2, endBefore: 1 },
+          strategy: 'protected',
+          settings: { virtualMask: { startAfter: 2, endBefore: 1 } },
         }),
       },
     }),
   ],
 })
 
-statics(userSchema as never)
+preprocessSchema(userSchema as never)
 
 const userModel = model('Example-accessor', userSchema)
 const UserModel = userModel as typeof userModel & SchemaStatics

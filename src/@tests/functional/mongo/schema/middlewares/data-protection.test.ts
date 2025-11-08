@@ -1,26 +1,30 @@
 // deno-lint-ignore-file no-explicit-any
-import type { EncryptedString } from 'typings/data.ts'
+import type { EncryptedString, MaskedString } from 'typings/data.ts'
 
-import { DropCollection, getDB, ignore, sanitize } from '../../../../_setup/mongo/connector.ts'
-import { dataProtectionGetter } from 'modules/database/data-policies/protection.ts'
-import { aesKey, keys } from '../../../../_setup/mongo/keys.ts'
+import { DropCollection, getDB, ignore, sanitize } from '../../../../(setup)/mongo/connector.ts'
+import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
+import { aesKey, keys } from '../../../../(setup)/keys.ts'
 import { assert, assertEquals } from '@std/assert'
 import { Schema } from 'mongoose'
 
 const userSchema = new Schema({
   name: {
     type: String,
-    get: dataProtectionGetter('masking'),
+    get: dataProtectionGetter('mask'),
+  },
+  email: {
+    type: String,
+    get: dataProtectionGetter({ strategy: 'mask', settings: { endBefore: '@' } }),
   },
   secret: {
     type: String,
-    get: dataProtectionGetter('sym-encrypt'),
+    get: dataProtectionGetter('encrypt'),
   },
   data: [
     new Schema({
       phones: {
         type: [String],
-        get: dataProtectionGetter('hashing'),
+        get: dataProtectionGetter('hash'),
       },
     }),
   ],
@@ -29,7 +33,7 @@ const userSchema = new Schema({
     of: new Schema({
       value: {
         type: String,
-        get: dataProtectionGetter('asym-encrypt'),
+        get: dataProtectionGetter({ strategy: 'encrypt', settings: { type: 'asymmetric' } }),
       },
     }),
   },
@@ -39,7 +43,7 @@ Deno.test({
   ...sanitize,
   name: 'Data protection pre save should works correctly',
   fn: async () => {
-    Deno.env.set('DATABASE_SECRET_KEY', 'my-secret-key')
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
 
     const db = await getDB()
 
@@ -47,6 +51,7 @@ Deno.test({
 
     const user = new Model({
       name: 'Ismael',
+      email: 'pepito@email.com',
       password: 'my password',
       data: [{
         phones: ['+323323232323', '+2322323232'],
@@ -59,16 +64,24 @@ Deno.test({
       },
     })
 
-    Deno.env.set('DATABASE_RSA_KEY', btoa(keys.privateKey))
-    Deno.env.set('DATABASE_RSA_PUB', btoa(keys.publicKey))
-    Deno.env.set('DATABASE_AES_KEY', aesKey)
+    Deno.env.set('DATA_RSA_KEY', btoa(keys.privateKey))
+    Deno.env.set('DATA_RSA_PUB', btoa(keys.publicKey))
+    Deno.env.set('DATA_AES_KEY', aesKey)
 
     const userSaved = await user.save()
 
     const json = userSaved.toJSON() as any
 
-    assertEquals(userSaved.name, 'Ismael')
-    assertEquals(json.name, 'Zx240a4012000f')
+    const maskedName: MaskedString = userSaved.name
+
+    assertEquals(maskedName?.unmask?.(), 'Ismael')
+    assertEquals(json.name, 'v0:Zx240a4012000f')
+
+    const maskedEmail: MaskedString = userSaved.email
+
+    assertEquals(maskedEmail?.toString(), '16z7b7a6e787dxZx1d1c5d1a110c@email.com')
+    assertEquals(json.email, 'v0:16z7b7a6e787dxZx1d1c5d1a110c@email.com')
+    assertEquals(maskedEmail?.unmask?.(), 'pepito@email.com')
 
     const phones = userSaved.data[0].phones as any
 
@@ -88,7 +101,7 @@ Deno.test({
     assert(json.secret && (json.secret !== 'my secret'))
     assertEquals(await secret?.decrypt?.(), 'my secret')
 
-    Deno.env.delete('DATABASE_SECRET_KEY')
+    Deno.env.delete('DATA_SECRET_KEY')
 
     await DropCollection(Model, db)
 

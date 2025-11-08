@@ -1,26 +1,26 @@
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
-import type { EncryptedString, HashedString } from 'typings/data.ts'
+import type { EncryptedString, HashedString, MaskedString } from 'typings/data.ts'
 
 import {
   dataProtectionGetter,
   dataProtectionSetterDefinition,
-} from 'modules/database/data-policies/protection.ts'
-import { statics } from 'mongo/processor/schema/statics/mod.ts'
-import { keys } from '../../../../_setup/mongo/keys.ts'
+} from 'modules/database/policies/protection.ts'
+import { keys } from '../../../../(setup)/keys.ts'
 import { assert, assertEquals } from '@std/assert'
 import { model, Schema } from 'mongoose'
+import { preprocessSchema } from 'mongo/processor/mod.ts'
 
 const userSchema = new Schema({
   name: String,
   password: {
     type: String,
-    get: dataProtectionGetter('hashing'),
+    get: dataProtectionGetter('hash'),
   },
   data: [
     new Schema({
       phones: {
         type: [String],
-        get: dataProtectionGetter('masking'),
+        get: dataProtectionGetter('mask'),
       },
     }),
   ],
@@ -28,7 +28,7 @@ const userSchema = new Schema({
     type: new Schema({
       aws: {
         type: String,
-        get: dataProtectionGetter('sym-encrypt'),
+        get: dataProtectionGetter('encrypt'),
       },
     }),
   },
@@ -37,13 +37,13 @@ const userSchema = new Schema({
     of: new Schema({
       value: {
         type: String,
-        get: dataProtectionGetter('asym-encrypt'),
+        get: dataProtectionGetter({ strategy: 'encrypt', settings: { type: 'asymmetric' } }),
       },
     }),
   },
 })
 
-statics(userSchema as never)
+preprocessSchema(userSchema as never)
 
 const userModel = model('Example-accessor', userSchema)
 const UserModel = userModel as typeof userModel & SchemaStatics
@@ -75,15 +75,17 @@ Deno.test('Validate data protection getter - hashing', async () => {
 })
 
 Deno.test('Validate data protection getter - masking', () => {
-  Deno.env.set('DATABASE_SECRET_KEY', 'my-secret-key')
+  Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
 
-  assertEquals(user.data[0].phones, ['1234566788', '1234566789'])
+  const phones: MaskedString = user.data[0].phones
 
-  Deno.env.delete('DATABASE_SECRET_KEY')
+  assertEquals(phones?.unmask?.(), ['1234566788', '1234566789'])
+
+  Deno.env.delete('DATA_SECRET_KEY')
 })
 
 Deno.test('Validate data protection getter - sym encrypt', async () => {
-  Deno.env.set('DATABASE_AES_KEY', 'hqIIz+SY/gZ7C9sDWSTiCA==')
+  Deno.env.set('DATA_AES_KEY', 'hqIIz+SY/gZ7C9sDWSTiCA==')
 
   const aws: EncryptedString = user.secrets?.aws
 
@@ -93,23 +95,26 @@ Deno.test('Validate data protection getter - sym encrypt', async () => {
 })
 
 Deno.test('Validate data protection getter - asym encrypt', async () => {
-  Deno.env.set('DATABASE_RSA_KEY', btoa(keys.privateKey))
-  Deno.env.set('DATABASE_RSA_PUB', btoa(keys.publicKey))
+  Deno.env.set('DATA_RSA_KEY', btoa(keys.privateKey))
+  Deno.env.set('DATA_RSA_PUB', btoa(keys.publicKey))
 
   const value: EncryptedString = user.metadata?.get('emails')?.value
 
   // deno-lint-ignore no-non-null-assertion no-extra-non-null-assertion no-non-null-asserted-optional-chain
   assertEquals(await value?.decrypt!(), 'pepito.perez@email.com')
   assertEquals(
-    value && await UserModel.decrypt(value.toString(), 'asym-encrypt'),
+    value && await UserModel.decrypt(value.toString(), { type: 'asymmetric' }),
     'pepito.perez@email.com',
   )
 })
 
 Deno.test('Validate data protection setter - masking', async () => {
-  Deno.env.set('DATABASE_SECRET_KEY', 'my-secret-key')
+  Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
 
-  const data = await dataProtectionSetterDefinition({ type: 'hashing' }, [
+  const data = await dataProtectionSetterDefinition({
+    activeVersion: 'v1',
+    versionConfigs: { v1: { strategy: 'hash' } },
+  }, [
     '1234566788',
     '1234566789',
   ])
@@ -117,5 +122,5 @@ Deno.test('Validate data protection setter - masking', async () => {
   assert(data[0])
   assert(user.data[0].phones[0] !== data[0])
 
-  Deno.env.delete('DATABASE_SECRET_KEY')
+  Deno.env.delete('DATA_SECRET_KEY')
 })

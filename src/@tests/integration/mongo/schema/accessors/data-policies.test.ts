@@ -2,7 +2,7 @@ import type { SchemaMethods } from 'mongo/typings/commons.ts'
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
 import type { HashedString } from 'typings/data.ts'
 
-import { dataPoliciesGetter } from 'modules/database/data-policies/mod.ts'
+import { dataPoliciesGetter } from 'modules/database/policies/mod.ts'
 import { assert, assertEquals } from '@std/assert'
 import { model, Schema } from 'mongoose'
 import { preprocessSchema } from 'mongo/processor/mod.ts'
@@ -14,18 +14,18 @@ console.warn = () => {}
 const userSchema = new Schema({
   name: {
     type: String,
-    get: dataPoliciesGetter({ access: 'private', protection: 'masking' }),
+    get: dataPoliciesGetter({ access: 'private', protection: 'mask' }),
   },
   password: {
     type: String,
-    get: dataPoliciesGetter({ access: 'internal', protection: 'hashing' }),
+    get: dataPoliciesGetter({ access: 'internal', protection: 'hash' }),
   },
   metadata: {
     type: Map,
     of: new Schema({
       value: {
         type: String,
-        get: dataPoliciesGetter({ access: 'private', protection: 'masking' }),
+        get: dataPoliciesGetter({ access: 'private', protection: 'mask' }),
       },
     }),
   },
@@ -34,8 +34,8 @@ const userSchema = new Schema({
       emails: {
         type: [String],
         get: dataPoliciesGetter({
-          access: { type: 'protected', virtualMask: { endBefore: '@' } },
-          protection: { type: 'masking' },
+          access: { strategy: 'protected', settings: { virtualMask: { endBefore: '@' } } },
+          protection: { strategy: 'mask' },
         }),
       },
     }),

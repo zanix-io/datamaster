@@ -1,7 +1,7 @@
 import type { ModelHOC } from 'database/typings/models.ts'
-import type { SeederHandler } from '../typings/general.ts'
 
 import ProgramModule from 'modules/program/mod.ts'
+import { seederAdaptation } from '../utils/seeders/adaptation.ts'
 
 /**
  * A higher-order component (HOC) that adds a model to the `ProgramModule`'s model registry.
@@ -48,8 +48,11 @@ export const defineModelHOC: ModelHOC = ({ extensions = {}, ...model }, type) =>
   const { seeders = [], ...exts } = extensions
 
   ProgramModule.models.addModel({ ...model, extensions: exts }, type)
+
+  if (!seeders.length) return
+
   ProgramModule.seeders.addSeeder({
     model: type === 'mongo' ? model.name : model,
-    handlers: seeders as SeederHandler[],
+    handlers: seederAdaptation(seeders, model, type),
   })
 }

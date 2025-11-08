@@ -55,8 +55,10 @@ class Program {
 }
 
 /**
- * A frozen singleton instance of the `Program`,
- * to provide reusable functionality and act as a shared metadata program module.
+ * A frozen singleton instance of the `Program`.
+ *
+ * This instance provides reusable functionality and serves as a shared module
+ * for program metadata and events.
  *
  * @type {Readonly<Program>}
  */

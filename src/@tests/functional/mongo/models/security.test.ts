@@ -1,5 +1,5 @@
 import { defineModelHOC } from 'modules/database/hocs/models.ts'
-import { getDB, ignore, sanitize } from '../../../_setup/mongo/connector.ts'
+import { getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { assert, assertEquals } from '@std/assert'
 import { Schema } from 'mongoose'
 

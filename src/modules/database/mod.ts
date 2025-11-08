@@ -16,27 +16,6 @@
  * The main export, `ZanixMongoConnector`, provides a MongoDB connection handler with
  * support for schema transformation, data policies, and model definition utilities.
  *
- * @example
- * ```ts
- * import {
- *   ZanixMongoConnector,
- *   defineModelHOC,
- *   transformRecursively,
- *   dataAccessGetter
- * } from 'jsr:@zanix/database@[version]/mod'
- *
- * const connector = new ZanixMongoConnector({
- *  uri: 'mongodb://localhost:27017',
- *  config: { dbName: 'my_database' },
- *  onConnected: () => {
- *    // Do something
- *  },
- *  onDisconnected: () => {
- *    // Do something
- *  },
- * })
- * ```
- *
  * @module zanixDatabase
  */
 
@@ -48,9 +27,9 @@
 export { defineModelHOC } from './hocs/models.ts'
 
 // accessors
-export { dataProtectionGetter } from './data-policies/protection.ts'
-export { dataAccessGetter } from './data-policies/access.ts'
-export { dataPoliciesGetter } from './data-policies/mod.ts'
+export { dataProtectionGetter } from './policies/protection.ts'
+export { dataAccessGetter } from './policies/access.ts'
+export { dataPoliciesGetter } from './policies/mod.ts'
 
 /**
  * MONGO DATABASE
@@ -65,14 +44,21 @@ export { getAllSubschemas } from 'mongo/utils/schemas.ts'
 export { findPathsWithAccessorsDeep } from 'mongo/utils/accessors.ts'
 
 // seeders
-export { seedByIdIfMissing, seedManyByIdIfMissing } from 'mongo/utils/seeders.ts'
+export {
+  seedByIdIfMissing,
+  seedManyByIdIfMissing,
+  seedRotateProtectionKeys,
+} from 'mongo/utils/seeders/mod.ts'
 
 //transforms
 export {
   transformDeepByPaths,
   transformRecursively,
 } from 'mongo/processor/schema/transforms/recursively.ts'
-export { transformByDataAccess } from 'mongo/processor/schema/transforms/data-access.ts'
+export {
+  transformByDataAccess,
+  transformByDataProtection,
+} from 'mongo/processor/schema/transforms/data-policies.ts'
 export { transformShallowByPaths } from 'mongo/processor/schema/transforms/shallow.ts'
 
 // main

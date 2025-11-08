@@ -1,5 +1,5 @@
-import { DropCollection, getDB, ignore, sanitize } from '../../../_setup/mongo/connector.ts'
-import { aesKey } from '../../../_setup/mongo/keys.ts'
+import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
+import { aesKey } from '../../../(setup)/keys.ts'
 import { assert, assertEquals, assertNotEquals } from '@std/assert'
 import { mask, unmask } from 'database/utils/protection.ts'
 import { generateHash, validateHash } from '@zanix/helpers'
@@ -16,7 +16,7 @@ Deno.test({
   ...sanitize,
   name: 'Schema encryption statics should work correctly by schema model',
   fn: async () => {
-    Deno.env.set('DATABASE_AES_KEY', aesKey)
+    Deno.env.set('DATA_AES_KEY', aesKey)
 
     const db = await getDB()
     const Model = await db.getModel('test-schema-statics', schema)
@@ -27,6 +27,7 @@ Deno.test({
     const value = await Model.encrypt(message)
 
     assertNotEquals(value, message)
+
     const decrypted = await Model.decrypt(value)
     assertEquals(decrypted, message)
 

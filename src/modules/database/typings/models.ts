@@ -77,4 +77,4 @@ export type ModelMetadata<T> = {
 } & BaseModelDefinition
 
 /** Basic data object to save in a model */
-export type DataObject = Record<string, Primitive | Primitive[]> & { id: string }
+export type DataObject = Record<string, object | Primitive | Primitive[]> & { id: string }

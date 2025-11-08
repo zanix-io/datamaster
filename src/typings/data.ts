@@ -60,5 +60,55 @@ export type EncryptedString =
      */
     decrypt?: () => Promise<string>
   }
-  | EncryptedString[]
+  | string[]
+    & {
+      /**
+       * Decrypts the current string and returns its plain text value.
+       *
+       * @returns A promise that resolves to the decrypted string value.
+       */
+      decrypt?: () => Promise<string[]>
+    }
+  | undefined
+
+/**
+ * Represents a string that may have been protected through masking.
+ *
+ * This type is returned by `dataProtectionGetter` when a field is
+ * configured with a **masking** data protection policy.
+ *
+ * - If the field is protected, the value will be a `String` with optional methods
+ *   to reveal the original data.
+ * - If the field is not protected, it may simply be a `String` or `undefined`.
+ * - It can also be an array of `MaskedString` when the field contains multiple values.
+ *
+ * @example
+ * ```ts
+ * const email: MaskedString = user.email;
+ * console.log(email?.toString()); // "jxxx@example.com"
+ *
+ * if (email?.unmask) {
+ *   const fullEmail = await email.unmask();
+ *   console.log(fullEmail); // "john.doe@example.com"
+ * }
+ * ```
+ */
+
+export type MaskedString =
+  | String & {
+    /**
+     * Reveals the original unmasked value, if available.
+     *
+     * @returns The full unmasked string.
+     */
+    unmask?: () => string
+  }
+  | string[] & {
+    /**
+     * Reveals the original unmasked value, if available.
+     *
+     * @returns The full unmasked string.
+     */
+    unmask?: () => string[]
+  }
   | undefined

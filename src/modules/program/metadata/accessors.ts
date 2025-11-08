@@ -1,4 +1,4 @@
-import type { DataFieldAccess, DataProtectionMethod } from 'database/typings/general.ts'
+import type { DataAccessConfig, DataProtection } from 'database/typings/protection.ts'
 
 import { ProgramContainer } from '@zanix/server'
 
@@ -27,34 +27,31 @@ export class AccessorsContainer extends ProgramContainer {
   /**
    * Associate data proteccion method with an accessor
    */
-  public setAccessorDataProtection<R>(
-    accessor: (...args: unknown[]) => R,
-    data: DataProtectionMethod,
-  ) {
+  public setDataProtection<R>(accessor: (...args: unknown[]) => R, data: DataProtection) {
     this.setAccessorData(accessor, data, this.#dataProtectionKey)
   }
 
   /**
    * get accessor data protection info and delete it
    */
-  public consumeAccessorDataProtection<R>(accessor: (...args: unknown[]) => R) {
-    return this.consumeAccessorData<R, DataProtectionMethod>(accessor, this.#dataProtectionKey)
+  public consumeDataProtection<R>(accessor: (...args: unknown[]) => R) {
+    return this.consumeAccessorData<R, DataProtection>(
+      accessor,
+      this.#dataProtectionKey,
+    )
   }
 
   /**
    * Associate data access with an accessor
    */
-  public setAccessorDataAccess<R>(
-    accessor: (...args: unknown[]) => R,
-    data: DataFieldAccess,
-  ) {
+  public setDataAccess<R>(accessor: (...args: unknown[]) => R, data: DataAccessConfig) {
     this.setAccessorData(accessor, data, this.#dataAccessKey)
   }
 
   /**
    * get accessor data access info and delete it
    */
-  public consumeAccessorDataAccess<R>(accessor: (...args: unknown[]) => R) {
-    return this.consumeAccessorData<R, DataFieldAccess>(accessor, this.#dataAccessKey)
+  public consumeDataAccess<R>(accessor: (...args: unknown[]) => R) {
+    return this.consumeAccessorData<R, DataAccessConfig>(accessor, this.#dataAccessKey)
   }
 }

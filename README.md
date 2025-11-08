@@ -77,7 +77,7 @@ Or import specific modules:
 
 ```ts
 // Mongo connector
-import { ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
+import { Schema, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
 
 // Models HOC
 import { defineModelHOC } from 'jsr:@zanix/datamaster@[version]/database'
@@ -97,15 +97,23 @@ import {
   transformShallowByPaths,
 } from 'jsr:@zanix/datamaster@[version]/database'
 
+// Seeders
+import {
+  seedByIdIfMissing,
+  seedManyByIdIfMissing,
+  seedRotateProtectionKeys,
+} from 'jsr:@zanix/datamaster@[version]/database'
+
 // Utils & types
 import {
   findPathsWithAccessorsDeep,
   getAllSubschemas,
 } from 'jsr:@zanix/datamaster@[version]/database'
+
 import type {
   EncryptedString,
   HashedString,
-  MongoConnectorOptions,
+  MaskedString,
 } from 'jsr:@zanix/datamaster@[version]/database'
 ```
 
@@ -118,19 +126,42 @@ import type {
 
 ### 🔐 Environment Variables
 
-Zanix Datamaster relies on specific environment variables for **database connectivity** and **data
-encryption**. Set these before running your application:
+**Zanix Datamaster** uses specific environment variables for **database connectivity** and **data
+protection** (masking, encryption, and hashing). These must be set before running your application.
 
-| Variable                  | Description                                       | Example                     |
-| ------------------------- | ------------------------------------------------- | --------------------------- |
-| **`MONGO_URI`**           | Connection URI for MongoDB.                       | `mongodb://localhost:27017` |
-| **`DATABASE_AES_KEY`**    | AES key used for symmetric data encryption.       | `my-aes-secret-key`         |
-| **`DATABASE_SECRET_KEY`** | Additional secret key for masking/unmasking data. | `supersecret123`            |
-| **`DATABASE_RSA_PUB`**    | RSA public key for asymmetric encryption.         | `BASE64...`                 |
-| **`DATABASE_RSA_PRIV`**   | RSA private key for asymmetric decryption.        | `-BASE64...`                |
+| Variable              | Description                                       | Example                     |
+| --------------------- | ------------------------------------------------- | --------------------------- |
+| **`MONGO_URI`**       | Connection URI for MongoDB.                       | `mongodb://localhost:27017` |
+| **`DATA_AES_KEY`**    | AES key used for symmetric data encryption.       | `my-aes-secret-key`         |
+| **`DATA_SECRET_KEY`** | Additional secret key for masking/unmasking data. | `supersecret123`            |
+| **`DATA_RSA_PUB`**    | RSA public key for asymmetric encryption.         | `BASE64...`                 |
+| **`DATA_RSA_PRIV`**   | RSA private key for asymmetric decryption.        | `BASE64...`                 |
 
-> ⚠️ **Security Note:** Keep your encryption keys safe and **never commit them to version control**.
-> These keys are used to protect sensitive field data handled by Zanix Datamaster.
+#### 🌐 Versioned Keys
+
+Zanix supports **versioned environment variables** for controlled key rotation and migration on data
+protection policies. Simply append a version suffix (e.g. `_V1`, `_V2`, etc.) to your environment
+variable names:
+
+| Strategy                  | Example Variables                               |
+| ------------------------- | ----------------------------------------------- |
+| **Symmetric encryption**  | `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, ...       |
+| **Asymmetric encryption** | `DATA_RSA_PUB_V1`, `DATA_RSA_KEY_V1`, ...       |
+| **Masking**               | `DATA_SECRET_KEY_V1`, `DATA_SECRET_KEY_V2`, ... |
+
+If no version is specified, Zanix defaults to **v0** (non-suffixed variables). Key versions can be
+managed programmatically and rotated using the utility:
+
+```ts
+seedRotateProtectionKeys()
+```
+
+> ⚠️ **Security Note:** Never commit encryption keys to version control. Ensure all versions of keys
+> are available during rotation until all data has been re-encrypted or unmasked with the new key.
+
+---
+
+#### Example
 
 ```ts
 import { defineModelHOC, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
@@ -152,14 +183,23 @@ defineModelHOC<Attrs>({
       get: dataPoliciesGetter({
         // Masks the value when accessed or returned to the user.
         // Example: 'user@example.com' → '******@example.com'.
-        access: { type: 'protected', virtualMask: { endBefore: '@' } },
+        access: {
+          strategy: 'protected',
+          settings: { virtualMask: { startAfter: 2, endBefore: '@' } },
+        },
         // Masks the value before saving it to the database, ensuring sensitive data is stored securely.
-        protection: { type: 'masking' },
+        protection: {
+          activeVersion: 'v1',
+          versionConfigs: {
+            v0: { strategy: 'mask' },
+            v1: { strategy: 'mask', settings: { endBefore: '@' } },
+          },
+        },
       }),
     },
   },
   extensions: {
-    seeders: [async (Model: any) => {
+    seeders: [async function seeder(Model: any) {
       const data = await Model.findById('68fb00b33405a3a540d9b971')
       if (data) return
       const user = new Model({
@@ -172,20 +212,19 @@ defineModelHOC<Attrs>({
     }],
   },
   callback: (schema) => {
+    schema.index({ name: 1, age: 1 }) // covered query
     schema.methods.myMethod = () => 'my value'
     return schema
   },
 })
 
+// Mongo connector with seed registration
 const connector = new ZanixMongoConnector({
-  uri: 'mongodb://localhost:27017',
+  uri: process.env.MONGO_URI!,
+  seedModel: 'my-seed-register-model',
   config: { dbName: 'my_database' },
-  onConnected: () => {
-    // Do something
-  },
-  onDisconnected: () => {
-    // Do something
-  },
+  onConnected: () => console.log('Database connected.'),
+  onDisconnected: () => console.log('Database disconnected.'),
 })
 
 await connector.connectorReady

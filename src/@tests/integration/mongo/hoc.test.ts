@@ -8,7 +8,7 @@ Deno.test('Model HOC should charge correctly', () => {
     name: 'test-basic-hoc',
     definition: { name: String },
     extensions: {
-      seeders: [() => {}],
+      seeders: [function seeder() {}],
     },
   })
 

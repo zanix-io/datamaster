@@ -29,4 +29,4 @@ export * from 'modules/database/mod.ts'
 // export * from 'modules/cache/mod.ts'
 
 // general types
-export type { EncryptedString, HashedString } from 'typings/data.ts'
+export type { EncryptedString, HashedString, MaskedString } from 'typings/data.ts'
