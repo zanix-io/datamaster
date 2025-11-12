@@ -13,16 +13,16 @@
     "jsr:@std/path@0.224": "0.224.0",
     "jsr:@std/path@^1.0.6": "1.1.2",
     "jsr:@std/uuid@0.224": "0.224.3",
-    "jsr:@zanix/server@1": "1.0.15",
-    "jsr:@zanix/server@^1.0.14": "1.0.15",
-    "jsr:@zanix/server@^1.0.15": "1.0.15",
-    "jsr:@zanix/utils@*": "2.1.10",
-    "jsr:@zanix/utils@2": "2.1.10",
+    "jsr:@zanix/server@1": "1.1.2",
+    "jsr:@zanix/server@^1.1.2": "1.1.2",
+    "jsr:@zanix/utils@*": "2.2.0",
+    "jsr:@zanix/utils@2": "2.2.0",
     "npm:@types/node@*": "24.2.0",
     "npm:esbuild@0.20.2": "0.20.2",
     "npm:graphql@16": "16.11.0",
     "npm:javascript-obfuscator@^4.0.2": "4.1.1",
-    "npm:mongoose@^6.7.0": "6.13.8"
+    "npm:mongoose@^6.7.0": "6.13.8",
+    "npm:redis@^5.9.0": "5.9.0_@redis+client@5.9.0"
   },
   "jsr": {
     "@luca/esbuild-deno-loader@0.11.1": {
@@ -80,65 +80,11 @@
         "jsr:@std/crypto"
       ]
     },
-    "@zanix/server@1.0.7": {
-      "integrity": "002159e853a3091d0f3ca573993cf55b36f6f30ee6f0d3209379742e48bef530",
+    "@zanix/server@1.1.2": {
+      "integrity": "ef26c2e3ee1f082ac6e18be6f56cb179e341a281ed487f1d90765e0aa1d78016",
       "dependencies": [
         "jsr:@std/path@0.224",
-        "jsr:@std/uuid",
-        "jsr:@zanix/utils@2",
-        "npm:graphql"
-      ]
-    },
-    "@zanix/server@1.0.9": {
-      "integrity": "0395579a1e8c29ae8ebc3a0a767394b6735b87188c5e063c989fa0b34f528bec",
-      "dependencies": [
-        "jsr:@std/path@0.224",
-        "jsr:@std/uuid",
-        "jsr:@zanix/utils@2",
-        "npm:graphql"
-      ]
-    },
-    "@zanix/server@1.0.10": {
-      "integrity": "20e796f9e9ad39612083c18fb96e21b5adb972e1aa6a635a984f56bfe04a89b6",
-      "dependencies": [
-        "jsr:@std/path@0.224",
-        "jsr:@std/uuid",
-        "jsr:@zanix/utils@2",
-        "npm:graphql"
-      ]
-    },
-    "@zanix/server@1.0.11": {
-      "integrity": "3182e688ce9e133f384543e532bf9fff01249d1949dd7cac418e7e767067f0c7",
-      "dependencies": [
-        "jsr:@std/path@0.224",
-        "jsr:@std/uuid",
-        "jsr:@zanix/utils@2",
-        "npm:graphql"
-      ]
-    },
-    "@zanix/server@1.0.12": {
-      "integrity": "20aed2dc695bd91107847e76d4282542ddd608628fbf97b094ca6d6bd5db3b29",
-      "dependencies": [
-        "jsr:@std/path@0.224",
-        "jsr:@std/uuid",
-        "jsr:@zanix/utils@2",
-        "npm:graphql"
-      ]
-    },
-    "@zanix/server@1.0.14": {
-      "integrity": "f2140cdee8db95ea6da8afde62a17ea772481a69cb1cfcb7065338a71e79132a",
-      "dependencies": [
-        "jsr:@std/path@0.224",
-        "jsr:@zanix/server@^1.0.14",
-        "jsr:@zanix/utils@2",
-        "npm:graphql"
-      ]
-    },
-    "@zanix/server@1.0.15": {
-      "integrity": "866a018c84a0173a6c2c05491b607b0fa19054e3574beaf50fc5bb9ad3d92222",
-      "dependencies": [
-        "jsr:@std/path@0.224",
-        "jsr:@zanix/server@^1.0.15",
+        "jsr:@zanix/server@^1.1.2",
         "jsr:@zanix/utils@2",
         "npm:graphql"
       ]
@@ -195,6 +141,16 @@
     },
     "@zanix/utils@2.1.10": {
       "integrity": "3bb593cafa5a1e748e5fe1637a11b16d500899ce6e0679c5247e3abff488e5cc",
+      "dependencies": [
+        "jsr:@luca/esbuild-deno-loader",
+        "jsr:@std/fmt",
+        "jsr:@std/path@0.224",
+        "npm:esbuild",
+        "npm:javascript-obfuscator"
+      ]
+    },
+    "@zanix/utils@2.2.0": {
+      "integrity": "d91f6e4b9dbef068847b7cba7f182009b3bd6909e203109ba339fe53a28701a6",
       "dependencies": [
         "jsr:@luca/esbuild-deno-loader",
         "jsr:@std/fmt",
@@ -768,6 +724,36 @@
         "sparse-bitfield"
       ]
     },
+    "@redis/bloom@5.9.0_@redis+client@5.9.0": {
+      "integrity": "sha512-W9D8yfKTWl4tP8lkC3MRYkMz4OfbuzE/W8iObe0jFgoRmgMfkBV+Vj38gvIqZPImtY0WB34YZkX3amYuQebvRQ==",
+      "dependencies": [
+        "@redis/client"
+      ]
+    },
+    "@redis/client@5.9.0": {
+      "integrity": "sha512-EI0Ti5pojD2p7TmcS7RRa+AJVahdQvP/urpcSbK/K9Rlk6+dwMJTQ354pCNGCwfke8x4yKr5+iH85wcERSkwLQ==",
+      "dependencies": [
+        "cluster-key-slot"
+      ]
+    },
+    "@redis/json@5.9.0_@redis+client@5.9.0": {
+      "integrity": "sha512-Bm2jjLYaXdUWPb9RaEywxnjmzw7dWKDZI4MS79mTWPV16R982jVWBj6lY2ZGelJbwxHtEVg4/FSVgYDkuO/MxA==",
+      "dependencies": [
+        "@redis/client"
+      ]
+    },
+    "@redis/search@5.9.0_@redis+client@5.9.0": {
+      "integrity": "sha512-jdk2csmJ29DlpvCIb2ySjix2co14/0iwIT3C0I+7ZaToXgPbgBMB+zfEilSuncI2F9JcVxHki0YtLA0xX3VdpA==",
+      "dependencies": [
+        "@redis/client"
+      ]
+    },
+    "@redis/time-series@5.9.0_@redis+client@5.9.0": {
+      "integrity": "sha512-W6ILxcyOqhnI7ELKjJXOktIg3w4+aBHugDbVpgVLPZ+YDjObis1M0v7ZzwlpXhlpwsfePfipeSK+KWNuymk52w==",
+      "dependencies": [
+        "@redis/client"
+      ]
+    },
     "@smithy/abort-controller@4.2.3": {
       "integrity": "sha512-xWL9Mf8b7tIFuAlpjKtRPnHrR8XVrwTj5NPYO/QwZPtc0SDLsPxb56V5tzi5yspSMytISHybifez+4jlrx0vkQ==",
       "dependencies": [
@@ -1262,6 +1248,9 @@
         "validator"
       ]
     },
+    "cluster-key-slot@1.1.2": {
+      "integrity": "sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA=="
+    },
     "color-convert@2.0.1": {
       "integrity": "sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==",
       "dependencies": [
@@ -1678,6 +1667,16 @@
     "punycode@2.3.1": {
       "integrity": "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="
     },
+    "redis@5.9.0_@redis+client@5.9.0": {
+      "integrity": "sha512-E8dQVLSyH6UE/C9darFuwq4usOPrqfZ1864kI4RFbr5Oj9ioB9qPF0oJMwX7s8mf6sPYrz84x/Dx1PGF3/0EaQ==",
+      "dependencies": [
+        "@redis/bloom",
+        "@redis/client",
+        "@redis/json",
+        "@redis/search",
+        "@redis/time-series"
+      ]
+    },
     "reflect-metadata@0.1.13": {
       "integrity": "sha512-Ts1Y/anZELhSsjMcU605fU9RE4Oi3p5ORujwbIKXfWa+0Zxs510Qrmrce5/Jowq3cHSZSJqBjypxmHarc+vEWg=="
     },
@@ -1812,7 +1811,8 @@
       "jsr:@std/assert@0.224",
       "jsr:@zanix/server@1",
       "jsr:@zanix/utils@2",
-      "npm:mongoose@^6.7.0"
+      "npm:mongoose@^6.7.0",
+      "npm:redis@^5.9.0"
     ]
   }
 }

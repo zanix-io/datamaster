@@ -1,5 +1,5 @@
 import type { SchemaAccessor } from 'database/typings/general.ts'
-import type { DataFieldAccess, DataProtectionOptions } from 'database/typings/protection.ts'
+import type { DataFieldAccess, DataProtectionOptions } from 'typings/protection.ts'
 
 import { dataProtectionGetter, normalizeDataProtection } from './protection.ts'
 import ProgramModule from 'modules/program/mod.ts'

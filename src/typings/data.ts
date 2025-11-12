@@ -8,18 +8,18 @@
  *
  * - If the field is protected, the value will be a `String` with an optional `verify` method.
  * - If the field is not protected, it may simply be a `String` or `undefined`.
- * - It can also be an array of `HashedString` when the field contains multiple values.
+ * - It can also be an array of `VerifiableObject` when the field contains multiple values.
  *
  * @example
  * ```ts
- * const password: HashedString = user.password;
+ * const password: VerifiableObject = user.password;
  * if (password?.verify) {
  *   const isValid = await password.verify('inputPassword');
  *   console.log(isValid ? 'Password is valid' : 'Invalid password');
  * }
  * ```
  */
-export type HashedString =
+export type VerifiableObject =
   | String & {
     /**
      * Verifies whether a given string matches the current hashed value.
@@ -29,7 +29,7 @@ export type HashedString =
      */
     verify?: (hash: string) => Promise<boolean>
   }
-  | HashedString[]
+  | VerifiableObject[]
   | undefined
 
 /**
@@ -40,18 +40,18 @@ export type HashedString =
  *
  * - If the field is protected, the value will be a `String` with an optional `decrypt` method.
  * - If the field is not protected, it may simply be a `String` or `undefined`.
- * - It can also be an array of `EncryptedString` when the field contains multiple values.
+ * - It can also be an array of `DecryptableObject` when the field contains multiple values.
  *
  * @example
  * ```ts
- * const secretData: EncryptedString = user.secretField;
+ * const secretData: DecryptableObject = user.secretField;
  * if (secretData?.decrypt) {
  *   const plainText = await secretData.decrypt();
  *   console.log('Decrypted data:', plainText);
  * }
  * ```
  */
-export type EncryptedString =
+export type DecryptableObject =
   | String & {
     /**
      * Decrypts the current string and returns its plain text value.
@@ -80,11 +80,11 @@ export type EncryptedString =
  * - If the field is protected, the value will be a `String` with optional methods
  *   to reveal the original data.
  * - If the field is not protected, it may simply be a `String` or `undefined`.
- * - It can also be an array of `MaskedString` when the field contains multiple values.
+ * - It can also be an array of `UnmaskableObject` when the field contains multiple values.
  *
  * @example
  * ```ts
- * const email: MaskedString = user.email;
+ * const email: UnmaskableObject = user.email;
  * console.log(email?.toString()); // "jxxx@example.com"
  *
  * if (email?.unmask) {
@@ -94,7 +94,7 @@ export type EncryptedString =
  * ```
  */
 
-export type MaskedString =
+export type UnmaskableObject =
   | String & {
     /**
      * Reveals the original unmasked value, if available.

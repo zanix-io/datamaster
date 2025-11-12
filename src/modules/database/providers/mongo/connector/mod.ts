@@ -4,17 +4,13 @@ import type { BaseAttributes, Extensions } from 'database/typings/general.ts'
 import type { MongoConnectorOptions } from '../typings/process.ts'
 import type { DefaultSchema, Model } from '../typings/commons.ts'
 
+import { ProgramModule as ServerProgram, ZanixDatabaseConnector } from '@zanix/server'
 import { postBindModel, preprocessSchema } from '../processor/mod.ts'
 import { Mongoose, Schema, type SchemaOptions } from 'mongoose'
 import { defineModelBySchema, defineModels } from './models.ts'
 import { runSeedersOnStart } from './seeders.ts'
 import { HttpError } from '@zanix/errors'
 import logger from '@zanix/logger'
-import {
-  type CoreConnectorTemplates,
-  ProgramModule as ServerProgram,
-  ZanixDatabaseConnector,
-} from '@zanix/server'
 
 /**
  * Manages the connection lifecycle with a MongoDB database using Mongoose,
@@ -23,6 +19,10 @@ import {
  * This connector serves as the MongoDB integration layer within the Zanix framework,
  * handling configuration, replica set awareness, and AsyncLocalStorage (ALS) context support
  * when required.
+ *
+ * Environment Variables:
+ * - **MONGO_URI**: Optional. If set, this URI will be used as the default MongoDB connection string.
+ *   Example: `MONGO_URI="mongodb://localhost:27017/my_database"`
  *
  * @class ZanixMongoConnector
  * @template T
@@ -33,19 +33,13 @@ import {
  * const connector = new ZanixMongoConnector({
  *  uri: 'mongodb://localhost:27017',
  *  config: { dbName: 'my_database' },
- *  onConnected: () => {
- *    // Do something
- *  },
- *  onDisconnected: () => {
- *    // Do something
- *  },
  * })
  * ```
  *
  * @param {MongoConnectorOptions} [config={}] - Configuration parameters for connector customization.
  */
-export class ZanixMongoConnector<T extends CoreConnectorTemplates = object>
-  extends ZanixDatabaseConnector<T> {
+export class ZanixMongoConnector extends ZanixDatabaseConnector {
+  #uri: string
   #database!: Mongoose
   #config: MongoConnectorOptions['config']
   private isReplicaSet?: boolean
@@ -59,13 +53,12 @@ export class ZanixMongoConnector<T extends CoreConnectorTemplates = object>
      */
     options: MongoConnectorOptions = {},
   ) {
-    const uri = options?.uri || Deno.env.get('MONGO_URI')
-    const { onConnected, onDisconnected } = options
-    super({ uri, onConnected, onDisconnected })
+    super()
 
     const targetName = this.constructor.name
-    this.name = targetName.startsWith('_Zanix') ? 'core database' : targetName
-    this.isReplicaSet = uri?.includes('replicaSet=') || uri?.includes('mongodb+srv://')
+    this.#uri = options?.uri || Deno.env.get('MONGO_URI') || 'mongodb://localhost'
+    this.name = targetName.startsWith('_Zanix') ? 'database core' : targetName
+    this.isReplicaSet = this.#uri?.includes('replicaSet=') || this.#uri?.includes('mongodb+srv://')
     this.#config = options.config
     this.seederModel = options.seedModel ?? 'zanix-seeders'
   }
@@ -153,51 +146,68 @@ export class ZanixMongoConnector<T extends CoreConnectorTemplates = object>
           'A required internal resource is missing. The system could not complete the operation.',
         cause:
           'Mongo model not found. To proceed, please use `defineModelHOC` or supply a valid schema.',
+        shouldLog: true,
       })
     }
 
     return this.defineModelBySchema<S>(options, name, entity)
   }
 
-  /**
+  /*
    * Establishes a connection to the MongoDB database using the provided URI.
    *
    * It initializes the Mongoose instance, applies the database configuration,
    * defines models, runs seeders if any, and logs the connection status.
-   *
-   * @param {string} uri - The MongoDB connection string URI. Defaults to constructor options URI
-   * @returns {Promise<boolean>} A promise that resolves to `true` if the connection was successful.
-   * @throws Will throw an error if the connection fails.
    */
-  protected async startConnection(uri?: string): Promise<boolean> {
+  protected async initialize() {
     try {
-      if (!uri) throw new Deno.errors.Interrupted('Invalid mongo connection string')
-
       this.#database = new Mongoose()
       const dbConfig = { ...this.#config }
       dbConfig.dbName = dbConfig.dbName || this.defaultDbName
 
       defineModels.call(this)
 
-      await this.#database.connect(uri, dbConfig)
+      await this.#database.connect(this.#uri, dbConfig)
 
       await runSeedersOnStart.call(this)
 
       const connected = this.#database.connection.readyState === 1
 
-      if (connected) logger.success(`MongoDB Connected Successfully through '${this.name}' class`)
-      else logger.error(`Failed to connect to MongoDB in '${this.name}' class`)
-
-      return connected
+      if (connected) {
+        logger.success(`MongoDB Connected Successfully through '${this.name}' class`)
+      } else {
+        logger.error(`Failed to connect to MongoDB in '${this.constructor.name}' class`, {
+          code: 'MONGODB_CONNECTION_FAILED',
+          meta: {
+            suggestion: 'Check MongoDB URI, credentials, and network connectivity',
+            connectorName: this.constructor.name,
+            source: 'zanix',
+          },
+        })
+      }
     } catch (error) {
       const { message, name, stack } = error as Error
       logger.error(
-        `Unable to establish connection for class '${this.name}'.`,
+        `Unable to establish connection for database in '${this.constructor.name}' class.`,
+        { message, name, stack },
         {
-          message: `Please check configuration or network settings.`,
-          cause: { message, name, stack },
+          code: 'MONGODB_CONNECTOR_MONGO_ERROR',
+          meta: {
+            connectorName: this.constructor.name,
+            suggestion: 'Please check configuration or network settings',
+            method: 'initialize',
+            source: 'zanix',
+          },
         },
       )
+    }
+  }
+
+  public async isHealthy(): Promise<boolean> {
+    try {
+      await this.#database.connection.db.command({ ping: 1 })
+      return true
+    } catch {
       return false
     }
   }
@@ -205,16 +215,18 @@ export class ZanixMongoConnector<T extends CoreConnectorTemplates = object>
   /**
    * Gracefully closes the database connection.
    *
-   * @returns {Promise<boolean>} A promise that resolves to `true` if the connection was closed successfully, or `false` otherwise.
+   * @returns {Promise<void>} A promise that resolves to `true` if the connection was closed successfully, or `false` otherwise.
    */
-  protected async stopConnection(): Promise<boolean> {
+  protected async close(): Promise<void> {
     try {
       // Disconnect from mongo
       await this.#database.disconnect()
-      return true
     } catch (e) {
-      logger.error(`Failed to disconnect to MongoDB in '${this.constructor.name}' class`, e)
-      return false
+      logger.error(
+        `Failed to disconnect MongoDB in '${this.constructor.name}' class`,
+        e,
+        'noSave',
+      )
     }
   }
 }

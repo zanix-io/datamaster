@@ -29,8 +29,11 @@ export const transactions = (schema: BaseCustomSchema): void => {
     // Check if transactions are not supported
     if (!schema.statics.isReplicaSet()) {
       throw new HttpError('INTERNAL_SERVER_ERROR', {
-        message:
-          'This MongoDB instance does not support transactions. Transactions are available only on replica sets or sharded clusters.',
+        message: 'MongoDB instance does not support transactions.',
+        cause: 'Transactions are only supported on replica sets or sharded clusters.',
+        code: 'MONGODB_UNSUPPORTED_TRANSACTIONS',
+        meta: { source: 'zanix' },
+        shouldLog: true,
       })
     }
 
@@ -63,7 +66,14 @@ export const transactions = (schema: BaseCustomSchema): void => {
         await session.endSession()
         return true
       } catch (e) {
-        logger.debug('Transaction commit failed due to an error. Aborting...', e)
+        logger.error('Transaction commit failed. Aborting operation.', e, {
+          code: 'DB_TRANSACTION_COMMIT_FAILED',
+          meta: {
+            action: 'commit',
+            outcome: 'aborted',
+            source: 'zanix',
+          },
+        })
         await session.abortTransaction()
         await session.endSession()
         return false

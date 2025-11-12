@@ -24,9 +24,10 @@ export const mainVirtuals = (schema: BaseCustomSchema): void => {
       this._id = id
     })
   } catch (err) {
-    logger.warn(
+    logger.error(
       'The virtual path "id" cannot be created because an "id" field already exists in the schema definition.',
       err,
+      'noSave',
     )
   }
 }

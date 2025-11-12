@@ -26,7 +26,19 @@ export { ProgramModule }
 
 // Global modules
 export * from 'modules/database/mod.ts'
-// export * from 'modules/cache/mod.ts'
+export * from 'modules/cache/mod.ts'
+
+// Data protection
+export {
+  createDecryptableObject,
+  createHashFrom as datamasterHash,
+  createUnmaskableObject,
+  createVerifiableObject,
+  decrypt as datamasterDecrypt,
+  encrypt as datamasterEncrypt,
+  mask as datamasterMask,
+  unmask as datamasterUnmask,
+} from 'modules/utils/protection.ts'
 
 // general types
-export type { EncryptedString, HashedString, MaskedString } from 'typings/data.ts'
+export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'

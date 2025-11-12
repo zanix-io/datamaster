@@ -10,7 +10,7 @@ import type {
   DataProtection,
   EncryptSettings,
   MaskingSettings,
-} from 'database/typings/protection.ts'
+} from 'typings/protection.ts'
 
 /** Upsert type options */
 export type UpsertTypeOptions = { useDataPolicies?: boolean; type?: 'update' | 'insert' }
@@ -37,7 +37,7 @@ export type SchemaStatics = {
    * @param {string | string[]} message - The message or array of messages to be encrypted.
    *   Can be a single string or an array of strings. Each message will be encrypted separately.
    *
-   * @param {EncryptSettings} setting - The encryption settings to be used for the encryption process.
+   * @param {EncryptSettings} settings - The encryption settings to be used for the encryption process.
    *   For example, the type of encryption (`symmetric` or `asymmetric`), as well as any additional
    *   encryption-related configurations.
    *   - If the type is `symmetric`, the system will look for the environment variable `DATA_AES_KEY`.
@@ -65,7 +65,7 @@ export type SchemaStatics = {
    * @param {string | string[]} encryptedMessage - The encrypted message or array of encrypted messages to decrypt.
    *   Can be a single string or an array of strings. Each encrypted message will be decrypted separately.
    *
-   * @param {EncryptSettings} setting - The decryption settings that match the settings used during encryption.
+   * @param {EncryptSettings} settings - The decryption settings that match the settings used during encryption.
    *   This includes the type of encryption (e.g., `symmetric` or `asymmetric`), as well as any other relevant settings.
    *   - If the type was `symmetric` during encryption, ensure the same key (e.g., `DATA_AES_KEY`) is available.
    *   - If the type was `asymmetric` during encryption, ensure the corresponding private key (e.g., `DATA_RSA_PRIVATE_KEY`) is available.
@@ -105,7 +105,7 @@ export type SchemaStatics = {
    * @param {string | string[]} message - The message or array of messages to mask.
    *   Can be a single string or an array of strings. Each message will be masked individually.
    *
-   * @param {MaskingSettings} setting - The masking configuration to be applied.
+   * @param {MaskingSettings} settings - The masking configuration to be applied.
    *   Defines how masking should be performed (e.g., algorithm type, mask format, or additional options).
    *   - This method requires a secret key to perform masking.
    *   - It first checks for the environment variable `DATA_SECRET_KEY`.
@@ -134,7 +134,7 @@ export type SchemaStatics = {
    * @param {string | string[]} maskedMessage - The masked message or array of masked messages to unmask.
    *   Can be a single string or an array of strings. Each masked value will be unmasked individually.
    *
-   * @param {MaskingSettings} setting - The masking configuration that matches the one used during masking.
+   * @param {MaskingSettings} settings - The masking configuration that matches the one used during masking.
    *   This must correspond to the same algorithm, format, and options applied during the mask operation.
    *   - The method uses a secret key to unmask data.
    *   - It first checks for the environment variable `DATA_SECRET_KEY`.

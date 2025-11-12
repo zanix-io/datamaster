@@ -1,4 +1,4 @@
-import type { EncryptedString, MaskedString } from 'typings/data.ts'
+import type { DecryptableObject, UnmaskableObject } from 'typings/data.ts'
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
 import type { Transform } from 'mongo/typings/schema.ts'
 
@@ -98,13 +98,13 @@ export const transformByDataProtection = (
         const decodedValue = dataProtectionGetterDefinition(dataProtection[path], value) as String
 
         if (Object.hasOwn(decodedValue, 'unmask')) {
-          const maskedString: MaskedString = decodedValue
+          const unmaskableString: UnmaskableObject = decodedValue
           // deno-lint-ignore no-non-null-assertion
-          return maskedString.unmask!()
+          return unmaskableString.unmask!()
         } else if (Object.hasOwn(decodedValue, 'decrypt')) {
-          const encryptedString: EncryptedString = decodedValue
+          const decryptableObject: DecryptableObject = decodedValue
           // deno-lint-ignore no-non-null-assertion
-          const decrypted = encryptedString.decrypt!()
+          const decrypted = decryptableObject.decrypt!()
           promises.push(decrypted)
 
           return decrypted

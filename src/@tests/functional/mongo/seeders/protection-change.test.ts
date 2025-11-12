@@ -10,7 +10,7 @@ import { Schema } from 'mongoose'
 const closeConnection = async (Model: any, db: any) => {
   // Drop collection
   await DropCollection(Model, db)
-  await db['stopConnection']()
+  await db['close']()
 }
 
 const checkVerions = ([seeder1, seeder2]: any, version: string) => {

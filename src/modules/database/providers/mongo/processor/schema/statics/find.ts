@@ -1,4 +1,3 @@
-import { InternalError } from '@zanix/errors'
 import type { ReadContext, ReadDocumentsOptions } from 'mongo/typings/commons.ts'
 import type { AdaptedModel } from 'mongo/typings/models.ts'
 import type { Document } from 'mongoose'
@@ -103,7 +102,5 @@ export function readDocuments<T extends Document>(
       return readCursor.call(this, ctx)
     case 'batch':
       return readBatch.call(this, ctx)
-    default:
-      throw new InternalError(`Unknown read mode: ${mode}`)
   }
 }

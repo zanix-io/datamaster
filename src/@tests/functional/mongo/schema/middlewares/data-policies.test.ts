@@ -1,4 +1,4 @@
-import type { EncryptedString, MaskedString } from 'typings/data.ts'
+import type { DecryptableObject, UnmaskableObject } from 'typings/data.ts'
 
 import { DropCollection, getDB, ignore, sanitize } from '../../../../(setup)/mongo/connector.ts'
 import { dataPoliciesGetter } from 'modules/database/policies/mod.ts'
@@ -74,14 +74,14 @@ Deno.test({
 
     const userSaved = await user.save()
 
-    const maskedName: MaskedString = userSaved.name
+    const maskedName: UnmaskableObject = userSaved.name
 
     assert(json.name)
     assert(maskedName?.toString() !== json.name)
     assertEquals(maskedName?.unmask?.(), 'Ismael')
 
     await DropCollection(Model, db)
-    await db['stopConnection']()
+    await db['close']()
   },
   ignore,
 })
@@ -118,26 +118,26 @@ Deno.test({
 
     const jsonSaved = userSaved.toJSON({ userSession: { type: 'user' } })
 
-    const maskedValue: MaskedString = userSaved.maskVersioned
+    const maskedValue: UnmaskableObject = userSaved.maskVersioned
     assert(jsonSaved.maskVersioned.startsWith('v1:'))
     assertEquals(maskedValue?.unmask?.(), json.maskVersioned)
 
-    const maskedValueArr: MaskedString = userSaved.maskVersionedArr
+    const maskedValueArr: UnmaskableObject = userSaved.maskVersionedArr
     assert(userSaved.maskVersionedArr[0]?.endsWith('@email.com'))
     assert(jsonSaved.maskVersionedArr[0]?.startsWith('v100:'))
     assertEquals(maskedValueArr?.unmask?.(), json.maskVersionedArr)
 
-    const encrypteddValue: EncryptedString = userSaved.encryptedVersioned
+    const encrypteddValue: DecryptableObject = userSaved.encryptedVersioned
     assert(jsonSaved.encryptedVersioned?.startsWith('v3:'))
     assertEquals(await encrypteddValue?.decrypt?.(), json.encryptedVersioned)
 
-    const encrypteddValueArr: EncryptedString = userSaved.encryptedVersionedArr
+    const encrypteddValueArr: DecryptableObject = userSaved.encryptedVersionedArr
 
     assert(jsonSaved.encryptedVersionedArr[0]?.startsWith('v2:'))
     assertEquals(await encrypteddValueArr?.decrypt?.(), json.encryptedVersionedArr)
 
     await DropCollection(Model, db)
-    await db['stopConnection']()
+    await db['close']()
   },
   ignore,
 })

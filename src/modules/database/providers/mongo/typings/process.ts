@@ -46,19 +46,16 @@ export type PathTransformOptions = {
  * @property {ConnectorOptions} options - MongoDB connection information.
  * @property {ConnectorOptions} [options.uri] - URI of the MongoDB database.
  * @property {ConnectOptions} [config] - Additional configuration options for the connection.
- * @property {boolean} [autoCached] - Whether to enable automatic caching. This feature is **experimental** and may not be fully implemented.
  * @property {string | false} [seedModel] - Controls the creation of the seeder model:
  * - If `false`, no model is created.
  * - If a `string` is provided, a model is created with that name.
  * - If omitted, a default model named `"zanix-seeders"` is created **only if seeders are used**.
  */
 export type MongoConnectorOptions = ConnectorOptions & {
+  /** Mongo connection string URI */
+  uri?: string
   /** Additional configuration options for the connection. */
   config?: ConnectOptions
-  /** Whether to enable automatic caching
-   * @experimental
-   */
-  autoCached?: boolean
   /** Controls the creation of the seeder model:
    * - If `false`, no model is created.
    * - If a `string` is provided, a model is created with that name.

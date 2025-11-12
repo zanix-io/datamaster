@@ -1,5 +1,5 @@
 import type { SchemaAccessor } from 'database/typings/general.ts'
-import type { DataAccessConfig, DataFieldAccess } from 'database/typings/protection.ts'
+import type { DataAccessConfig, DataFieldAccess } from 'typings/protection.ts'
 
 import { ProgramModule, type Session } from '@zanix/server'
 import { mask } from '@zanix/helpers'
@@ -35,9 +35,15 @@ export function dataAccessGetterDefinition(
 
   if (shouldRemove) {
     if (!session) {
-      logger.warn(
-        "Data access policies are enabled, but no session was found. Set 'userSession' in the toJSON transform options, or enable ALS through the 'model configuration options' if a manual session is not used.",
-      )
+      logger.warn('Data access policies are enabled, but no session was found.', {
+        code: 'DATA_ACCESS_NO_SESSION',
+        meta: {
+          suggestion:
+            "Set 'userSession' in the toJSON transform options, or enable ALS through the model configuration options if a manual session is not used.",
+          policyEnabled: true,
+          source: 'zanix',
+        },
+      })
     }
     return
   }
@@ -83,6 +89,7 @@ export function dataAccessGetter(
   if (typeof this === 'object') {
     logger.warn(
       'An access policy getter definition (dataAccessGetter) is incorrectly implemented and needs to be reviewed.',
+      'noSave',
     )
 
     return access as unknown as SchemaAccessor

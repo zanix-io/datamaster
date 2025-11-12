@@ -1,6 +1,6 @@
 import type { SchemaMethods } from 'mongo/typings/commons.ts'
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
-import type { HashedString } from 'typings/data.ts'
+import type { VerifiableObject } from 'typings/data.ts'
 
 import { dataPoliciesGetter } from 'modules/database/policies/mod.ts'
 import { assert, assertEquals } from '@std/assert'
@@ -66,7 +66,7 @@ const user = userDoc as (SchemaMethods & typeof userDoc)
 Deno.test('Data policies should works on toJSON transformation - authenticated user', () => {
   const session = { type: 'user' } as const
 
-  const password: HashedString = user.password
+  const password: VerifiableObject = user.password
 
   assert(password?.verify)
 

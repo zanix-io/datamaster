@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import type { EncryptedString, MaskedString } from 'typings/data.ts'
+import type { DecryptableObject, UnmaskableObject } from 'typings/data.ts'
 
 import { DropCollection, getDB, ignore, sanitize } from '../../../../(setup)/mongo/connector.ts'
 import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
@@ -72,12 +72,12 @@ Deno.test({
 
     const json = userSaved.toJSON() as any
 
-    const maskedName: MaskedString = userSaved.name
+    const maskedName: UnmaskableObject = userSaved.name
 
     assertEquals(maskedName?.unmask?.(), 'Ismael')
     assertEquals(json.name, 'v0:Zx240a4012000f')
 
-    const maskedEmail: MaskedString = userSaved.email
+    const maskedEmail: UnmaskableObject = userSaved.email
 
     assertEquals(maskedEmail?.toString(), '16z7b7a6e787dxZx1d1c5d1a110c@email.com')
     assertEquals(json.email, 'v0:16z7b7a6e787dxZx1d1c5d1a110c@email.com')
@@ -91,13 +91,13 @@ Deno.test({
     assert(json.data[0].phones[0] !== '+323323232323')
     assert(json.data[0].phones[1] !== '+2322323232')
 
-    const email: EncryptedString = userSaved.metadata?.get('emails')?.value
+    const email: DecryptableObject = userSaved.metadata?.get('emails')?.value
     assertEquals(await email?.decrypt?.(), 'pepito.perez@email.com')
     assert(
       json.metadata?.emails.value && (json.metadata?.emails.value !== 'pepito.perez@email.com'),
     )
 
-    const secret: EncryptedString = userSaved.secret
+    const secret: DecryptableObject = userSaved.secret
     assert(json.secret && (json.secret !== 'my secret'))
     assertEquals(await secret?.decrypt?.(), 'my secret')
 
@@ -105,7 +105,7 @@ Deno.test({
 
     await DropCollection(Model, db)
 
-    await db['stopConnection']()
+    await db['close']()
   },
   ignore,
 })

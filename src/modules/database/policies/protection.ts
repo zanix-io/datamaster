@@ -1,21 +1,21 @@
-import type { EncryptedString, HashedString } from 'typings/data.ts'
+import type { DecryptableObject, VerifiableObject } from 'typings/data.ts'
 import type { SchemaAccessor } from 'database/typings/general.ts'
 import type {
   DataProtection,
   DataProtectionBase,
   DataProtectionMethods,
   DataProtectionOptions,
-} from 'database/typings/protection.ts'
+} from 'typings/protection.ts'
 
 import {
-  createDecryptObject,
+  createDecryptableObject,
   createHashFrom,
-  createUnmaskObject,
-  createVerifyObject,
+  createUnmaskableObject,
+  createVerifiableObject,
   encrypt,
   extractVersion,
   mask,
-} from 'database/utils/protection.ts'
+} from 'modules/utils/protection.ts'
 import ProgramModule from 'modules/program/mod.ts'
 import logger from '@zanix/logger'
 
@@ -46,13 +46,13 @@ export const normalizeDataProtection = (
  *                                    If provided, these values will be modified according to the access policy.
  *                                    Defaults to `undefined` if not provided.
  *
- * @returns {HashedString | EncryptedString} The modified value or values after applying the data protection settings.
+ * @returns {VerifiableObject | DecryptableObject} The modified value or values after applying the data protection settings.
  *                            For `hashing` it provides the verifier function.
  */
 export const dataProtectionGetterDefinition = (
   config: DataProtection,
   value?: string | string[],
-): HashedString | EncryptedString => {
+): VerifiableObject | DecryptableObject => {
   if (!value) return
   const { message, version } = extractVersion(value)
 
@@ -64,11 +64,11 @@ export const dataProtectionGetterDefinition = (
 
   switch (strategy) {
     case 'mask':
-      return createUnmaskObject(message, settings, version)
+      return createUnmaskableObject(message, settings, version)
     case 'encrypt':
-      return createDecryptObject(message, settings, version)
+      return createDecryptableObject(message, settings, version)
     case 'hash':
-      return createVerifyObject(message, settings, version)
+      return createVerifiableObject(message, settings, version)
     default:
       return value
   }
@@ -174,17 +174,17 @@ export const dataProtectionSetterDefinition = (
  * const symmEncryptGetter = dataProtectionGetter('encrypt') // defaults applied
  * const hashGetter = dataProtectionGetter('hash') // defaults applied
  *
- * const unmaskedString: MaskedString = maskGetter(maskedFieldValue)
- * const unmaskedValue = unmaskedString.unmask()
+ * const unmaskableString: UnmaskableObject = maskGetter(maskedFieldValue)
+ * const unmaskableValue = UnmaskableObject.unmask()
  *
- * const decryptedAsymString: EncryptedString = asymmEncryptGetter(asymmEncryptedFieldValue)
+ * const decryptedAsymString: DecryptableObject = asymmEncryptGetter(asymmEncryptedFieldValue)
  * const decryptedAsymValue = await decryptedAsymString.decrypt()
  *
- * const decryptedSymString: EncryptedString = symmEncryptGetter(symmEncryptedFieldValue)
+ * const decryptedSymString: DecryptableObject = symmEncryptGetter(symmEncryptedFieldValue)
  * const decryptedSymValue = await decryptedSymString.decrypt()
  *
- * const hashedString: HashedString = hashGetter(hashedFieldValue)
- * await hashedString.verify(passwordToVerify)
+ * const verifiableString: VerifiableObject = hashGetter(hashedFieldValue)
+ * await verifiableString.verify(passwordToVerify)
  * ```
  *
  * ---
@@ -222,6 +222,7 @@ export function dataProtectionGetter(
   if (typeof this === 'object') {
     logger.warn(
       'A Data protection getter definition (dataProtectionGetter) is incorrectly implemented and needs to be reviewed.',
+      'noSave',
     )
 
     return protection as unknown as SchemaAccessor

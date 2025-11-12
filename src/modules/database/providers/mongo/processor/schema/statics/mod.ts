@@ -1,7 +1,7 @@
 import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
-import type { DataAccessConfig, DataProtection } from 'database/typings/protection.ts'
+import type { DataAccessConfig, DataProtection } from 'typings/protection.ts'
 
-import { decrypt, encrypt, mask, unmask } from 'database/utils/protection.ts'
+import { decrypt, encrypt, mask, unmask } from 'modules/utils/protection.ts'
 import { generateHash, validateHash } from '@zanix/helpers'
 import { transactions } from './transactions.ts'
 import { upsertById, upsertManyById } from './upsert.ts'

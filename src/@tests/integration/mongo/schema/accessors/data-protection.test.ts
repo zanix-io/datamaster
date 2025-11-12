@@ -1,5 +1,5 @@
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
-import type { EncryptedString, HashedString, MaskedString } from 'typings/data.ts'
+import type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'
 
 import {
   dataProtectionGetter,
@@ -64,7 +64,7 @@ const user = new UserModel({
 })
 
 Deno.test('Validate data protection getter - hashing', async () => {
-  const password: HashedString = user.password
+  const password: VerifiableObject = user.password
 
   assert(
     password &&
@@ -77,7 +77,7 @@ Deno.test('Validate data protection getter - hashing', async () => {
 Deno.test('Validate data protection getter - masking', () => {
   Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
 
-  const phones: MaskedString = user.data[0].phones
+  const phones: UnmaskableObject = user.data[0].phones
 
   assertEquals(phones?.unmask?.(), ['1234566788', '1234566789'])
 
@@ -87,7 +87,7 @@ Deno.test('Validate data protection getter - masking', () => {
 Deno.test('Validate data protection getter - sym encrypt', async () => {
   Deno.env.set('DATA_AES_KEY', 'hqIIz+SY/gZ7C9sDWSTiCA==')
 
-  const aws: EncryptedString = user.secrets?.aws
+  const aws: DecryptableObject = user.secrets?.aws
 
   // deno-lint-ignore no-non-null-assertion no-extra-non-null-assertion no-non-null-asserted-optional-chain
   assertEquals(await aws?.decrypt!(), 'mys')
@@ -98,7 +98,7 @@ Deno.test('Validate data protection getter - asym encrypt', async () => {
   Deno.env.set('DATA_RSA_KEY', btoa(keys.privateKey))
   Deno.env.set('DATA_RSA_PUB', btoa(keys.publicKey))
 
-  const value: EncryptedString = user.metadata?.get('emails')?.value
+  const value: DecryptableObject = user.metadata?.get('emails')?.value
 
   // deno-lint-ignore no-non-null-assertion no-extra-non-null-assertion no-non-null-asserted-optional-chain
   assertEquals(await value?.decrypt!(), 'pepito.perez@email.com')

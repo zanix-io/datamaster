@@ -7,6 +7,18 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-11-12
+
+### Changed
+
+- Data protection types
+
+### 🆕 Added
+
+- Redis connector.
+- Local Cache.
+- Cache providers.
+
 ## [0.2.0] - 2025-11-08
 
 ### 🆕 Added

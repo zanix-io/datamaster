@@ -19,7 +19,6 @@ export const sanitize = {
 export class Mongo extends ZanixMongoConnector {
   constructor(options?: ConnectorOptions) {
     super({
-      uri: 'mongodb://localhost',
       seedModel: false,
       ...options,
     })
@@ -31,8 +30,8 @@ Mongo.prototype['_znx_props_'] = { ...Mongo.prototype['_znx_props_'], startMode:
 export const getDB = async () => {
   const bd = await new Promise<Mongo>((resolve) => {
     const _bd = new Mongo()
-    _bd.connectorReady.then(() => {
-      _bd['startConnection']().then(() => resolve(_bd))
+    _bd.isReady.then(() => {
+      _bd.isHealthy().then(() => resolve(_bd))
     })
   })
   return bd

@@ -1,4 +1,4 @@
-import type { DataAccessConfig, DataProtection } from 'database/typings/protection.ts'
+import type { DataAccessConfig, DataProtection } from 'typings/protection.ts'
 
 import { ProgramContainer } from '@zanix/server'
 

@@ -84,6 +84,7 @@ export function seedRotateProtectionKeys(
       return logger.warn(
         'No data protection configuration found. Skipping execution of [seedRotateProtectionKeys]. ' +
           'Ensure that the model has proper data protection settings before attempting key rotation.',
+        'noSave',
       )
     }
 

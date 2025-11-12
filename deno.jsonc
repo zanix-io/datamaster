@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -46,6 +46,7 @@
     "semiColons": false
   },
   "imports": {
+    "redis": "npm:redis@^5.9.0",
     "mongoose": "npm:mongoose@^6.7",
     "@std/assert": "jsr:@std/assert@0.224",
     "@zanix/workers": "jsr:@zanix/utils@2.*/workers",
@@ -59,12 +60,14 @@
     "typings/": "./src/typings/",
     "utils/": "./src/utils/",
     "cache/": "./src/modules/cache/",
+    "qlru/": "./src/modules/cache/qlru/",
     "database/": "./src/modules/database/",
     "mongo/": "./src/modules/database/providers/mongo/"
   },
   "exports": {
     ".": "./mod.ts",
     "./database": "./src/modules/database/mod.ts",
+    "./cache": "./src/modules/cache/mod.ts",
     /** core module definitions */
     "./core": "./src/modules/core.ts"
   },

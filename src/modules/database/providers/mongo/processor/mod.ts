@@ -1,7 +1,7 @@
 import type { Extensions } from 'database/typings/general.ts'
 import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
 import type { Model } from 'mongo/typings/commons.ts'
-import type { DataAccessConfig, DataProtection } from 'database/typings/protection.ts'
+import type { DataAccessConfig, DataProtection } from 'typings/protection.ts'
 
 import { baseTransformations } from './schema/transforms/mod.ts'
 import { findPathsWithAccessorsDeep } from '../utils/accessors.ts'

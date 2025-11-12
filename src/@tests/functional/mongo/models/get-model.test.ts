@@ -21,7 +21,7 @@ const modelValidation = async (Model: any, db: any) => {
   // Drop collection
   await DropCollection(Model, db)
 
-  await db['stopConnection']()
+  await db['close']()
 }
 
 Deno.test({

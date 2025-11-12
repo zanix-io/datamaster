@@ -75,7 +75,7 @@ Deno.test({
 
     mongoPasswordValidation(ModelBySchema)
 
-    await db['stopConnection']()
+    await db['close']()
   },
   ignore,
 })

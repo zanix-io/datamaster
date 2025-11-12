@@ -44,7 +44,28 @@ and access & protection policies.
   - Built-in data access and protection policies.
   - `AsyncLocalStorage` (ALS) support.
 
-- **Model HOC support**
+- **Redis connector**
+
+  - Native `ZanixRedisConnector` class.
+  - Optimized connection pooling and async operations.
+  - Supports pub/sub, key expiration, and data serialization.
+  - Designed for caching, queueing, and distributed locking.
+
+- **Local cache system**
+
+  - Based on `Least Recently Used (LRU)` for ultra-fast in-memory caching..
+  - Automatic eviction policy (LRU).
+  - Serves as a fallback when the external cache is unavailable.
+
+- **Cache provider & strategies**
+
+  - `getCachedOrFetch`: Retrieves a value from cache with local fallback and optional fetch.
+  - `getCachedOrRevalidate`: Retrieves a cached value using a soft TTL strategy and local fallback.
+  - Unified API for managing multi-layer caching (Redis + local).
+  - Customizable cache adapters and TTL policies.
+
+- **Model HOC support (Database Only)**
+
   - Define and load models dynamically with `defineModelHOC`.
   - Supports **seeders**: an array of async/sync functions
     `(Model, connector) => void | Promise<void>` to populate initial data.
@@ -53,7 +74,7 @@ and access & protection policies.
 
 - **Extensible architecture**
 
-  - Ready for future connectors (Redis, Memcached, PostgreSQL).
+  - Ready for future connectors (Memcached, PostgreSQL).
   - Organized exports:
 
     - `./cache` → cache systems.
@@ -76,6 +97,34 @@ import * as datamaster from 'jsr:@zanix/datamaster@[version]'
 Or import specific modules:
 
 ```ts
+/**
+ *  ______               _
+ * |___  /              (_)
+ *    / /   __ _  _ __   _ __  __
+ *   / /   / _` || '_ \ | |\ \/ /
+ * ./ /___| (_| || | | || | >  <
+ * \_____/ \__,_||_| |_||_|/_/\_\
+ */
+
+/**
+ * *************************************************
+ * CACHE *******************************************
+ * *************************************************
+ */
+
+// Connectors & providers
+export {
+  ZanixCacheCoreProvider,
+  ZanixQLRUConnector,
+  ZanixRedisConnector,
+} from 'jsr:@zanix/datamaster@[version]/cache'
+
+/**
+ * *************************************************
+ * DATABASE ****************************************
+ * *************************************************
+ */
+
 // Mongo connector
 import { Schema, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
 
@@ -110,11 +159,26 @@ import {
   getAllSubschemas,
 } from 'jsr:@zanix/datamaster@[version]/database'
 
-import type {
-  EncryptedString,
-  HashedString,
-  MaskedString,
-} from 'jsr:@zanix/datamaster@[version]/database'
+/**
+ * *************************************************
+ * GENERAL *****************************************
+ * *************************************************
+ */
+
+// Data protection
+export {
+  createDecryptableObject,
+  createHashFrom as datamasterHash,
+  createUnmaskableObject,
+  createVerifiableObject,
+  decrypt as datamasterDecrypt,
+  encrypt as datamasterEncrypt,
+  mask as datamasterMask,
+  unmask as datamasterUnmask,
+} from 'modules/utils/protection.ts'
+
+// general types
+export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'
 ```
 
 > Replace `[version]` with the latest version from
@@ -126,16 +190,19 @@ import type {
 
 ### 🔐 Environment Variables
 
-**Zanix Datamaster** uses specific environment variables for **database connectivity** and **data
-protection** (masking, encryption, and hashing). These must be set before running your application.
+**Zanix Datamaster** uses specific environment variables for **cache/database connectivity** and
+**data protection** (masking, encryption, and hashing). These must be set before running your
+application.
 
-| Variable              | Description                                       | Example                     |
-| --------------------- | ------------------------------------------------- | --------------------------- |
-| **`MONGO_URI`**       | Connection URI for MongoDB.                       | `mongodb://localhost:27017` |
-| **`DATA_AES_KEY`**    | AES key used for symmetric data encryption.       | `my-aes-secret-key`         |
-| **`DATA_SECRET_KEY`** | Additional secret key for masking/unmasking data. | `supersecret123`            |
-| **`DATA_RSA_PUB`**    | RSA public key for asymmetric encryption.         | `BASE64...`                 |
-| **`DATA_RSA_PRIV`**   | RSA private key for asymmetric decryption.        | `BASE64...`                 |
+| Variable                    | Description                                                                                                           | Example Value               |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| **`MONGO_URI`**             | Connection URI for MongoDB.                                                                                           | `mongodb://localhost:27017` |
+| **`DATA_AES_KEY`**          | AES key used for symmetric data encryption.                                                                           | `my-aes-secret-key`         |
+| **`DATA_SECRET_KEY`**       | Additional secret key for masking/unmasking data.                                                                     | `supersecret123`            |
+| **`DATA_RSA_PUB`**          | RSA public key for asymmetric encryption.                                                                             | `BASE64...`                 |
+| **`DATA_RSA_PRIV`**         | RSA private key for asymmetric decryption.                                                                            | `BASE64...`                 |
+| **`REDIS_URI`**             | Connection URI for Redis cache.                                                                                       | `redis://localhost:6379`    |
+| **`LOCAL_CACHE_MAX_ITEMS`** | Maximum number of items in the local in-memory cache. Uses a Least Recently Used (LRU) strategy. Defaults to `50000`. | `1000`                      |
 
 #### 🌐 Versioned Keys
 
@@ -156,8 +223,17 @@ managed programmatically and rotated using the utility:
 seedRotateProtectionKeys()
 ```
 
-> ⚠️ **Security Note:** Never commit encryption keys to version control. Ensure all versions of keys
-> are available during rotation until all data has been re-encrypted or unmasked with the new key.
+---
+
+⚠️ **Security:**
+
+- **Encryption Keys:** Never commit encryption keys to version control. During key rotation, keep
+  all key versions accessible until data is re-encrypted.
+- **External Caching / Storage:** Never store sensitive data in plaintext. Only cache ephemeral or
+  encrypted data, using short TTLs and secure connections. Always apply data protection policies on
+  databases, or use data protection utilities such as `datamasterEncrypt`/`Decrypt`,
+  `datamasterMask`/`Unmask`, `datamasterHash`/`createVerifyObject` (or `validateHash` from
+  `zanix/utils`).
 
 ---
 
@@ -223,13 +299,11 @@ const connector = new ZanixMongoConnector({
   uri: process.env.MONGO_URI!,
   seedModel: 'my-seed-register-model',
   config: { dbName: 'my_database' },
-  onConnected: () => console.log('Database connected.'),
-  onDisconnected: () => console.log('Database disconnected.'),
 })
 
 await connector.connectorReady
 
-await connector['startConnection']()
+await connector['initialize']()
 
 const UsersModel = connector.getModel<Attrs>('users')
 
@@ -237,7 +311,7 @@ const user = await UsersModel.findById('68fb00b33405a3a540d9b971')
 
 console.log(user)
 
-await connector['stopConnection']()
+await connector['close']()
 ```
 
 ---

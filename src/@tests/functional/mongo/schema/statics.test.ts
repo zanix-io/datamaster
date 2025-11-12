@@ -1,12 +1,13 @@
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { aesKey } from '../../../(setup)/keys.ts'
 import { assert, assertEquals, assertNotEquals } from '@std/assert'
-import { mask, unmask } from 'database/utils/protection.ts'
+import { mask, unmask } from 'modules/utils/protection.ts'
 import { generateHash, validateHash } from '@zanix/helpers'
 import { Schema } from 'mongoose'
 
 // mocks
 console.debug = () => {}
+console.error = () => {}
 
 export const schema = new Schema(
   { name: String, description: String },
@@ -40,7 +41,7 @@ Deno.test({
     // Drop collection
     await DropCollection(Model, db)
 
-    await db['stopConnection']()
+    await db['close']()
   },
   ignore,
 })
@@ -81,7 +82,7 @@ Deno.test({
     // Drop collection
     await DropCollection(Model, db)
 
-    await db['stopConnection']()
+    await db['close']()
   },
   ignore,
 })
@@ -128,7 +129,7 @@ Deno.test({
     // Drop collection
     await DropCollection(Model, db)
 
-    await db['stopConnection']()
+    await db['close']()
   },
   ignore,
 })

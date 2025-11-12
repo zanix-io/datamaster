@@ -29,10 +29,9 @@ export async function runSeedersOnStart(this: ZanixMongoConnector) {
   await Model?.insertMany(ProgramModule.seeders.consumeDataToQuery('save')).catch((e) => {
     logger.error(
       `Operation failed while registering the seeder process for the '${this.name}' class.`,
-      {
-        message: seederErrorMsg,
-        cause: e,
-      },
+      e,
+      { suggestion: seederErrorMsg },
+      'noSave',
     )
   })
 
@@ -67,10 +66,9 @@ export async function runSeedersBySchema(
   await Model?.insertMany(ProgramModule.seeders.consumeDataToQuery('save')).catch((e) => {
     logger.error(
       `Operation failed while registering the seeder process for the '${this.name}' class.`,
-      {
-        message: seederErrorMsg,
-        cause: e,
-      },
+      e,
+      { suggestion: seederErrorMsg },
+      'noSave',
     )
   })
 }
