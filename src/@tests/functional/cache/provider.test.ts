@@ -54,10 +54,10 @@ Deno.test('getCachedOrFetch should fetch and store data when cache miss occurs',
 
   const key = 'new-key'
   const value = 'fetched-value'
-  const fetchFn = () => Promise.resolve(value) // A simple fetch function
+  const fetcher = () => value // A simple fetch function
 
   // Call fbGet, which should invoke the fetchFn since the cache is missed
-  const result = await provider.getCachedOrFetch('redis', key, { fetchFn })
+  const result = await provider.getCachedOrFetch('redis', key, { fetcher })
   assertEquals(result, value, 'Should return the fetched value from the fetch function')
   assertEquals(
     provider.local.has(key),
@@ -106,13 +106,13 @@ Deno.test(
     await provider.redis.set(key, value)
 
     const softTtl = 5 // Soft TTL is 5 seconds
-    const fetchFn = () => Promise.resolve('new-fresh-value') // A function to fetch new data
+    const fetcher = () => 'new-fresh-value' // A function to fetch new data
 
     // Wait a bit to ensure soft TTL has expired
     await new Promise((resolve) => setTimeout(resolve, 50))
 
     // Call softTtlGet to check if the data is refreshed in the background
-    const result = await provider.getCachedOrRevalidate('redis', key, { softTtl, fetchFn })
+    const result = await provider.getCachedOrRevalidate('redis', key, { softTtl, fetcher })
 
     // Wait a bit to ensure fetchFn is completed on backround
     await new Promise((resolve) => setTimeout(resolve, 500))
@@ -143,10 +143,10 @@ Deno.test('getCachedOrRevalidate should fallback to fetch if no cache available'
   await provider.redis['initialize']()
 
   const key = 'missing-key'
-  const fetchFn = () => Promise.resolve('fresh-data') // A function to fetch new data
+  const fetcher = () => Promise.resolve('fresh-data') // A function to fetch new data
 
   // Simulate cache miss (the value doesn't exist in either cache)
-  const result = await provider.getCachedOrRevalidate('redis', key, { fetchFn })
+  const result = await provider.getCachedOrRevalidate('redis', key, { fetcher })
 
   assertEquals(result, 'fresh-data', 'Should fetch data if not found in cache')
   assertEquals(
@@ -170,14 +170,14 @@ Deno.test('getCachedOrRevalidate should handle errors gracefully', async () => {
   await provider.redis['initialize']()
 
   const key = 'error-key'
-  const fetchFn = () => {
+  const fetcher = () => {
     throw new Error('Fetch failed')
   } // Simulate an error in the fetch function
 
   // Ensure the error is thrown if fetch fails
   await assertRejects(
     async () => {
-      await provider.getCachedOrRevalidate('redis', key, { fetchFn })
+      await provider.getCachedOrRevalidate('redis', key, { fetcher })
     },
     Error,
     'Fetch failed', // The error message we expect

@@ -24,36 +24,36 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
    * @param {Exclude<CoreCacheConnectors, 'local'>} provider - The external cache provider to query.
    * @param {K} key - The cache key to look up.
    * @param {Object} [options] - Additional configuration.
-   * @param {() => Promise<V>} [options.fetchFn] - A fallback fetch function if the cache miss occurs.
+   * @param {() => Promise<V>} [options.fetcher] - A fallback fetch function if the cache miss occurs.
    * @param {number | 'KEEPTTL'} [options.exp] - Expiration in seconds, or `'KEEPTTL'` to preserve existing TTL.
    * @returns {Promise<V | undefined>} The cached or freshly fetched value, or `undefined` if not found.
    */
-  public override async getCachedOrFetch<V, K>(
+  public override async getCachedOrFetch<V, K = string>(
     provider: Extract<CoreCacheConnectors, 'redis'>,
     key: K,
-    options: { fetchFn?: () => Promise<V>; exp?: number | 'KEEPTTL' } = {},
-  ): Promise<V | undefined> {
+    options: { fetcher?: () => V | Promise<V>; exp?: number | 'KEEPTTL' } = {},
+  ): Promise<V> {
     const local = this.local.get(key)
-    if (local) return local
+    if (local !== undefined) return local
 
-    const { exp, fetchFn } = options
+    const { exp, fetcher } = options
     const cache = this[provider]
 
     const cached = await cache.get(key).then((result) => {
       this.local.set(key, result, exp)
       return result
     }).catch((err) => {
-      if (!fetchFn) throw err
+      if (!fetcher) throw err
       logger.error('Cache save operation failed.', err, {
         code: 'CACHE_SAVE_FAILED',
         meta: { key, method: 'getCachedOrFetch', source: 'zanix' },
       })
     })
-    if (cached) return cached
+    if (cached !== undefined) return cached
 
-    if (!fetchFn) return
+    if (!fetcher) return undefined as V
 
-    const freshValue = await fetchFn()
+    const freshValue = await fetcher()
     await this.saveToCaches({ provider, key, value: freshValue, exp })
     return freshValue
   }
@@ -75,38 +75,37 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
    * @param {Exclude<CoreCacheConnectors, 'local'>} provider - The external cache provider (e.g. Redis).
    * @param {K} key - The cache key to retrieve.
    * @param {Object} [options] - Additional configuration.
-   * @param {() => Promise<V>} [options.fetchFn] - A fallback fetch function to refresh the cache.
+   * @param {() => Promise<V>} [options.fetcher] - A fallback fetch function to refresh the cache.
    * @param {number | 'KEEPTTL'} [options.exp] - Expiration in seconds, or `'KEEPTTL'` to keep the current TTL.
    * @param {number} [options.softTtl=45] - Soft TTL in seconds. After this time, the cache is refreshed in background.
    * @returns {Promise<V | undefined>} The cached or freshly fetched value, or `undefined` if not found.
    */
-  public override async getCachedOrRevalidate<V, K>(
+  public override async getCachedOrRevalidate<V, K = string>(
     provider: Extract<CoreCacheConnectors, 'redis'>,
     key: K,
-    options: { fetchFn?: () => Promise<V>; exp?: number | 'KEEPTTL'; softTtl?: number } = {},
-  ): Promise<V | undefined> {
+    options: { fetcher?: () => V | Promise<V>; exp?: number | 'KEEPTTL'; softTtl?: number } = {},
+  ): Promise<V> {
     const getAge = (timestamp: number) => (Date.now() - timestamp) / 1000
-    const { exp, softTtl = 45, fetchFn } = options
+    const { exp, softTtl = 45, fetcher } = options
     const local = this.local.get(key)
 
-    if (local && getAge(local.timestamp) < softTtl) return local.value
+    if (local !== undefined && getAge(local.timestamp) < softTtl) return local.value
 
     const cache = this[provider]
 
     try {
       const cached = await cache.get(key)
-
-      if (cached) {
+      if (cached !== undefined) {
         if (getAge(cached.timestamp) < softTtl) {
           this.local.set(key, cached, exp)
           return cached.value
         }
 
         // Refresh asynchronously if data is stale but not expired
-        if (fetchFn) {
+        if (fetcher) {
           queueMicrotask(async () => {
             try {
-              const newValue = await fetchFn()
+              const newValue = await fetcher()
               await this.saveToCaches({
                 provider,
                 key,
@@ -126,17 +125,17 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
         return cached.value
       }
     } catch (err) {
-      if (!fetchFn) throw err
+      if (!fetcher) throw err
       logger.error('Cache save operation failed.', err, {
         code: 'CACHE_SAVE_FAILED',
         meta: { key, method: 'getCachedOrRevalidate', source: 'zanix' },
       })
     }
 
-    if (!fetchFn) return
+    if (!fetcher) return undefined as V
 
     // Get from the source
-    const freshValue = await fetchFn()
+    const freshValue = await fetcher()
 
     const entry = { value: freshValue, timestamp: Date.now() }
     await this.saveToCaches({ provider, key, value: entry, exp })
@@ -144,20 +143,40 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
   }
 
   /**
-   * Saves a value into both the local cache and the specified external provider.
+   * Saves a value into both the local cache and the specified external cache provider.
+   *
+   * This method stores `value` under `key` in the local (in-memory) cache and also
+   * writes it to the external provider indicated by `provider` (e.g. Redis).
+   *
+   * @template K - Type of the cache key.
+   * @template V - Type of the cached value.
+   *
+   * @param {Object} options - Options controlling how the value is saved.
+   * @param {Extract<CoreCacheConnectors, 'redis'>} options.provider - External cache provider/connector to use (currently `'redis'`).
+   * @param {K} options.key - The key under which the value will be stored.
+   * @param {V} options.value - The value to store in caches.
+   * @param {number | 'KEEPTTL'} [options.exp] - TTL in seconds for the external cache, or `'KEEPTTL'` to preserve the existing TTL.
+   * @param {boolean} [options.schedule=false] - If `true`, schedule the external write (e.g. enqueue or perform in background) instead of performing it synchronously (use for redis).
+   *
+   * @returns {Promise<void>} Resolves when the local cache is updated and the external write has been scheduled or completed.
+   *
+   * @throws {Error} If the operation fails (e.g. local cache update fails or external write scheduling fails).
    */
-  private async saveToCaches<K, V>(
+  public override async saveToCaches<K, V>(
     options: {
       provider: Extract<CoreCacheConnectors, 'redis'>
       key: K
       value: V
       exp?: number | 'KEEPTTL'
+      schedule?: boolean
     },
-  ) {
-    const { key, exp, value, provider } = options
-    this.local.set(key, value, exp)
+  ): Promise<void> {
+    const { key, exp, value, provider, schedule } = options
+    const args = [key, value, exp, schedule] as const
 
-    await this[provider].set(key, value, exp).catch((e) =>
+    this.local.set(...args)
+
+    await this[provider].set(...args).catch((e) =>
       logger.error('Cache save operation failed.', e, {
         code: 'CACHE_SAVE_FAILED',
         meta: { key, method: 'saveToCaches', source: 'zanix' },

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertRejects } from '@std/assert'
+import { assert, assertEquals, assertFalse, assertRejects } from '@std/assert'
 import { InternalError } from '@zanix/errors'
 import { ZanixRedisConnector } from 'modules/cache/providers/redis/connector/mod.ts'
 
@@ -123,6 +123,67 @@ Deno.test('RedisCache failed commands by connection timeout', async () => {
   assertEquals(error.code, 'REDIS_CONNECTION_TIMEOUT')
 
   cache['close']()
+})
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: 'RedisCache scheduler shoud work on backround set with maxDelay',
+  fn: async () => {
+    const cache = new ZanixRedisConnector<string, number>({
+      commandTimeout: 1000,
+      maxCommandRetries: 1,
+    })
+    await cache.clear()
+
+    const key = 'schedule-key'
+
+    await cache.set(key, 1, 0.4, true)
+
+    const value = await cache.get(key)
+    assertFalse(value) // shoud not exist
+
+    // wait 100ms to wait to save on background
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    const savedValue = await cache.get(key)
+    assert(savedValue)
+
+    await cache.clear()
+    cache['close']()
+  },
+})
+
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: 'RedisCache scheduler shoud work on backround set with maxBatch',
+  fn: async () => {
+    const cache = new ZanixRedisConnector<string, number>({
+      commandTimeout: 1000,
+      maxCommandRetries: 1,
+      schedulerOptions: {
+        maxDelay: 1000,
+        maxBatch: 2,
+      },
+    })
+    await cache.clear()
+
+    const key = 'schedule-key'
+
+    await cache.set(key, 1, 0.4, true)
+
+    const value = await cache.get(key)
+    assertFalse(value) // shoud not exist
+
+    await cache.set('schedule-key-2', 1, 0.4, true)
+
+    const savedValue = await cache.get(key)
+    assert(savedValue)
+
+    await cache.clear()
+    cache['close']()
+  },
 })
 
 Deno.test({

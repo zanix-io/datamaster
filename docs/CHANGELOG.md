@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-11-14
+
+### Added
+
+- **Scheduler providers**: Added support for scheduler providers in cache systems.
+
+### Changed
+
+- **Cache provider**: Enhanced cache provider to support scheduling and client retrieval
+  functionality.
+
 ## [0.3.0] - 2025-11-12
 
 ### Changed

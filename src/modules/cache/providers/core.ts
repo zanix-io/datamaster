@@ -10,8 +10,8 @@
 import { ZanixCacheCoreProvider } from './mod.ts'
 import { Provider } from '@zanix/server'
 
-/** Provider loader */
-const providerLoader = async () => {
+/** Provider HOC */
+const providerHOC = async () => {
   await import('./qlru/core.ts')
   await import('./redis/core.ts')
 
@@ -34,6 +34,6 @@ const providerLoader = async () => {
  *
  * @module
  */
-const zanixCacheProviderCore: void = await providerLoader()
+const zanixCacheProviderCore: void = await providerHOC()
 
 export default zanixCacheProviderCore

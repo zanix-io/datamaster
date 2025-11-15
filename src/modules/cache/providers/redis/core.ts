@@ -10,8 +10,8 @@
 import { ZanixRedisConnector } from './connector/mod.ts'
 import { Connector } from '@zanix/server'
 
-/** Connector loader */
-const connectorLoader = () => {
+/** Connector HOC */
+const connectorHOC = () => {
   if (!Deno.env.get('REDIS_URI')) return
 
   @Connector('cache:redis')
@@ -35,6 +35,6 @@ const connectorLoader = () => {
  *
  * @module
  */
-const zanixRedisConnectorCore: void = connectorLoader()
+const zanixRedisConnectorCore: void = connectorHOC()
 
 export default zanixRedisConnectorCore

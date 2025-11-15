@@ -20,6 +20,32 @@ Deno.test('QuickLRU: works with string keys and object values', () => {
   assertEquals(result?.name, 'Alice')
 })
 
+Deno.test({
+  sanitizeOps: false,
+  sanitizeResources: false,
+  name: 'QuickLRU: shoud work on backround set with',
+  fn: async () => {
+    const cache = new ZanixQLRUConnector<string, number>({ capacity: 3 })
+
+    cache.clear()
+
+    const key = 'schedule-key'
+
+    cache.set(key, 1, 0.4, true)
+
+    const value = cache.get(key)
+    assertFalse(value) // shoud not exist
+
+    // wait 50ms to wait to save on background
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    const savedValue = cache.get(key)
+    assert(savedValue)
+
+    cache.clear()
+  },
+})
+
 Deno.test('QuickLRU: works with number keys and string values', () => {
   const cache = new ZanixQLRUConnector<number, string>({ capacity: 2 })
 

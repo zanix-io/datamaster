@@ -6,6 +6,7 @@ import { ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
 import { scanKeys } from './scan.ts'
 import logger from '@zanix/logger'
+import { RedisPipelineScheduler } from './scheduler.ts'
 
 /**
  * A Redis-backed cache implementation with automatic retry and command queuing.
@@ -19,14 +20,16 @@ import logger from '@zanix/logger'
  */
 // deno-lint-ignore no-explicit-any
 export class ZanixRedisConnector<K extends string = string, V = any>
-  extends ZanixCacheConnector<K, V, 'async'> {
+  extends ZanixCacheConnector<K, V, 'redis'> {
   #uri: string
   #client!: RedisClientType
+  private schedulerOptions: RedisOptions['schedulerOptions']
   protected name: string
   private execWithRetry = execWithRetry
   private scanKeys = scanKeys
   private accessor connected = false
   private accessor reconnect = false
+  protected accessor scheduler!: RedisPipelineScheduler
   protected reconnectStrategy: RedisOptions['reconnectStrategy']
   protected commandRetryInterval: number
   protected maxCommandRetries: number
@@ -53,16 +56,19 @@ export class ZanixRedisConnector<K extends string = string, V = any>
       reconnectStrategy,
       commandRetryInterval = 100,
       connectionTimeout,
+      schedulerOptions,
       namespace,
       contextId,
+      autoInitialize,
       randomOffset = 9,
     } = options
 
-    super({ contextId, ttl, namespace })
+    super({ contextId, ttl, namespace, autoInitialize })
 
     this.#uri = redisUrl
     const targetName = this.constructor.name
     this.name = targetName.startsWith('_Zanix') ? 'cache core' : targetName
+    this.schedulerOptions = schedulerOptions
     this.commandRetryInterval = commandRetryInterval
     this.maxCommandRetries = maxCommandRetries
     this.commandTimeout = commandTimeout
@@ -80,6 +86,12 @@ export class ZanixRedisConnector<K extends string = string, V = any>
       socket: { reconnectStrategy: this.reconnectStrategy },
       disableOfflineQueue: false, // Active queue offline until connected
     })
+
+    this.scheduler = new RedisPipelineScheduler(
+      this.#client,
+      this.execWithRetry,
+      this.schedulerOptions,
+    )
 
     let timeInit = Date.now()
 
@@ -138,24 +150,24 @@ export class ZanixRedisConnector<K extends string = string, V = any>
    * @param key The key to insert or update.
    * @param value The value to store.
    * @param ttl The optional TTL (in seconds).
+   * @param schedule Use Redis pipeline schedule helper
    */
-  public async set(key: K, value: V, ttl?: number | 'KEEPTTL'): Promise<void> {
+  public async set(key: K, value: V, ttl?: number | 'KEEPTTL', schedule?: boolean): Promise<void> {
     const ttlValue = ttl ?? this.ttl
+    const keyToSave = this.getKey(key)
+    const valueToSave = JSON.stringify(value)
+    const options = {
+      expiration: ttlValue === 'KEEPTTL' ? ttlValue : ttlValue > 0
+        ? {
+          type: 'PX' as const,
+          value: ttlValue * 1000 + Math.floor(Math.random() * this.randomOffset) * 1000,
+        }
+        : undefined,
+    }
 
-    await this.execWithRetry(() =>
-      this.#client.set(
-        this.getKey(key),
-        JSON.stringify(value),
-        {
-          expiration: ttlValue === 'KEEPTTL' ? ttlValue : ttlValue > 0
-            ? {
-              type: 'PX',
-              value: ttlValue * 1000 + Math.floor(Math.random() * this.randomOffset) * 1000,
-            }
-            : undefined,
-        },
-      )
-    )
+    if (schedule) {
+      this.execWithRetry(() => this.scheduler.addSet(keyToSave, valueToSave, options) as never)
+    } else await this.execWithRetry(() => this.#client.set(keyToSave, valueToSave, options))
   }
 
   public async get<O = V>(key: K): Promise<O | undefined> {
@@ -209,5 +221,9 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     } catch (e) {
       logger.error(`Failed to close Redis in '${this.name}' class`, e, 'noSave')
     }
+  }
+
+  public getClient<T>(): T {
+    return this.#client as T
   }
 }

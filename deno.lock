@@ -13,8 +13,8 @@
     "jsr:@std/path@0.224": "0.224.0",
     "jsr:@std/path@^1.0.6": "1.1.2",
     "jsr:@std/uuid@0.224": "0.224.3",
-    "jsr:@zanix/server@1": "1.1.2",
-    "jsr:@zanix/server@^1.1.2": "1.1.2",
+    "jsr:@zanix/server@1": "1.1.3",
+    "jsr:@zanix/server@^1.1.3": "1.1.3",
     "jsr:@zanix/utils@*": "2.2.0",
     "jsr:@zanix/utils@2": "2.2.0",
     "npm:@types/node@*": "24.2.0",
@@ -80,11 +80,11 @@
         "jsr:@std/crypto"
       ]
     },
-    "@zanix/server@1.1.2": {
-      "integrity": "ef26c2e3ee1f082ac6e18be6f56cb179e341a281ed487f1d90765e0aa1d78016",
+    "@zanix/server@1.1.3": {
+      "integrity": "c93140f4e95a839b0f5025bd080d9a90db7073d996736abfd0e853c4567ba4de",
       "dependencies": [
         "jsr:@std/path@0.224",
-        "jsr:@zanix/server@^1.1.2",
+        "jsr:@zanix/server@^1.1.3",
         "jsr:@zanix/utils@2",
         "npm:graphql"
       ]

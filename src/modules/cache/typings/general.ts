@@ -79,4 +79,19 @@ export type RedisOptions = ConnectorOptions & {
    * Defaults to 9 (0–9).
    */
   randomOffset?: number
+  /**
+   * Options to batches redis commands and executes them
+   * either when the batch reaches a maximum size
+   * or when a maximum delay has elapsed — whichever comes first.
+   */
+  schedulerOptions?: {
+    /**
+     * Maximum number of commands per batch (default: 200).
+     */
+    maxBatch?: number
+    /**
+     * Maximum delay in milliseconds before flushing (default: 100ms).
+     */
+    maxDelay?: number
+  }
 }
