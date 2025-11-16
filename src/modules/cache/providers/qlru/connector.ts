@@ -196,7 +196,7 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
 
   protected override close() {}
 
-  public get client(): this {
-    return this
+  public getClient<T = Map<K, CacheEntry<V>>>(): T {
+    return this.#cache as T
   }
 }

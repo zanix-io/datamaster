@@ -2,11 +2,11 @@ import type { RedisOptions } from 'cache/typings/general.ts'
 
 import { clearTimeouts, execWithRetry } from './retries.ts'
 import { createClient, type RedisClientType } from 'redis'
+import { RedisPipelineScheduler } from './scheduler.ts'
 import { ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
-import { scanKeys } from './scan.ts'
 import logger from '@zanix/logger'
-import { RedisPipelineScheduler } from './scheduler.ts'
+import { scanKeys } from './scan.ts'
 
 /**
  * A Redis-backed cache implementation with automatic retry and command queuing.
@@ -25,8 +25,8 @@ export class ZanixRedisConnector<K extends string = string, V = any>
   #client!: RedisClientType
   private schedulerOptions: RedisOptions['schedulerOptions']
   protected name: string
-  private execWithRetry = execWithRetry
   private scanKeys = scanKeys
+  private execWithRetry = execWithRetry
   private accessor connected = false
   private accessor reconnect = false
   protected accessor scheduler!: RedisPipelineScheduler
@@ -154,7 +154,6 @@ export class ZanixRedisConnector<K extends string = string, V = any>
    */
   public async set(key: K, value: V, ttl?: number | 'KEEPTTL', schedule?: boolean): Promise<void> {
     const ttlValue = ttl ?? this.ttl
-    const keyToSave = this.getKey(key)
     const valueToSave = JSON.stringify(value)
     const options = {
       expiration: ttlValue === 'KEEPTTL' ? ttlValue : ttlValue > 0
@@ -166,44 +165,42 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
 
     if (schedule) {
-      this.execWithRetry(() => this.scheduler.addSet(keyToSave, valueToSave, options) as never)
-    } else await this.execWithRetry(() => this.#client.set(keyToSave, valueToSave, options))
+      this.execWithRetry(() => this.scheduler.addSet(key, valueToSave, options) as never)
+    } else await this.execWithRetry(() => this.#client.set(key, valueToSave, options))
   }
 
   public async get<O = V>(key: K): Promise<O | undefined> {
-    const val = await this.execWithRetry(() => this.#client.get(this.getKey(key)))
+    const val = await this.execWithRetry(() => this.#client.get(key))
     if (val === null) return undefined
     return JSON.parse(val) as O
   }
 
   public async has(key: K): Promise<boolean> {
-    const exists = await this.execWithRetry(() => this.#client.exists(this.getKey(key)))
+    const exists = await this.execWithRetry(() => this.#client.exists(key))
     return exists === 1
   }
 
   public async delete(key: K): Promise<boolean> {
-    const deleted = await this.execWithRetry(() => this.#client.del(this.getKey(key)))
+    const deleted = await this.execWithRetry(() => this.#client.del(key))
     return deleted === 1
   }
 
   public async clear(): Promise<void> {
-    const keys = await this.execWithRetry(() => this.scanKeys(this.#client))
-    await Promise.all(keys.map((k) => this.#client.del(this.getKey(k))))
+    await this.execWithRetry(() => this.#client.flushDb())
   }
 
-  public size(): Promise<number> {
-    return this.execWithRetry(() => this.scanKeys(this.#client).then((keys) => keys.length))
+  public async size(): Promise<number> {
+    const k = await this.keys()
+    return k.length
   }
 
-  public keys(): Promise<K[]> {
-    return this.execWithRetry(() => this.scanKeys(this.#client))
+  public keys(match?: string): Promise<K[]> {
+    return this.scanKeys(match)
   }
 
   public async values<O = V>(): Promise<O[]> {
     const keys = await this.keys()
-    const values = keys.map((key) =>
-      this.#client.get(this.getKey(key)).then((val) => val && JSON.parse(val))
-    )
+    const values = keys.map((key) => this.#client.get(key).then((val) => val && JSON.parse(val)))
     const result = await Promise.all(values)
     return result.filter(Boolean) as O[]
   }
@@ -223,7 +220,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
   }
 
-  public get client(): RedisClientType {
-    return this.#client
+  public getClient<T = Promise<RedisClientType>>(): T {
+    return this.execWithRetry(() => this.#client) as T
   }
 }

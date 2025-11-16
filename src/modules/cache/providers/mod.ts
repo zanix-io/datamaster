@@ -216,6 +216,6 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
    * @returns {Promise<T>} A promise that resolves with the result of the executed function.
    */
   public override withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-    return this.keyLockManager.withLock(key, fn)
+    return this.keyLockManager.withLock<T>(key, fn)
   }
 }

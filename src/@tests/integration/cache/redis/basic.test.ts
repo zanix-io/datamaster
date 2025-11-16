@@ -42,6 +42,34 @@ Deno.test('RedisCache: does not expire items when TTL is 0', async () => {
   cache['close']()
 })
 
+Deno.test('RedisCache: scanKeys shoud work correctly', async () => {
+  const cache = new ZanixRedisConnector<string, number>()
+  await cache.set('a', 1)
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+  assertStrictEquals(await cache.get('a'), 1)
+
+  cache['close']()
+})
+
+Deno.test('RedisCache: lua support and clear with lua', async () => {
+  const cache = new ZanixRedisConnector<string, number>()
+  const client = await cache.getClient()
+  const result = await client.eval(
+    `
+    local key = KEYS[1]
+    local value = ARGV[1]
+
+    redis.call("SET", key, value)
+    return redis.call("GET", key)
+    `,
+    { keys: ['demo:key'], arguments: ['hola'] },
+  )
+
+  assertEquals(result, 'hola')
+
+  cache['close']()
+})
+
 Deno.test('RedisCache: clear() removes all items', async () => {
   const cache = new ZanixRedisConnector<string, number>()
   await cache.set('a', 1)

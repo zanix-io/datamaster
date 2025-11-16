@@ -12,7 +12,7 @@ export function clearTimeouts() {
 /** Helper to retry a command with timeout */
 export async function execWithRetry<T, K extends string, V>(
   this: ZanixRedisConnector<K, V>,
-  fn: () => Promise<T>,
+  fn: () => T | Promise<T>,
   attempt: number = 0,
 ): Promise<T> {
   if (this['connected']) return fn()

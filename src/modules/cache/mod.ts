@@ -13,7 +13,10 @@ export { ZanixCacheCoreProvider } from './providers/mod.ts'
 export { ZanixQLRUConnector } from './providers/qlru/connector.ts'
 export { ZanixRedisConnector } from './providers/redis/connector/mod.ts'
 
-// types
+// Utils, extensions
+export { scanKeys } from './providers/redis/connector/scan.ts'
+
+// Types
 export type {
   /**
    * Redis client type

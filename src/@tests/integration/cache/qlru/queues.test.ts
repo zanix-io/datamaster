@@ -20,7 +20,7 @@ Deno.test('QuickLRU: can support concurrency using lock manager', async () => {
     })
 
   // without lock
-  await Promise.all([fn(), fn(), fn(), fn()])
+  await Promise.all([fn(), fn(), fn(), fn(), fn(), fn(), fn()])
   assertEquals(cache.get(key), 1)
 
   // with lock
@@ -30,7 +30,9 @@ Deno.test('QuickLRU: can support concurrency using lock manager', async () => {
     lockManager.withLock(key, fn),
     lockManager.withLock(key, fn),
     lockManager.withLock(key, fn),
+    lockManager.withLock(key, fn),
+    lockManager.withLock(key, fn),
   ])
 
-  assertEquals(cache.get(key), 4)
+  assertEquals(cache.get(key), 6)
 })
