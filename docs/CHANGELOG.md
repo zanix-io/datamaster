@@ -7,6 +7,14 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-11-15
+
+### Added
+
+- `Semaphore` implementation for managing concurrent access.
+- `LockManager` for keyed concurrency control using semaphores.
+- `withLock` function added to the Cache provider for safe serialized operations.
+
 ## [0.3.1] - 2025-11-14
 
 ### Added

@@ -223,7 +223,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
   }
 
-  public getClient<T>(): T {
-    return this.#client as T
+  public get client(): RedisClientType {
+    return this.#client
   }
 }

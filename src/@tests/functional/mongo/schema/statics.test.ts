@@ -1,7 +1,7 @@
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { aesKey } from '../../../(setup)/keys.ts'
 import { assert, assertEquals, assertNotEquals } from '@std/assert'
-import { mask, unmask } from 'modules/utils/protection.ts'
+import { mask, unmask } from 'utils/protection.ts'
 import { generateHash, validateHash } from '@zanix/helpers'
 import { Schema } from 'mongoose'
 

@@ -15,7 +15,7 @@ import {
   encrypt,
   extractVersion,
   mask,
-} from 'modules/utils/protection.ts'
+} from 'utils/protection.ts'
 import ProgramModule from 'modules/program/mod.ts'
 import logger from '@zanix/logger'
 

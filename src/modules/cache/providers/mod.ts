@@ -1,4 +1,5 @@
 import { type CoreCacheConnectors, ZanixCacheProvider } from '@zanix/server'
+import { LockManager } from 'utils/queues/lock-manager.ts'
 import logger from '@zanix/logger'
 
 /**
@@ -10,6 +11,8 @@ import logger from '@zanix/logger'
  * @extends ZanixCacheProvider
  */
 export class ZanixCacheCoreProvider extends ZanixCacheProvider {
+  private keyLockManager = new LockManager() // Exclusive lock per key, only one function runs at a time by default
+
   /**
    * Retrieves a value from cache with local fallback and optional fetch.
    *
@@ -182,5 +185,37 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
         meta: { key, method: 'saveToCaches', source: 'zanix' },
       })
     )
+  }
+
+  /**
+   * Executes the provided asynchronous function under an exclusive lock associated with the given key.
+   *
+   * This method ensures that only one operation at a time can run for the specified key.
+   * Multiple calls using different keys may execute in parallel, but calls sharing the same key will
+   * be queued and executed sequentially.
+   *
+   * Internally, this uses a {@link LockManager} configured with 1 permit, meaning each key provides
+   * an exclusive lock (mutex-style behavior).
+   *
+   * **Use case:**
+   * - Use when you need to synchronize access to a resource across multiple operations
+   *   (e.g., preventing race conditions in shared resources).
+   *
+   * **Do not use if:**
+   * - You are working in a distributed system or need a distributed lock (e.g., microservices).
+   * - High-frequency or low-latency operations where locking overhead is not acceptable.
+   *
+   * This is an in-memory lock. In distributed environments, you can leverage Redis
+   * to implement a proper distributed locking mechanism.
+   *
+   * @template T
+   * @param {string} key - The unique identifier used to determine which operations
+   *                       should be mutually exclusive.
+   * @param {() => Promise<T>} fn - The asynchronous function to execute once the lock
+   *                                for the given key is acquired.
+   * @returns {Promise<T>} A promise that resolves with the result of the executed function.
+   */
+  public override withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    return this.keyLockManager.withLock(key, fn)
   }
 }

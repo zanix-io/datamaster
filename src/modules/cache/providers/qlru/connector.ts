@@ -1,7 +1,6 @@
 import type { CacheEntry, QLRUCacheOptions } from 'cache/typings/general.ts'
 import { ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
-import { setImmediate } from 'node:timers/promises'
 
 /**
  * A fast and lightweight Least Recently Used (LRU) cache with optional TTL (Time-To-Live) support.
@@ -86,7 +85,7 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
    */
   public set(key: K, value: V, ttl?: number | 'KEEPTTL', schedule?: boolean): void {
     if (schedule) {
-      setImmediate(() => this.set(key, value, ttl))
+      setTimeout(() => this.set(key, value, ttl))
       return
     }
 
@@ -197,7 +196,7 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
 
   protected override close() {}
 
-  public getClient<T>(): T {
-    return this as unknown as T
+  public get client(): this {
+    return this
   }
 }

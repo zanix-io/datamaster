@@ -21,7 +21,6 @@
 
 // Main
 import ProgramModule from 'modules/program/public.ts'
-
 export { ProgramModule }
 
 // Global modules
@@ -38,7 +37,11 @@ export {
   encrypt as datamasterEncrypt,
   mask as datamasterMask,
   unmask as datamasterUnmask,
-} from 'modules/utils/protection.ts'
+} from 'utils/protection.ts'
 
-// general types
+// Utils
+export { LockManager } from 'utils/queues/lock-manager.ts'
+export { Semaphore } from 'utils/queues/semaphore.ts'
+
+// General types
 export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'

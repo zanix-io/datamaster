@@ -57,12 +57,22 @@ and access & protection policies.
   - Automatic eviction policy (LRU).
   - Serves as a fallback when the external cache is unavailable.
 
+- **Queues & concurrency helpers**
+  - **Semaphores**: Limit the number of concurrent operations with FIFO queuing.
+  - **Keyed Lock Manager**: Provides exclusive, per-key locks for safe serialized operations **in
+    non-distributed systems**.
+
 - **Cache provider & strategies**
 
   - `getCachedOrFetch`: Retrieves a value from cache with local fallback and optional fetch.
   - `getCachedOrRevalidate`: Retrieves a cached value using a soft TTL strategy and local fallback.
   - Unified API for managing multi-layer caching (Redis + local).
   - Customizable cache adapters and TTL policies.
+  - `withLock`: Ensures serialized, concurrency-safe operations for a given cache key **in
+    non-distributed systems**.
+    - Prevents race conditions in write-heavy scenarios.
+    - Guarantees only one mutation for the same key runs at a time.
+    - Built on top of the `LockManager` and semaphores for predictable and safe execution.
 
 - **Model HOC support (Database Only)**
 
@@ -175,9 +185,13 @@ export {
   encrypt as datamasterEncrypt,
   mask as datamasterMask,
   unmask as datamasterUnmask,
-} from 'modules/utils/protection.ts'
+} from 'utils/protection.ts'
 
-// general types
+// Queues Utils
+export { LockManager } from 'utils/queues/lock-manager.ts'
+export { Semaphore } from 'utils/queues/semaphore.ts'
+
+// General types
 export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'
 ```
 
