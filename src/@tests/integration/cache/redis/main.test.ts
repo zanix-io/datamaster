@@ -49,7 +49,7 @@ Deno.test('RedisCache basic operations', async () => {
 })
 
 Deno.test('RedisCache TTL expiration', async () => {
-  const cache = new ZanixRedisConnector<string, string>({ ttl: 0.1, randomOffset: 0 }) // TTL 100ms
+  const cache = new ZanixRedisConnector<string, string>({ ttl: 0.1, maxTTLOffset: 0 }) // TTL 100ms
   await cache.isReady
 
   await cache.clear()
@@ -138,7 +138,7 @@ Deno.test({
 
     const key = 'schedule-key'
 
-    await cache.set(key, 1, 0.4, true)
+    await cache.set(key, 1, { exp: 0.4, schedule: true })
 
     const value = await cache.get(key)
     assertFalse(value) // shoud not exist
@@ -171,12 +171,12 @@ Deno.test({
 
     const key = 'schedule-key'
 
-    await cache.set(key, 1, 0.4, true)
+    await cache.set(key, 1, { exp: 0.4, schedule: true })
 
     const value = await cache.get(key)
     assertFalse(value) // shoud not exist
 
-    await cache.set('schedule-key-2', 1, 0.4, true)
+    await cache.set('schedule-key-2', 1, { exp: 0.4, schedule: true })
 
     const savedValue = await cache.get(key)
     assert(savedValue)

@@ -21,7 +21,7 @@ Deno.test('RedisCache: basic set and get', async () => {
 })
 
 Deno.test('RedisCache: respects TTL expiration', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, randomOffset: 0 }) // 100 ms TTL
+  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 }) // 100 ms TTL
   await cache.set('x', 42)
   assertStrictEquals(await cache.get('x'), 42)
 
@@ -96,7 +96,7 @@ Deno.test('RedisCache: delete() removes specific item', async () => {
 })
 
 Deno.test('RedisCache: size() evicts expired items', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, randomOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 })
   await cache.set('a', 1)
   await cache.set('b', 2)
   await cache.set('c', 3)
@@ -108,7 +108,7 @@ Deno.test('RedisCache: size() evicts expired items', async () => {
 })
 
 Deno.test('RedisCache: keys() returns valid non-expired keys', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, randomOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 })
   await cache.set('b', 2)
   await cache.set('a', 1)
 
@@ -122,9 +122,9 @@ Deno.test('RedisCache: keys() returns valid non-expired keys', async () => {
 })
 
 Deno.test('RedisCache: values() returns valid non-expired values', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, randomOffset: 0 })
-  await cache.set('a', 1)
-  await cache.set('b', 2)
+  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1 })
+  await cache.set('a', 1, { maxTTLOffset: 0 })
+  await cache.set('b', 2, { maxTTLOffset: 0 })
 
   const valuesBefore = await cache.values()
   assertEquals(valuesBefore.sort(), [1, 2])
@@ -136,7 +136,7 @@ Deno.test('RedisCache: values() returns valid non-expired values', async () => {
 })
 
 Deno.test('RedisCache: overwriting key resets TTL', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, randomOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 })
   await cache.set('x', 10)
 
   await new Promise((r) => setTimeout(r, 80))
@@ -150,11 +150,11 @@ Deno.test('RedisCache: overwriting key resets TTL', async () => {
 })
 
 Deno.test('RedisCache: overwriting key dont resets TTL if KEEP', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 1, randomOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({ ttl: 1, maxTTLOffset: 0 })
   await cache.set('x', 10)
 
   await new Promise((r) => setTimeout(r, 800))
-  await cache.set('x', 20, 'KEEPTTL') // KEEP TTL
+  await cache.set('x', 20, { exp: 'KEEPTTL' }) // KEEP TTL
 
   await new Promise((r) => setTimeout(r, 100)) // Now 900ms since first write
 
@@ -168,11 +168,11 @@ Deno.test('RedisCache: overwriting key dont resets TTL if KEEP', async () => {
 })
 
 Deno.test('RedisCache: with custom TTL', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 1, randomOffset: 0 })
-  await cache.set('x', 10)
+  const cache = new ZanixRedisConnector<string, number>({ ttl: 1 })
+  await cache.set('x', 10, { maxTTLOffset: 0 })
 
   await new Promise((r) => setTimeout(r, 800))
-  await cache.set('x', 20, 0.7) // Reset TTL with custom TTL value
+  await cache.set('x', 20, { exp: 0.7, maxTTLOffset: 0 }) // Reset TTL with custom TTL value
 
   await new Promise((r) => setTimeout(r, 600)) // Now 1600ms since first write
 

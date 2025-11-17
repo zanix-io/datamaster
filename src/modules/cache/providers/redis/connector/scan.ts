@@ -7,17 +7,17 @@ import type { ZanixRedisConnector } from './mod.ts'
 export async function scanKeys<K extends string, V>(
   this: ZanixRedisConnector<K, V>,
   match = '*',
-  cursor = '0',
-  acc: K[] = [],
+  _cursor = '0',
+  _acc: K[] = [],
 ): Promise<K[]> {
   const client = await this.getClient()
-  const result = await client.scan(cursor, { MATCH: match, COUNT: 100 })
+  const result = await client.scan(_cursor, { MATCH: match, COUNT: 100 })
 
   // Remove namespace prefix
-  acc.push(...result.keys as K[])
+  _acc.push(...result.keys as K[])
 
   // Recurse if cursor is not '0'
   return result.cursor === '0'
-    ? acc
-    : scanKeys.call(this, match, result.cursor, acc) as unknown as K[]
+    ? _acc
+    : scanKeys.call(this, match, result.cursor, _acc) as unknown as K[]
 }

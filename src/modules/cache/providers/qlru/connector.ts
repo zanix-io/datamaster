@@ -1,5 +1,5 @@
 import type { CacheEntry, QLRUCacheOptions } from 'cache/typings/general.ts'
-import { ZanixCacheConnector } from '@zanix/server'
+import { type CacheSetOptions, ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
 
 /**
@@ -21,7 +21,6 @@ import { InternalError } from '@zanix/errors'
 export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector<K, V, 'local'> {
   #cache!: Map<K, CacheEntry<V>>
   protected readonly capacity: number
-  private randomOffset
 
   /**
    * Creates an instance of QuickLRU.
@@ -33,14 +32,20 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
       capacity = Number(Deno.env.get('LOCAL_CACHE_MAX_ITEMS')) || 50000,
       contextId,
       ttl = 0,
-      randomOffset = 9,
+      maxTTLOffset,
+      minTTLForOffset,
     } = options
 
     if (capacity <= 0) {
       throw new InternalError('QuickLRU: capacity must be greater than 0.')
     }
-    super({ contextId, ttl, autoInitialize: false })
-    this.randomOffset = randomOffset
+    super({
+      contextId,
+      ttl,
+      maxOffsetSeconds: maxTTLOffset,
+      minTTLForOffset,
+      autoInitialize: false,
+    })
     this.capacity = capacity
 
     this.initialize()
@@ -78,14 +83,15 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
    * Adds or updates a key-value pair in the cache.
    * If the cache exceeds its capacity, the least recently used entry is evicted.
    *
-   * @param key The key to insert or update.
+   * @param key The key used to store the value.
    * @param value The value to store.
-   * @param ttl The optional TTL (in seconds)
-   * @param schedule save in backround using `setImmediate`
+   * @param {BaseSetOpts} [options] The optional configuration
    */
-  public set(key: K, value: V, ttl?: number | 'KEEPTTL', schedule?: boolean): void {
+  public set(key: K, value: V, options: CacheSetOptions = {}): void {
+    const { exp, schedule, maxTTLOffset, minTTLForOffset } = options
+
     if (schedule) {
-      setTimeout(() => this.set(key, value, ttl))
+      setTimeout(() => this.set(key, value, { ...options, schedule: false }))
       return
     }
 
@@ -96,17 +102,17 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
     }
 
     const opts = { value, expirationTime: 0, ttl: 0 }
-    const msTTL = ttl ?? this.ttl
+    const ttl = exp ?? this.ttl
 
-    const exp = (ttl: number) => ttl > 0 ? Date.now() + ttl * 1000 : 0
+    const expire = (ttl: number) => ttl > 0 ? Date.now() + ttl * 1000 : 0
 
-    if (msTTL === 'KEEPTTL') {
-      opts.expirationTime = oldValue?.expirationTime ?? exp(this.ttl)
+    if (ttl === 'KEEPTTL') {
+      opts.expirationTime = oldValue?.expirationTime ?? expire(this.ttl)
       opts.ttl = oldValue?.ttl ?? this.ttl * 1000
     } else {
-      const ttlOffset = Math.floor(Math.random() * this.randomOffset) * 1000
-      opts.expirationTime = exp(msTTL + ttlOffset / 1000)
-      opts.ttl = msTTL * 1000 + ttlOffset
+      const ttlWithOffset = this.getTTLWithOffset(ttl, maxTTLOffset, minTTLForOffset)
+      opts.expirationTime = expire(ttlWithOffset)
+      opts.ttl = ttlWithOffset * 1000
     }
 
     this.#cache.set(key, opts)

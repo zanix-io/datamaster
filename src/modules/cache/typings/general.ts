@@ -19,7 +19,12 @@ export type QLRUCacheOptions = ConnectorOptions & {
    * A random value between 0 and this number will be added to the base TTL.
    * Defaults to 9 (0–9).
    */
-  randomOffset?: number
+  maxTTLOffset?: number
+  /**
+   * Minimum TTL in seconds required for the offset to be applied.
+   * Defaults to 5.
+   */
+  minTTLForOffset?: number
 }
 
 /**
@@ -78,7 +83,12 @@ export type RedisOptions = ConnectorOptions & {
    * A random value between 0 and this number will be added to the base TTL.
    * Defaults to 9 (0–9).
    */
-  randomOffset?: number
+  maxTTLOffset?: number
+  /**
+   * Minimum TTL in seconds required for the offset to be applied.
+   * Defaults to 5.
+   */
+  minTTLForOffset?: number
   /**
    * Options to batches redis commands and executes them
    * either when the batch reaches a maximum size

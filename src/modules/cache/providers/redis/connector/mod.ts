@@ -3,7 +3,7 @@ import type { RedisOptions } from 'cache/typings/general.ts'
 import { clearTimeouts, execWithRetry } from './retries.ts'
 import { createClient, type RedisClientType } from 'redis'
 import { RedisPipelineScheduler } from './scheduler.ts'
-import { ZanixCacheConnector } from '@zanix/server'
+import { type CacheSetOptions, ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
 import logger from '@zanix/logger'
 import { scanKeys } from './scan.ts'
@@ -34,7 +34,6 @@ export class ZanixRedisConnector<K extends string = string, V = any>
   protected commandRetryInterval: number
   protected maxCommandRetries: number
   protected commandTimeout: number
-  private randomOffset: number
   private timeout: number
 
   /**
@@ -57,13 +56,13 @@ export class ZanixRedisConnector<K extends string = string, V = any>
       commandRetryInterval = 100,
       connectionTimeout,
       schedulerOptions,
-      namespace,
       contextId,
       autoInitialize,
-      randomOffset = 9,
+      maxTTLOffset,
+      minTTLForOffset,
     } = options
 
-    super({ contextId, ttl, namespace, autoInitialize })
+    super({ contextId, ttl, maxOffsetSeconds: maxTTLOffset, minTTLForOffset, autoInitialize })
 
     this.#uri = redisUrl
     const targetName = this.constructor.name
@@ -72,7 +71,6 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     this.commandRetryInterval = commandRetryInterval
     this.maxCommandRetries = maxCommandRetries
     this.commandTimeout = commandTimeout
-    this.randomOffset = randomOffset
     this.timeout = connectionTimeout || this.timeoutConnection
     this.reconnectStrategy = reconnectStrategy || ((retries) => {
       // Retry with exponential backoff, max 5 seconds
@@ -144,29 +142,22 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
   }
 
-  /**
-   * Adds or updates a key-value pair in the cache.
-   *
-   * @param key The key to insert or update.
-   * @param value The value to store.
-   * @param ttl The optional TTL (in seconds).
-   * @param schedule Use Redis pipeline schedule helper
-   */
-  public async set(key: K, value: V, ttl?: number | 'KEEPTTL', schedule?: boolean): Promise<void> {
-    const ttlValue = ttl ?? this.ttl
+  public async set(key: K, value: V, options: CacheSetOptions = {}): Promise<void> {
+    const { exp, schedule, maxTTLOffset, minTTLForOffset } = options
+    const ttlValue = exp ?? this.ttl
     const valueToSave = JSON.stringify(value)
-    const options = {
+    const setterOptions = {
       expiration: ttlValue === 'KEEPTTL' ? ttlValue : ttlValue > 0
         ? {
           type: 'PX' as const,
-          value: ttlValue * 1000 + Math.floor(Math.random() * this.randomOffset) * 1000,
+          value: this.getTTLWithOffset(ttlValue, maxTTLOffset, minTTLForOffset) * 1000,
         }
         : undefined,
     }
 
     if (schedule) {
-      this.execWithRetry(() => this.scheduler.addSet(key, valueToSave, options) as never)
-    } else await this.execWithRetry(() => this.#client.set(key, valueToSave, options))
+      this.execWithRetry(() => this.scheduler.addSet(key, valueToSave, setterOptions) as never)
+    } else await this.execWithRetry(() => this.#client.set(key, valueToSave, setterOptions))
   }
 
   public async get<O = V>(key: K): Promise<O | undefined> {

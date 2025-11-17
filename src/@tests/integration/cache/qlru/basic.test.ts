@@ -48,7 +48,8 @@ Deno.test('QuickLRU: respects TTL expiration', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 3,
     ttl: 0.1,
-    randomOffset: 0.001,
+    maxTTLOffset: 0.001,
+    minTTLForOffset: 0,
   }) // 100 ms TTL
   cache.set('x', 42)
   assertStrictEquals(cache.get('x'), 42)
@@ -91,7 +92,8 @@ Deno.test('QuickLRU: size() evicts expired items', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 3,
     ttl: 0.1,
-    randomOffset: 0.001,
+    maxTTLOffset: 0.001,
+    minTTLForOffset: 0,
   })
   cache.set('a', 1)
   cache.set('b', 2)
@@ -105,7 +107,8 @@ Deno.test('QuickLRU: keys() returns valid non-expired keys', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 3,
     ttl: 0.1,
-    randomOffset: 0.001,
+    maxTTLOffset: 0.001,
+    minTTLForOffset: 0,
   })
   cache.set('a', 1)
   cache.set('b', 2)
@@ -121,7 +124,8 @@ Deno.test('QuickLRU: values() returns valid non-expired values', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 3,
     ttl: 0.1,
-    randomOffset: 0.001,
+    maxTTLOffset: 0.001,
+    minTTLForOffset: 0,
   })
   cache.set('a', 1)
   cache.set('b', 2)
@@ -137,7 +141,8 @@ Deno.test('QuickLRU: overwriting key resets TTL', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 2,
     ttl: 0.1,
-    randomOffset: 0.001,
+    maxTTLOffset: 0.001,
+    minTTLForOffset: 0,
   })
   cache.set('x', 10)
 
@@ -153,12 +158,11 @@ Deno.test('QuickLRU: overwriting key dont resets TTL if KEEP', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 2,
     ttl: 1,
-    randomOffset: 0,
   })
   cache.set('x', 10)
 
   await new Promise((r) => setTimeout(r, 800))
-  cache.set('x', 20, 'KEEPTTL') // KEEP TTL
+  cache.set('x', 20, { exp: 'KEEPTTL' }) // KEEP TTL
 
   await new Promise((r) => setTimeout(r, 150)) // Now 950ms since first write
 
@@ -173,12 +177,13 @@ Deno.test('QuickLRU: with custom TTL', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 2,
     ttl: 0.1,
-    randomOffset: 0.001,
+    maxTTLOffset: 0.001,
+    minTTLForOffset: 0,
   })
   cache.set('x', 10)
 
   await new Promise((r) => setTimeout(r, 80))
-  cache.set('x', 20, 0.07) // Reset TTL with custom TTL value
+  cache.set('x', 20, { exp: 0.07 }) // Reset TTL with custom TTL value
 
   await new Promise((r) => setTimeout(r, 60)) // Now 160ms since first write
 

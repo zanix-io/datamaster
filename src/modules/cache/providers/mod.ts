@@ -1,4 +1,9 @@
-import { type CoreCacheConnectors, ZanixCacheProvider } from '@zanix/server'
+import {
+  type CacheProviderSetOptions,
+  type CacheSetOptions,
+  type CoreCacheConnectors,
+  ZanixCacheProvider,
+} from '@zanix/server'
 import { LockManager } from 'utils/queues/lock-manager.ts'
 import logger from '@zanix/logger'
 
@@ -26,24 +31,22 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
    * @template K The key type.
    * @param {Exclude<CoreCacheConnectors, 'local'>} provider - The external cache provider to query.
    * @param {K} key - The cache key to look up.
-   * @param {Object} [options] - Additional configuration.
-   * @param {() => Promise<V>} [options.fetcher] - A fallback fetch function if the cache miss occurs.
-   * @param {number | 'KEEPTTL'} [options.exp] - Expiration in seconds, or `'KEEPTTL'` to preserve existing TTL.
+   * @param {ProviderBaseGetOpts} [options] - Additional configuration.
    * @returns {Promise<V | undefined>} The cached or freshly fetched value, or `undefined` if not found.
    */
   public override async getCachedOrFetch<V, K = string>(
     provider: Extract<CoreCacheConnectors, 'redis'>,
     key: K,
-    options: { fetcher?: () => V | Promise<V>; exp?: number | 'KEEPTTL' } = {},
+    options: CacheProviderSetOptions<V> = {},
   ): Promise<V> {
     const local = this.local.get(key)
     if (local !== undefined) return local
 
-    const { exp, fetcher } = options
+    const { fetcher, ...opts } = options
     const cache = this[provider]
 
     const cached = await cache.get(key).then((result) => {
-      this.local.set(key, result, exp)
+      this.local.set(key, result, opts)
       return result
     }).catch((err) => {
       if (!fetcher) throw err
@@ -57,7 +60,7 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
     if (!fetcher) return undefined as V
 
     const freshValue = await fetcher()
-    await this.saveToCaches({ provider, key, value: freshValue, exp })
+    await this.saveToCaches({ provider, key, value: freshValue, ...opts })
     return freshValue
   }
 
@@ -77,19 +80,17 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
    * @template K The key type.
    * @param {Exclude<CoreCacheConnectors, 'local'>} provider - The external cache provider (e.g. Redis).
    * @param {K} key - The cache key to retrieve.
-   * @param {Object} [options] - Additional configuration.
-   * @param {() => Promise<V>} [options.fetcher] - A fallback fetch function to refresh the cache.
-   * @param {number | 'KEEPTTL'} [options.exp] - Expiration in seconds, or `'KEEPTTL'` to keep the current TTL.
+   * @param {ProviderBaseGetOpts} [options] - Additional configuration.
    * @param {number} [options.softTtl=45] - Soft TTL in seconds. After this time, the cache is refreshed in background.
    * @returns {Promise<V | undefined>} The cached or freshly fetched value, or `undefined` if not found.
    */
   public override async getCachedOrRevalidate<V, K = string>(
     provider: Extract<CoreCacheConnectors, 'redis'>,
     key: K,
-    options: { fetcher?: () => V | Promise<V>; exp?: number | 'KEEPTTL'; softTtl?: number } = {},
+    options: { softTtl?: number } & CacheProviderSetOptions<V> = {},
   ): Promise<V> {
     const getAge = (timestamp: number) => (Date.now() - timestamp) / 1000
-    const { exp, softTtl = 45, fetcher } = options
+    const { softTtl = 45, fetcher, ...opts } = options
     const local = this.local.get(key)
 
     if (local !== undefined && getAge(local.timestamp) < softTtl) return local.value
@@ -100,7 +101,7 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
       const cached = await cache.get(key)
       if (cached !== undefined) {
         if (getAge(cached.timestamp) < softTtl) {
-          this.local.set(key, cached, exp)
+          this.local.set(key, cached, opts)
           return cached.value
         }
 
@@ -113,7 +114,7 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
                 provider,
                 key,
                 value: { value: newValue, timestamp: Date.now() },
-                exp,
+                ...opts,
               })
             } catch (e) {
               logger.error('Cache refresh operation failed.', e, {
@@ -124,7 +125,7 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
           })
         }
 
-        this.local.set(key, cached, exp)
+        this.local.set(key, cached, opts)
         return cached.value
       }
     } catch (err) {
@@ -141,7 +142,7 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
     const freshValue = await fetcher()
 
     const entry = { value: freshValue, timestamp: Date.now() }
-    await this.saveToCaches({ provider, key, value: entry, exp })
+    await this.saveToCaches({ provider, key, value: entry, ...opts })
     return freshValue
   }
 
@@ -158,9 +159,6 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
    * @param {Extract<CoreCacheConnectors, 'redis'>} options.provider - External cache provider/connector to use (currently `'redis'`).
    * @param {K} options.key - The key under which the value will be stored.
    * @param {V} options.value - The value to store in caches.
-   * @param {number | 'KEEPTTL'} [options.exp] - TTL in seconds for the external cache, or `'KEEPTTL'` to preserve the existing TTL.
-   * @param {boolean} [options.schedule=false] - If `true`, schedule the external write (e.g. enqueue or perform in background) instead of performing it synchronously (use for redis).
-   *
    * @returns {Promise<void>} Resolves when the local cache is updated and the external write has been scheduled or completed.
    *
    * @throws {Error} If the operation fails (e.g. local cache update fails or external write scheduling fails).
@@ -170,12 +168,10 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
       provider: Extract<CoreCacheConnectors, 'redis'>
       key: K
       value: V
-      exp?: number | 'KEEPTTL'
-      schedule?: boolean
-    },
+    } & CacheSetOptions,
   ): Promise<void> {
-    const { key, exp, value, provider, schedule } = options
-    const args = [key, value, exp, schedule] as const
+    const { key, value, provider, ...opts } = options
+    const args = [key, value, opts] as const
 
     this.local.set(...args)
 

@@ -37,7 +37,7 @@ Deno.test('getCachedOrFetch should return cached value from local cache', async 
   const value = 'cached-value'
 
   // Simulate the value being in the local cache
-  provider.local.set(key, value, 60)
+  provider.local.set(key, value, { exp: 60 })
 
   // Call fbGet to retrieve the value from the cache
   const result = await provider.getCachedOrFetch('redis', key)
@@ -81,7 +81,7 @@ Deno.test('getCachedOrRevalidate should return cached value within soft TTL wind
 
   const key = 'soft-ttl-key'
   const value = { value: 'soft-ttl-value', timestamp: Date.now() - 1000 } // 1 second old
-  provider.local.set(key, value)
+  provider.local.set(key, value, {})
 
   const softTtl = 5 // Soft TTL is set to 5 seconds
 
@@ -102,8 +102,8 @@ Deno.test(
 
     const key = 'refresh-key'
     const value = { value: 'old-value', timestamp: Date.now() - 10000 } // 10 seconds old
-    provider.local.set(key, value)
-    await provider.redis.set(key, value)
+    provider.local.set(key, value, {})
+    await provider.redis.set(key, value, {})
 
     const softTtl = 5 // Soft TTL is 5 seconds
     const fetcher = () => 'new-fresh-value' // A function to fetch new data
