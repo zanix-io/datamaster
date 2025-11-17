@@ -1,19 +1,17 @@
 import { assertEquals } from '@std/assert/assert-equals'
 import { assertRejects, assertThrows } from '@std/assert'
 import { ZanixCacheCoreProvider } from 'modules/cache/providers/mod.ts'
-import { ZanixQLRUConnector } from 'modules/cache/providers/qlru/connector.ts'
-import { Connector } from '@zanix/server'
 import { ZanixRedisConnector } from 'modules/cache/providers/redis/connector/mod.ts'
+import { Connector } from '@zanix/server'
 
 // mocks
 console.info = () => {}
 console.error = () => {}
 console.warn = () => {}
 
-const registerInstance = () => {
+const registerInstance = async () => {
   // Register instance
-  @Connector('cache:local')
-  class _Local extends ZanixQLRUConnector<string, string> {}
+  await import('../../../modules/cache/providers/qlru/core.ts')
 
   // Register instance
   @Connector({ type: 'cache:redis', autoInitialize: false })
@@ -28,7 +26,7 @@ Deno.test('provider should throws on non instantiated cache', () => {
 
 // Test case for getCachedOrFetch: Should return cached value from local cache if it exists
 Deno.test('getCachedOrFetch should return cached value from local cache', async () => {
-  registerInstance()
+  await registerInstance()
 
   const provider = new ZanixCacheCoreProvider('testContext')
   await provider.redis['initialize']()
@@ -48,7 +46,7 @@ Deno.test('getCachedOrFetch should return cached value from local cache', async 
 
 // Test case for getCachedOrFetch: Should fetch data and store it if cache miss occurs
 Deno.test('getCachedOrFetch should fetch and store data when cache miss occurs', async () => {
-  registerInstance()
+  await registerInstance()
   const provider = new ZanixCacheCoreProvider('testContext')
   await provider.redis['initialize']()
 
@@ -75,7 +73,7 @@ Deno.test('getCachedOrFetch should fetch and store data when cache miss occurs',
 
 // Test case for getCachedOrRevalidate: Should return cached value within soft TTL window
 Deno.test('getCachedOrRevalidate should return cached value within soft TTL window', async () => {
-  registerInstance()
+  await registerInstance()
   const provider = new ZanixCacheCoreProvider()
   await provider.redis['initialize']()
 
@@ -96,7 +94,7 @@ Deno.test('getCachedOrRevalidate should return cached value within soft TTL wind
 Deno.test(
   'getCachedOrRevalidate should refresh data in background after soft TTL expires',
   async () => {
-    registerInstance()
+    await registerInstance()
     const provider = new ZanixCacheCoreProvider('testContext')
     await provider.redis['initialize']()
 
@@ -138,7 +136,7 @@ Deno.test(
 
 // Test case for getCachedOrRevalidate: Should fallback to fetch if no cache available
 Deno.test('getCachedOrRevalidate should fallback to fetch if no cache available', async () => {
-  registerInstance()
+  await registerInstance()
   const provider = new ZanixCacheCoreProvider('testContext')
   await provider.redis['initialize']()
 
@@ -165,7 +163,7 @@ Deno.test('getCachedOrRevalidate should fallback to fetch if no cache available'
 
 // Test case for getCachedOrRevalidate: Should handle errors gracefully
 Deno.test('getCachedOrRevalidate should handle errors gracefully', async () => {
-  registerInstance()
+  await registerInstance()
   const provider = new ZanixCacheCoreProvider('testContext')
   await provider.redis['initialize']()
 
@@ -184,4 +182,13 @@ Deno.test('getCachedOrRevalidate should handle errors gracefully', async () => {
   )
 
   provider.redis['close']()
+})
+
+Deno.test('QLRU cache should not reinitializate', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+
+  provider.local.set('1', 1, { exp: 10 })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assertEquals(provider.local.get('1'), 1)
 })

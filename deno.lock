@@ -10,8 +10,9 @@
     "jsr:@std/internal@^1.0.10": "1.0.12",
     "jsr:@std/path@0.224": "0.224.0",
     "jsr:@std/path@^1.0.6": "1.1.2",
-    "jsr:@zanix/server@1": "1.2.2",
-    "jsr:@zanix/server@^1.2.2": "1.2.2",
+    "jsr:@zanix/server@1": "1.2.3",
+    "jsr:@zanix/server@^1.2.2": "1.2.3",
+    "jsr:@zanix/server@^1.2.3": "1.2.3",
     "jsr:@zanix/utils@*": "2.2.2",
     "jsr:@zanix/utils@2": "2.2.2",
     "npm:@types/node@*": "24.2.0",
@@ -67,11 +68,11 @@
         "jsr:@std/internal@^1.0.10"
       ]
     },
-    "@zanix/server@1.2.2": {
-      "integrity": "1c58f57579a6e67da24de1c6f611a83d810c5e68f7e83eb3781386f3e1ac41b7",
+    "@zanix/server@1.2.3": {
+      "integrity": "35a8b61bf774b3213f3866b74d389409d6b906291a3a753e1afd8d59b2458d06",
       "dependencies": [
         "jsr:@std/path@0.224",
-        "jsr:@zanix/server@^1.2.2",
+        "jsr:@zanix/server@^1.2.3",
         "jsr:@zanix/utils@2",
         "npm:graphql",
         "npm:redis"

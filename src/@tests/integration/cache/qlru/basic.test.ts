@@ -47,12 +47,12 @@ Deno.test('QuickLRU: updates existing key and moves it to most recent', () => {
 Deno.test('QuickLRU: respects TTL expiration', async () => {
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 3,
-    ttl: 0.1,
-    maxTTLOffset: 0.001,
-    minTTLForOffset: 0,
-  }) // 100 ms TTL
-  cache.set('x', 42)
+  })
+  cache.set('x', 42, { exp: 0.1 }) // 100 ms TTL
   assertStrictEquals(cache.get('x'), 42)
+
+  await new Promise((resolve) => setTimeout(resolve, 50))
+  assert(cache.get('x')) // still here
 
   // Wait until item expires
   await new Promise((resolve) => setTimeout(resolve, 150))

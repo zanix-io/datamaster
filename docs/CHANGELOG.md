@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.5] - 2025-11-17
+
+### Fixed
+
+- Core cache provider local instance autoinitialization
+
 ## [0.3.4] - 2025-11-17
 
 ### Changed
