@@ -105,3 +105,19 @@ export type SeederProcessor = {
     model: any,
   ) => unknown
 }
+
+/**
+ * Represents a single Expired Value entry.
+ */
+export interface ExpiredValueEntry<V> {
+  value: V
+  expirationTime: number // 0 if no TTL
+  ttl: number // ttl saved in milliseconds
+}
+
+/**
+ * Represents a single KV entry.
+ */
+export interface KVEntry<V> extends ExpiredValueEntry<V> {
+  key: string
+}

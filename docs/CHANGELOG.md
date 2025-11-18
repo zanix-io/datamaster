@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.6] - 2025-11-17
+
+### Added
+
+- Support for **SQLite** as a local key-value store backend.
+- **ZanixKV connector** for lightweight and fast KV storage with optional TTL and per-key locking.
+
 ## [0.3.5] - 2025-11-17
 
 ### Fixed

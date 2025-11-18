@@ -22,12 +22,14 @@
 
 ## 🧩 Description
 
-**Zanix Datamaster** is part of the **Zanix** ecosystem — a suite of tools for modern
-micro-applications. It provides **database and cache connectors** through a unified API for services
-like **MongoDB**, **Redis**, and **Memcached** (coming soon).
+**Zanix Datamaster** is a core component of the **Zanix** ecosystem — a toolkit designed for modern
+micro-applications. It offers a **unified API for database and cache connectors**, supporting
+services such as **MongoDB**, **Redis**, **SQLite** (as a KV store), and **Memcached** (coming
+soon).
 
-Currently, it includes full **MongoDB** support, with schema utilities, deep data transformations,
-and access & protection policies.
+Out of the box, it provides full support for **MongoDB**, **Redis**, and **KV stores**, including
+schema management utilities, advanced data transformations, robust access and protection policies,
+local caching utilities, such as in-memory Map for fast, etc.
 
 > 💡 Special thanks to the external database and cache providers whose technologies make this module
 > possible.
@@ -56,6 +58,14 @@ and access & protection policies.
   - Based on `Least Recently Used (LRU)` for ultra-fast in-memory caching..
   - Automatic eviction policy (LRU).
   - Serves as a fallback when the external cache is unavailable.
+
+* **Key-value store connector**
+
+  - Lightweight and fast **SQLite-backed key-value store**.
+  - Supports **optional TTL (Time-To-Live)** for automatic expiration.
+  - Provides **get, set, delete, and clear** operations.
+  - Includes **per-key exclusive locking** for safe concurrent access.
+  - Ideal for local storage, caching, and lightweight persistence scenarios.
 
 - **Queues & concurrency helpers**
   - **Semaphores**: Limit the number of concurrent operations with FIFO queuing.
@@ -168,6 +178,9 @@ import {
   findPathsWithAccessorsDeep,
   getAllSubschemas,
 } from 'jsr:@zanix/datamaster@[version]/database'
+
+// SQLite
+import { LocalSQLite, ZanixKVStoreConnector } from 'jsr:@zanix/datamaster@[version]/database'
 
 /**
  * *************************************************

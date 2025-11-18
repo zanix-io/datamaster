@@ -66,5 +66,11 @@ export { ZanixMongoConnector } from 'mongo/connector/mod.ts'
 export { Schema } from 'mongoose'
 
 /**
+ * SQLite
+ */
+
+export { ZanixKVStoreConnector } from './providers/sqlite/connector.ts'
+export { LocalSQLite } from './utils/sqlite.ts'
+/**
  * OTHER DATABASES...
  */

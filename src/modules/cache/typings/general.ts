@@ -1,14 +1,5 @@
 import type { ConnectorOptions } from '@zanix/server'
 
-/**
- * Represents a single cache entry in the QuickLRU cache.
- */
-export interface CacheEntry<V> {
-  value: V
-  expirationTime: number // 0 if no TTL
-  ttl: number // ttl saved in milliseconds
-}
-
 /** Quick LRU cache options */
 export type QLRUCacheOptions = ConnectorOptions & {
   capacity?: number

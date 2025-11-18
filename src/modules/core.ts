@@ -9,3 +9,4 @@
 
 export { default as mongoCore } from 'mongo/connector/core.ts'
 export { default as cacheProvider } from 'cache/providers/core.ts'
+export { default as znxKeyValue } from 'sqlite/core.ts'

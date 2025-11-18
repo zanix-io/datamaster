@@ -1,4 +1,5 @@
-import type { CacheEntry, QLRUCacheOptions } from 'cache/typings/general.ts'
+import type { QLRUCacheOptions } from 'cache/typings/general.ts'
+import type { ExpiredValueEntry } from 'database/typings/general.ts'
 import { type CacheSetOptions, ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
 
@@ -19,7 +20,7 @@ import { InternalError } from '@zanix/errors'
  */
 // deno-lint-ignore no-explicit-any
 export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector<K, V, 'local'> {
-  #cache!: Map<K, CacheEntry<V>>
+  #cache!: Map<K, ExpiredValueEntry<V>>
   protected readonly capacity: number
 
   /**
@@ -48,11 +49,11 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
     })
     this.capacity = capacity
 
-    this.initialize()
+    if (!this['_znx_props_'].data.autoInitialize) this.initialize()
   }
 
   protected override initialize() {
-    this.#cache = new Map<K, CacheEntry<V>>()
+    this.#cache = new Map<K, ExpiredValueEntry<V>>()
   }
 
   /**
@@ -85,7 +86,7 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
    *
    * @param key The key used to store the value.
    * @param value The value to store.
-   * @param {BaseSetOpts} [options] The optional configuration
+   * @param {CacheSetOptions} [options] The optional configuration
    */
   public set(key: K, value: V, options: CacheSetOptions = {}): void {
     const { exp, schedule, maxTTLOffset, minTTLForOffset } = options
@@ -202,7 +203,7 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
 
   protected override close() {}
 
-  public getClient<T = Map<K, CacheEntry<V>>>(): T {
+  public getClient<T = Map<K, ExpiredValueEntry<V>>>(): T {
     return this.#cache as T
   }
 }

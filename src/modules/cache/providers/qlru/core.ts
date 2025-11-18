@@ -12,7 +12,7 @@ import { Connector } from '@zanix/server'
 
 /** Connector loader */
 const connectorHOC = () => {
-  @Connector({ type: 'cache:local', autoInitialize: false })
+  @Connector({ type: 'cache:local', autoInitialize: false, startMode: 'lazy' })
   class _ZanixLocalCacheCoreConnector extends ZanixQLRUConnector {}
 }
 

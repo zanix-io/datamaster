@@ -41,7 +41,7 @@ export class LockManager {
     return sem
   }
 
-  public async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  public async withLock<T>(key: string, fn: () => T | Promise<T>): Promise<T> {
     const sem = this.getSemaphore(key)
 
     await sem.acquire()
