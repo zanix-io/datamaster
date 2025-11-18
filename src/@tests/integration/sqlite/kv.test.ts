@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert'
+import { assert, assertEquals } from '@std/assert'
 import { getTemporaryFolder } from '@zanix/helpers'
 import { ZanixKVStoreConnector } from 'modules/database/providers/sqlite/connector.ts'
 
@@ -28,7 +28,9 @@ Deno.test('ZanixKVConnector: delete key', () => {
 Deno.test('ZanixKVConnector: TTL expiration', async () => {
   const kv = new ZanixKVStoreConnector<string>({ filename })
   kv.set('ttlKey', 'temp', 1) // 1 second TTL
-  await new Promise((r) => setTimeout(r, 1100))
+  await new Promise((r) => setTimeout(r, 900))
+  assert(kv.get('ttlKey')) // still here
+  await new Promise((r) => setTimeout(r, 100))
   const value = kv.get('ttlKey')
   assertEquals(value, undefined)
 })

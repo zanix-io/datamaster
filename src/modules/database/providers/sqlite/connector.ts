@@ -44,8 +44,8 @@ export class ZanixKVStoreConnector<V = any> extends ZanixKVConnector {
       {
         key: 'TEXT',
         value: 'TEXT',
-        expirationTime: 'INTEGER',
-        ttl: 'INTEGER',
+        expirationTime: 'TEXT',
+        ttl: 'TEXT',
       },
       { primaryKey: ['key'] },
     )
@@ -65,8 +65,8 @@ export class ZanixKVStoreConnector<V = any> extends ZanixKVConnector {
     if (!entry) return undefined
 
     // Check if expired
-    if (entry.ttl > 0 && Date.now() > entry.expirationTime) {
-      this.#sqlite.deleteByKey({ key })
+    if (Number(entry.ttl) > 0 && Date.now() > Number(entry.expirationTime)) {
+      //  this.#sqlite.deleteByKey({ key })
       return undefined
     }
 
@@ -98,7 +98,12 @@ export class ZanixKVStoreConnector<V = any> extends ZanixKVConnector {
       data.ttl = exp * 1000
     }
 
-    this.#sqlite.insertOrUpdateData({ ...data, key })
+    this.#sqlite.insertOrUpdateData({
+      ...data,
+      expirationTime: data.expirationTime.toString(),
+      ttl: data.ttl.toString(),
+      key,
+    })
   }
 
   /**
