@@ -10,8 +10,8 @@
 import { ZanixMongoConnector } from './mod.ts'
 import { Connector } from '@zanix/server'
 
-/** Connector HOC */
-const connectorHOC = () => {
+/** Connector DSL definition */
+const registerConnector = () => {
   if (!Deno.env.get('MONGO_URI')) return
 
   @Connector('database')
@@ -35,6 +35,6 @@ const connectorHOC = () => {
  *
  * @module
  */
-const zanixMongoConnectorCore: void = connectorHOC()
+const zanixMongoConnectorCore: void = registerConnector()
 
 export default zanixMongoConnectorCore

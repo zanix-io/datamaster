@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-11-19
+
+### Changed
+
+- Replaced Higher-Order Component (HOC) files with `defs` files to unify module definitions and
+  centralize DSL-based declarations, metadata, and foundational structures. This improves
+  consistency and simplifies the architecture for components like handlers, interactors, providers,
+  and connectors.
+
 ## [0.4.0] - 2025-11-17
 
 ### Added

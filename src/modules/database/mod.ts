@@ -24,7 +24,7 @@
  */
 
 // models
-export { defineModelHOC } from './hocs/models.ts'
+export { registerModel } from './defs/models.ts'
 
 // accessors
 export { dataProtectionGetter } from './policies/protection.ts'

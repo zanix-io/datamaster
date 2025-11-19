@@ -84,9 +84,9 @@ local caching utilities, such as in-memory Map for fast, etc.
     - Guarantees only one mutation for the same key runs at a time.
     - Built on top of the `LockManager` and semaphores for predictable and safe execution.
 
-- **Model HOC support (Database Only)**
+- **Model DSL definition support (Database Only)**
 
-  - Define and load models dynamically with `defineModelHOC`.
+  - Define and load models dynamically with `registerModel`.
   - Supports **seeders**: an array of async/sync functions
     `(Model, connector) => void | Promise<void>` to populate initial data.
   - Allows callbacks to extend schemas with custom methods.
@@ -148,8 +148,8 @@ export {
 // Mongo connector
 import { Schema, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
 
-// Models HOC
-import { defineModelHOC } from 'jsr:@zanix/datamaster@[version]/database'
+// Models DSL definition
+import { registerModel } from 'jsr:@zanix/datamaster@[version]/database'
 
 // Access & protection policies
 import {
@@ -267,7 +267,7 @@ seedRotateProtectionKeys()
 #### Example
 
 ```ts
-import { defineModelHOC, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
+import { registerModel, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
 
 type Attrs = {
   name: string
@@ -275,8 +275,8 @@ type Attrs = {
   email: string
 }
 
-// Define a model via HOC with schema, seeders, and custom methods
-defineModelHOC<Attrs>({
+// Register a model via DSL definition with schema, seeders, and custom methods
+registerModel<Attrs>({
   name: 'users',
   definition: {
     name: String,

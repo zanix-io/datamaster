@@ -10,8 +10,8 @@
 import { ZanixQLRUConnector } from './connector.ts'
 import { Connector } from '@zanix/server'
 
-/** Connector loader */
-const connectorHOC = () => {
+/** Connector DSL definition */
+const registerConnector = () => {
   @Connector({ type: 'cache:local', autoInitialize: false, startMode: 'lazy' })
   class _ZanixLocalCacheCoreConnector extends ZanixQLRUConnector {}
 }
@@ -31,6 +31,6 @@ const connectorHOC = () => {
  *
  * @module
  */
-const zanixQLRUConnectorCore: void = connectorHOC()
+const zanixQLRUConnectorCore: void = registerConnector()
 
 export default zanixQLRUConnectorCore

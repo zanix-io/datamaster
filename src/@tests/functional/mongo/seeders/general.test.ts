@@ -3,7 +3,7 @@
 import { assert, assertEquals } from '@std/assert'
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { seedByIdIfMissing, seedManyByIdIfMissing } from 'mongo/utils/seeders/mod.ts'
-import { defineModelHOC } from 'modules/database/hocs/models.ts'
+import { registerModel } from 'modules/database/defs/models.ts'
 import { Schema } from 'mongoose'
 
 const bulk = [
@@ -75,7 +75,7 @@ Deno.test({
   ...sanitize,
   name: 'Mongo connector should run seeders',
   fn: async () => {
-    defineModelHOC({
+    registerModel({
       name: 'test-seeders',
       definition: {
         name: String,
@@ -117,7 +117,7 @@ Deno.test({
   ...sanitize,
   name: 'Mongo connector should run customized seeders',
   fn: async () => {
-    defineModelHOC({
+    registerModel({
       name: 'test-customized-seeders',
       definition: {
         name: String,

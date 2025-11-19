@@ -12,7 +12,7 @@ const seederErrorMsg =
 
 /**
  * Extends the ZanixMongoConnector to execute seeders on models
- * injected through a Higher-Order Component (HOC).
+ * injected through a DSL definition.
  *
  * This function is responsible for initializing and running seed scripts
  * associated with specific MongoDB models, allowing for streamlined data

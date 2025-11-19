@@ -11,11 +11,10 @@ import { ZanixKVStoreConnector } from './connector.ts'
 import { Connector } from '@zanix/server'
 
 /**
- * Higher-order function that wraps the ZanixKVConnector with the Zanix `@Connector` decorator.
- *
- * @returns A decorated KV connector class.
+ * DSL function that decorates the `ZanixKVStoreConnector` using the Zanix `@Connector`
+ * decorator, registering it as a KV connector within the framework.
  */
-const connectorHOC = () => {
+const registerConnector = () => {
   @Connector({ type: 'kvLocal', autoInitialize: false, startMode: 'lazy' })
   class _ZanixKVConnector extends ZanixKVStoreConnector {}
 }
@@ -39,6 +38,6 @@ const connectorHOC = () => {
  * import zanixKVConnectorCore from './zanix_kv_connector_core.ts';
  * // Connector is automatically registered and ready to use
  */
-const zanixKVConnectorCore: void = connectorHOC()
+const zanixKVConnectorCore: void = registerConnector()
 
 export default zanixKVConnectorCore

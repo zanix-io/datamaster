@@ -33,7 +33,7 @@ export type BaseModel<Attrs extends object, T extends DatabaseTypes> = {
 } & ModelDefinition<T, Attrs>
 
 /**
- * Higher-order component (HOC) that enhances a base model with specific model definitions and optional configuration.
+ * DSL definition that enhances a base model with specific model definitions and optional configuration.
  * This type represents a function that takes a model, along with an optional type, and modifies or extends the model.
  * The default type is `'mongo'`, but it can be customized for different database types.
  *
@@ -41,20 +41,20 @@ export type BaseModel<Attrs extends object, T extends DatabaseTypes> = {
  * @template Attrs - The attributes or schema of the model, defaulting to `any`. This represents the structure or shape
  *                   of the model's data.
  *
- * @type ModelHOC
+ * @type ModelDef
  *
- * @param {BaseModel & ModelDefinition<T, Attrs>} model - The base model and its definition that will be enhanced by the HOC.
+ * @param {BaseModel & ModelDefinition<T, Attrs>} model - The base model and its definition that will be enhanced by the DSL definition.
  * @param {T} [type='mongo'] - An optional parameter to specify the database type (e.g., `'mongo'`, `'postgres'`, etc.).
  *                              Defaults to `'mongo'`.
  */
-export type ModelHOC = <Attrs extends object = any, T extends DatabaseTypes = 'mongo'>(
+export type ModelDef = <Attrs extends object = any, T extends DatabaseTypes = 'mongo'>(
   model: BaseModel<Attrs, T>,
   type?: T,
 ) => void
 
 /**
  * Defines metadata for a model, including its name, schema definition, and an optional callback function.
- * This is typically used when defining a model in a higher-order component (HOC) like `defineModelHOC`.
+ * This is typically used when defining a model in a DSL definition like `registerModel`.
  *
  * @template T - The type of the model definition, typically representing a schema or structure for the model.
  *

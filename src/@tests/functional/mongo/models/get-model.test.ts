@@ -1,7 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { assertEquals } from '@std/assert'
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
-import { defineModelHOC } from 'modules/database/hocs/models.ts'
+import { registerModel } from 'modules/database/defs/models.ts'
 import { Schema } from 'mongoose'
 
 const modelValidation = async (Model: any, db: any) => {
@@ -26,14 +26,14 @@ const modelValidation = async (Model: any, db: any) => {
 
 Deno.test({
   ...sanitize,
-  name: 'Mongo connector should add HOC model',
+  name: 'Mongo connector should add DSL model',
   fn: async () => {
     type Attrs = {
       name?: string
       description?: string
     }
 
-    defineModelHOC<Attrs>({
+    registerModel<Attrs>({
       name: 'test-basic-get-model',
       definition: {
         name: String,

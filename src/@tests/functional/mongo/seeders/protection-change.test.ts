@@ -2,7 +2,7 @@
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { seedManyByIdIfMissing, seedRotateProtectionKeys } from 'mongo/utils/seeders/mod.ts'
 import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
-import { defineModelHOC } from 'modules/database/hocs/models.ts'
+import { registerModel } from 'modules/database/defs/models.ts'
 import { aesKey, keys } from '../../../(setup)/keys.ts'
 import { assert, assertEquals } from '@std/assert'
 import { Schema } from 'mongoose'
@@ -53,7 +53,7 @@ Deno.test({
 
     let assertExecuted = false
 
-    defineModelHOC({
+    registerModel({
       name: 'test-seeders-rotate-keys',
       definition: {
         name: {
@@ -120,7 +120,7 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY_V1', 'my-secret-key-v2')
     Deno.env.set('DATA_AES_KEY_V1', aesKey)
 
-    defineModelHOC({
+    registerModel({
       name: 'test-seeders-rotate-keys',
       definition: {
         name: {

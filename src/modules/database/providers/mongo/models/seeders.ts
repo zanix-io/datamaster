@@ -1,4 +1,4 @@
-import { defineModelHOC } from 'database/hocs/models.ts'
+import { registerModel } from 'database/defs/models.ts'
 
 export type SeedModelAttrs = {
   name: string
@@ -9,11 +9,11 @@ export type SeedModelAttrs = {
 }
 
 /**
- * HOC to define Seed Model
+ * DSL function to define Seed Model
  * @param name  - Seed Model Name
  */
 export const defineSeedModel = (name: string) => {
-  defineModelHOC<SeedModelAttrs>({
+  registerModel<SeedModelAttrs>({
     name,
     definition: {
       name: { type: String, required: true, indexes: true },

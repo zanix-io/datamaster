@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -70,7 +70,6 @@
     ".": "./mod.ts",
     "./database": "./src/modules/database/mod.ts",
     "./cache": "./src/modules/cache/mod.ts",
-    /** core module definitions */
     "./core": "./src/modules/core.ts"
   },
   "nodeModulesDir": "auto",

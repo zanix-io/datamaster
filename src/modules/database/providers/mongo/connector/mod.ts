@@ -80,7 +80,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   /**
    * Retrieves a model instance by creating a new one based on the provided schema.
    *
-   * - For advanced customization (e.g., seeders, triggers, dataPolicies), you can define them using the `extensions` option, or alternatively through `defineModelHOC` for a higher-level setup.
+   * - For advanced customization (e.g., seeders, triggers, dataPolicies), you can define them using the `extensions` option, or alternatively through `registerModel` for a higher-level setup.
    * - If seeders are not included via `extensions`, they should be executed separately using the `runSeeders` connector function.
    *
    * When accessing related models via this method:
@@ -89,7 +89,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    * - If the related models require seed data, make sure their seeders are included in the `extensions.seeders` option.
    *
    * To avoid such issues, you should:
-   * - Prefer `defineModelHOC` for loading related or referenced models, as it handles binding and setup automatically, or
+   * - Prefer `registerModel` for loading related or referenced models, as it handles binding and setup automatically, or
    * - Explicitly provide related models via `options.relatedModels` (`{ [modelName: string]: {schema: Schema, options?: SchemaModelInitOptions<S> }`) and any necessary seeders.
    *
    * **Warning:** Identifiers specified in schema `ref` fields must exactly match the corresponding keys in `relatedModels`. Using different identifiers will prevent proper model resolution.
@@ -106,7 +106,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   /**
    * Retrieves an already registered model by its name.
    *
-   * **Note:** To have schemas available in this context, please use `defineModelHOC`.
+   * **Note:** To have schemas available in this context, please use `registerModel`.
    *
    * @template Attrs - The base attributes type of the model.
    * @template Opts - The optional defined schema options.
@@ -145,7 +145,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
         message:
           'A required internal resource is missing. The system could not complete the operation.',
         cause:
-          'Mongo model not found. To proceed, please use `defineModelHOC` or supply a valid schema.',
+          'Mongo model not found. To proceed, please use `registerModel` or supply a valid schema.',
         shouldLog: true,
       })
     }

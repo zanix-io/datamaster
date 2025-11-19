@@ -1,4 +1,4 @@
-import { defineModelHOC } from 'modules/database/hocs/models.ts'
+import { registerModel } from 'modules/database/defs/models.ts'
 import { getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { assert, assertEquals } from '@std/assert'
 import { Schema } from 'mongoose'
@@ -51,7 +51,7 @@ Deno.test({
   ...sanitize,
   name: 'Valide mongo db sensible data instanced',
   fn: async () => {
-    defineModelHOC({
+    registerModel({
       name: 'test-security-model',
       definition: {
         name: String,
@@ -61,9 +61,9 @@ Deno.test({
 
     const db = await getDB()
 
-    const ModelByHOC = db.getModel('test-security-model')
+    const ModelByDSL = db.getModel('test-security-model')
 
-    mongoPasswordValidation(ModelByHOC)
+    mongoPasswordValidation(ModelByDSL)
 
     const ModelBySchema = await db.getModel(
       'test-security-model-by-schema',

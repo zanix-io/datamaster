@@ -1,10 +1,10 @@
-import type { ModelHOC } from 'database/typings/models.ts'
+import type { ModelDef } from 'database/typings/models.ts'
 
 import ProgramModule from 'modules/program/mod.ts'
 import { seederAdaptation } from '../utils/seeders/adaptation.ts'
 
 /**
- * A higher-order component (HOC) that adds a model to the `ProgramModule`'s model registry.
+ * A DSL definition that adds a model to the `ProgramModule`'s model registry.
  * This function enhances the given model by adding it to a collection or registry of models,
  * optionally specifying the database type (defaulting to `'mongo'`).
  *
@@ -13,13 +13,13 @@ import { seederAdaptation } from '../utils/seeders/adaptation.ts'
  * @param type - An optional database type that the model is associated with. Defaults to `'mongo'`.
  *
  * @example
- * // Example usage of defineModelHOC
+ * // Example usage of registerModel
  * const MyModel = {...} as const;
- * defineModelHOC<Attrs>(MyModel);
+ * registerModel<Attrs>(MyModel);
  *
  * @example
  * // Example usage with MyModel specification
- * defineModelHOC({
+ * registerModel({
  *   name: 'test',
  *   definition: {
  *     name: {
@@ -42,7 +42,7 @@ import { seederAdaptation } from '../utils/seeders/adaptation.ts'
  *   },
  * });
  */
-export const defineModelHOC: ModelHOC = ({ extensions = {}, ...model }, type) => {
+export const registerModel: ModelDef = ({ extensions = {}, ...model }, type) => {
   if (!type) type = 'mongo' as never
 
   const { seeders = [], ...exts } = extensions

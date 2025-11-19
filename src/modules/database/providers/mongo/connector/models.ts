@@ -11,7 +11,7 @@ import { Schema } from 'mongoose'
 
 /**
  * Extends the ZanixMongoConnector to define and register
- * all models injected through a Higher-Order Component (HOC).
+ * all models injected through a DSL definition.
  *
  * It retrieves model definitions and optional callbacks from metadata,
  * creates schemas, optionally processes them with callbacks,

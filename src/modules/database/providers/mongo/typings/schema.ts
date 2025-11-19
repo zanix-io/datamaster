@@ -19,7 +19,7 @@ export type BaseCustomSchema = {
 /**
  * Optional parameters to define a model by schema.
  *
- * Prefer `defineModelHOC` for loading related or referenced models, as it handles binding and setup automatically
+ * Prefer `registerModel` for loading related or referenced models, as it handles binding and setup automatically
  */
 export type SchemaModelInitOptions<S extends Schema> = {
   /**
