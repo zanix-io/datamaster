@@ -20,9 +20,10 @@
     "jsr:@std/path@1": "1.1.2",
     "jsr:@std/path@^1.0.6": "1.1.2",
     "jsr:@std/path@^1.1.1": "1.1.2",
-    "jsr:@zanix/server@1": "1.2.5",
-    "jsr:@zanix/server@^1.2.5": "1.2.5",
-    "jsr:@zanix/utils@2": "2.2.2",
+    "jsr:@zanix/server@1": "1.2.9",
+    "jsr:@zanix/server@^1.2.9": "1.2.9",
+    "jsr:@zanix/utils@*": "2.2.3",
+    "jsr:@zanix/utils@2": "2.2.3",
     "npm:@types/node@*": "24.2.0",
     "npm:esbuild@0.20.2": "0.20.2",
     "npm:graphql@16": "16.12.0",
@@ -111,18 +112,17 @@
         "jsr:@std/internal@^1.0.10"
       ]
     },
-    "@zanix/server@1.2.5": {
-      "integrity": "a9ab45665312e15c461c761b27f0c70c0f49336f65105a34ba073f951c1024b5",
+    "@zanix/server@1.2.9": {
+      "integrity": "4558bdf925423ed30b7d981aa06ebfb421cf29fd57522c6e9867540d2cb8d814",
       "dependencies": [
         "jsr:@std/path@0.224",
-        "jsr:@zanix/server@^1.2.5",
-        "jsr:@zanix/utils",
+        "jsr:@zanix/utils@2",
         "npm:graphql",
         "npm:redis"
       ]
     },
-    "@zanix/utils@2.2.2": {
-      "integrity": "65ac8e6eed182e3dbbf9d2549de98d9d4206a4e20eb7e80882400a372e4c7c71",
+    "@zanix/utils@2.2.3": {
+      "integrity": "df5487ab636060a44b6dc07e831c000274c39f578999d0fbb56d482607c2b92a",
       "dependencies": [
         "jsr:@luca/esbuild-deno-loader",
         "jsr:@std/fmt@0.224",
