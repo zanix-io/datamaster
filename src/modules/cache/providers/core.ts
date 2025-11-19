@@ -10,11 +10,12 @@
 import { ZanixCacheCoreProvider } from './mod.ts'
 import { Provider } from '@zanix/server'
 
-/** Provider DSL definition */
-const registerProvider = async () => {
-  await import('./qlru/core.ts')
-  await import('./redis/core.ts')
+// Connectors DSL load
+import './qlru/core.ts'
+import './redis/core.ts'
 
+/** Provider DSL definition */
+const registerProvider = () => {
   @Provider('cache')
   class _ZanixCacheCoreProvider extends ZanixCacheCoreProvider {}
 }
@@ -34,6 +35,6 @@ const registerProvider = async () => {
  *
  * @module
  */
-const zanixCacheProviderCore: void = await registerProvider()
+const zanixCacheProviderCore: void = registerProvider()
 
 export default zanixCacheProviderCore

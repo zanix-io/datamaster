@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] - 2025-11-19
+
+### Fixed
+
+- Removed top-level `await` from core modules to avoid resource leaks during test runs.
+
 ## [0.4.1] - 2025-11-19
 
 ### Changed
