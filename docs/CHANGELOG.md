@@ -7,6 +7,19 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.3] - 2025-11-19
+
+### Fixed
+
+- Fixed an issue where the Mongo connector was not making the model available until the connection
+  was established.
+
+  Now, the model is made available immediately, allowing services to access it without waiting for
+  the connection to be fully established.
+
+  This improves behavior in scenarios where services try to access the model before the connection
+  is available.
+
 ## [0.4.2] - 2025-11-19
 
 ### Fixed
