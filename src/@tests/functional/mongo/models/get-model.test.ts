@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { assertEquals } from '@std/assert'
-import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
+import { DropCollection, getDB, ignore, Mongo, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { registerModel } from 'modules/database/defs/models.ts'
 import { Schema } from 'mongoose'
 
@@ -35,18 +35,9 @@ Deno.test({
 
     registerModel<Attrs>({
       name: 'test-basic-get-model',
-      definition: {
-        name: String,
-        description: String,
-      },
-      options: {
-        methods: {
-          myFirstMethod: () => 'my first value',
-        },
-      },
-      extensions: {
-        seeders: [function seeder() {}],
-      },
+      definition: { name: String, description: String },
+      options: { methods: { myFirstMethod: () => 'my first value' } },
+      extensions: { seeders: [function seeder() {}] },
       callback: (schema) => {
         schema.methods.myMethod = () => 'my value'
         return schema
@@ -65,18 +56,30 @@ Deno.test({
   ...sanitize,
   name: 'Mongo connector should add model by schema',
   fn: async () => {
-    const schema = new Schema({
-      name: String,
-      description: String,
-    }, {
-      methods: {
-        myFirstMethod: () => 'my first value',
-      },
+    const schema = new Schema({ name: String, description: String }, {
+      methods: { myFirstMethod: () => 'my first value' },
     })
     schema.methods.myMethod = () => 'my value'
 
     const db = await getDB()
-    const Model = await db.getModel('test-by-schema-get-model', schema)
+    const Model = db.getModel('test-by-schema-get-model', schema)
+    await modelValidation(Model, db)
+  },
+  ignore,
+})
+
+Deno.test({
+  ...sanitize,
+  name: 'Mongo connector should disponibilize model before initialize connection',
+  fn: async () => {
+    const schema = new Schema({ name: String, description: String }, {
+      methods: { myFirstMethod: () => 'my first value' },
+    })
+    schema.methods.myMethod = () => 'my value'
+
+    const db = new Mongo()
+    const Model = db.getModel('test-by-schema-get-model', schema)
+    await db.isReady
     await modelValidation(Model, db)
   },
   ignore,

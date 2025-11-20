@@ -65,7 +65,7 @@ Deno.test({
 
     mongoPasswordValidation(ModelByDSL)
 
-    const ModelBySchema = await db.getModel(
+    const ModelBySchema = db.getModel(
       'test-security-model-by-schema',
       new Schema({
         name: String,

@@ -64,7 +64,7 @@ Deno.test({
 
     const db = await getDB()
 
-    const Model = await db.getModel('test-middlewares-policies-pre-save', userSchema)
+    const Model = db.getModel('test-middlewares-policies-pre-save', userSchema)
 
     const user = new Model({
       name: 'Ismael',
@@ -99,7 +99,7 @@ Deno.test({
 
     const db = await getDB()
 
-    const Model = await db.getModel('test-middlewares-policies-pre-save', userSchema)
+    const Model = db.getModel('test-middlewares-policies-pre-save', userSchema)
 
     const user = new Model({
       name: 'Ismael',

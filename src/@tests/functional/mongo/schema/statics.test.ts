@@ -20,7 +20,7 @@ Deno.test({
     Deno.env.set('DATA_AES_KEY', aesKey)
 
     const db = await getDB()
-    const Model = await db.getModel('test-schema-statics', schema)
+    const Model = db.getModel('test-schema-statics', schema)
     assertEquals(Model.encrypt, Model.schema.statics.encrypt)
 
     // encryption
@@ -51,7 +51,7 @@ Deno.test({
   name: 'Static mongo transactions should committed',
   fn: async function () {
     const db = await getDB()
-    const Model = await db.getModel('test-schema-transactions', schema)
+    const Model = db.getModel('test-schema-transactions', schema)
 
     if (Model.isReplicaSet()) {
       const { session, commit } = await Model.startTransaction()
@@ -92,7 +92,7 @@ Deno.test({
   name: 'Static mongo transactions should aborted',
   fn: async function () {
     const db = await getDB()
-    const Model = await db.getModel('test-schema-transactions-1', schema)
+    const Model = db.getModel('test-schema-transactions-1', schema)
 
     if (Model.isReplicaSet()) {
       const { session, commit, abort } = await Model.startTransaction()

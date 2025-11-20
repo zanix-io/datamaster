@@ -35,13 +35,17 @@ export function defineModels(this: ZanixMongoConnector) {
  * Extends the ZanixMongoConnector to define and register
  * a model initialized by some schema.
  */
-export async function defineModelBySchema<S extends DefaultSchema>(
+export function defineModelBySchema<S extends DefaultSchema>(
   this: ZanixMongoConnector,
   options: SchemaModelInitOptions<S>,
   modelName: string,
   entity: S,
 ) {
-  const { extensions: { seeders = [], ...extensions } = {}, relatedModels = {} } = options
+  const {
+    callback = () => {},
+    extensions: { seeders = [], ...extensions } = {},
+    relatedModels = {},
+  } = options
 
   // Bind related models first
   for (const [relatedName, relatedSchema] of Object.entries(relatedModels)) {
@@ -51,10 +55,14 @@ export async function defineModelBySchema<S extends DefaultSchema>(
   // Bind the main model
   const Model = this['bindModel'](modelName, entity, extensions)
 
-  // Run seeders
-  await runSeedersBySchema.call(this, seeders, modelName)
+  const AdaptedModel = postBindModel(Model) as AdaptedModelBySchema<S>
 
-  return postBindModel(Model) as AdaptedModelBySchema<S>
+  // Run seeders
+  runSeedersBySchema.call(this, seeders, modelName)
+    .then(() => callback(AdaptedModel, 'seeders executed'))
+    .catch((e) => callback(AdaptedModel, e.message || 'an error ocurred running seeders'))
+
+  return AdaptedModel
 }
 
 /** Load Seed Core Model */

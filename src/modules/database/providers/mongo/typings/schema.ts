@@ -1,7 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
+import type { BaseAttributes, Extensions, SchemaAccessor } from 'database/typings/general.ts'
 import type { Document, Schema, SchemaDefinition, SchemaDefinitionProperty } from 'mongoose'
 import type { SchemaStatics } from './statics.ts'
-import type { BaseAttributes, Extensions, SchemaAccessor } from 'database/typings/general.ts'
+import type { AdaptedModelBySchema } from './models.ts'
 import type { SchemaMethods } from './commons.ts'
 
 export type SchemaWithPaths = Schema & { paths: Record<string, any> }
@@ -30,6 +31,10 @@ export type SchemaModelInitOptions<S extends Schema> = {
    * Models to explicitly bind and populate.
    */
   relatedModels?: { [modelName: string]: { schema: S; options?: SchemaModelInitOptions<S> } }
+  /**
+   * Callback to ensure asynchronous operations, such as running seeders, complete before proceeding
+   */
+  callback?: (Model: AdaptedModelBySchema<S>, msg: string) => void
 }
 
 /**

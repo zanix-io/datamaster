@@ -104,11 +104,16 @@ Deno.test({
     })
 
     const db = await getDB()
-    const Model = await db.getModel('test-schema-seeders', schemaSeeders, {
-      extensions: extensionsSeeders,
-    })
 
-    await seedersValidation(Model, db)
+    await new Promise((resolve) => {
+      db.getModel('test-schema-seeders', schemaSeeders, {
+        extensions: extensionsSeeders,
+        callback: async (Model) => {
+          await seedersValidation(Model, db)
+          resolve(true)
+        },
+      })
+    })
   },
   ignore,
 })

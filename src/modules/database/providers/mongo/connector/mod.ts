@@ -40,7 +40,7 @@ import logger from '@zanix/logger'
  */
 export class ZanixMongoConnector extends ZanixDatabaseConnector {
   #uri: string
-  #database!: Mongoose
+  #database: Mongoose
   #config: MongoConnectorOptions['config']
   private isReplicaSet?: boolean
   protected name: string
@@ -61,6 +61,8 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     this.isReplicaSet = this.#uri?.includes('replicaSet=') || this.#uri?.includes('mongodb+srv://')
     this.#config = options.config
     this.seederModel = options.seedModel ?? 'zanix-seeders'
+
+    this.#database = new Mongoose()
   }
 
   /**
@@ -102,7 +104,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     name: string,
     schema: S,
     options?: GetModelOptions & SchemaModelInitOptions<S>,
-  ): Promise<AdaptedModelBySchema<S>>
+  ): AdaptedModelBySchema<S>
   /**
    * Retrieves an already registered model by its name.
    *
@@ -124,7 +126,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     name: string,
     entity?: S | GetModelOptions,
     options: GetModelOptions & SchemaModelInitOptions<S> = {},
-  ): Model<Attrs> | Promise<AdaptedModelBySchema<S>> {
+  ): Model<Attrs> | AdaptedModelBySchema<S> {
     const hasSchema = entity instanceof Schema
 
     // extending the ALS session for Model use
@@ -161,7 +163,6 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    */
   protected async initialize() {
     try {
-      this.#database = new Mongoose()
       const dbConfig = { ...this.#config }
       dbConfig.dbName = dbConfig.dbName || this.defaultDbName
 

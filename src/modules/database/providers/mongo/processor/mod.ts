@@ -29,6 +29,7 @@ import ProgramModule from 'modules/program/mod.ts'
  *
  * @template T
  * @param { T} Model - A factory function that creates and returns a model instance.
+ *
  * @returns {T} The sanitized and preprocessed model ready for use.
  */
 export const postBindModel = <T extends Model>(Model: T): T => {
