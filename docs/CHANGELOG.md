@@ -7,6 +7,19 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.4] - 2025-11-21
+
+### Added
+
+- **Multi-database support for model names**, allowing the `database:model` syntax to register and
+  reference models across different databases.
+- **Multi-database support in model definitions (`defs`)**, enabling relations (`ref`) that point to
+  models in other databases using the same `database:model` format.
+- **New environment variable: `DATABASE_SEEDERS`**
+  - Controls whether system seeders are executed.
+  - Defaults to `true`.
+  - Set to `false` to globally disable all seed operations.
+
 ## [0.4.3] - 2025-11-19
 
 ### Fixed

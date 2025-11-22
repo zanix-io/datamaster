@@ -91,7 +91,6 @@ export type AdaptedModel<
   Opts extends SchemaOptions = SchemaOptions,
 > = Model<Attrs> & SchemaStatics & {
   schema: SchemaDefinition<Opts> & BaseCustomSchema
-  db: never
 }
 
 /**
@@ -99,7 +98,6 @@ export type AdaptedModel<
  */
 export type AdaptedModelBySchema<S extends Schema> = ModelBySchema<S> & SchemaStatics & {
   schema: BaseCustomSchema & ModelBySchema<S>['schema']
-  db: never
 }
 
 /**

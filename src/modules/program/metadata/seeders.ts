@@ -1,5 +1,6 @@
 import type { DatabaseTypes } from 'database/typings/general.ts'
 import { ProgramContainer, type Seeders } from '@zanix/server'
+import { readConfig } from '@zanix/helpers'
 
 /**
  * A container for holding and managing seeders.
@@ -8,7 +9,7 @@ export class SeedersContainer extends ProgramContainer {
   public existInDB: Set<string> = new Set()
 
   #key = (type: DatabaseTypes) => `${type}:db-seeders`
-  #keyData = (db: DatabaseTypes, type: string) => `${db}:db-${type}-seeders`
+  #keyData = (dbType: DatabaseTypes, action: string) => `${dbType}:data-${action}-seeders`
 
   /**
    * Add seeder data
@@ -38,15 +39,19 @@ export class SeedersContainer extends ProgramContainer {
   /**
    * add seeder data to query
    */
-  public addDataToQuery(
-    data: object,
-    action: 'save' | 'find',
-    type: DatabaseTypes = 'mongo',
-    container: object = this,
-  ) {
+  public addDataToQuery(options: {
+    data: object
+    action: 'save' | 'find'
+    database?: string
+    type?: DatabaseTypes
+  }, container: object = this) {
+    const { data, action, database = 'default', type = 'mongo' } = options
     const key = this.#keyData(type, action)
     const seeders = this.consumeDataToQuery(action, type)
-    seeders.push(data)
+
+    if (database !== 'default') Object.assign(data, { 'executedBy': readConfig().name })
+
+    seeders[database] = [...(seeders[database] || []), data]
     this.setData(key, seeders, container)
   }
 
@@ -59,7 +64,7 @@ export class SeedersContainer extends ProgramContainer {
     container: object = this,
   ) {
     const key = this.#keyData(type, action)
-    const data = this.getData<unknown[]>(key, container) || []
+    const data = this.getData<Record<string, unknown[]>>(key, container) || {}
     this.deleteData(key, container)
     return data
   }

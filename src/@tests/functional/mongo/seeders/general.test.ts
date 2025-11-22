@@ -2,7 +2,7 @@
 
 import { assert, assertEquals } from '@std/assert'
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
-import { seedByIdIfMissing, seedManyByIdIfMissing } from 'mongo/utils/seeders/mod.ts'
+import { seedByIdIfMissing, seedManyByIdIfMissing } from 'mongo/utils/seeders.ts'
 import { registerModel } from 'modules/database/defs/models.ts'
 import { Schema } from 'mongoose'
 
@@ -130,7 +130,10 @@ Deno.test({
       },
       extensions: {
         seeders: [
-          { handler: seedByIdIfMissing(bulk[0]), options: { runOnWorker: true, verbose: false } },
+          {
+            handler: seedByIdIfMissing(bulk[0]),
+            options: { version: '0.1.0', runOnWorker: true, verbose: false },
+          },
           seedManyByIdIfMissing([bulk[1], bulk[2]]),
           seedByIdIfMissing(bulk[0]),
         ],

@@ -31,6 +31,9 @@ export { dataProtectionGetter } from './policies/protection.ts'
 export { dataAccessGetter } from './policies/access.ts'
 export { dataPoliciesGetter } from './policies/mod.ts'
 
+// types
+export type { SeedModelAttrs } from './typings/models.ts'
+
 /**
  * MONGO DATABASE
  */
@@ -48,7 +51,7 @@ export {
   seedByIdIfMissing,
   seedManyByIdIfMissing,
   seedRotateProtectionKeys,
-} from 'mongo/utils/seeders/mod.ts'
+} from 'mongo/utils/seeders.ts'
 
 //transforms
 export {

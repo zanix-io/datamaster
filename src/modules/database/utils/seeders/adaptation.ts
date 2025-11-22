@@ -1,12 +1,12 @@
 import type { DatabaseTypes, SeederHandler, SeederProcessor } from 'database/typings/general.ts'
 
-import { mongoSeederProcessor } from 'mongo/utils/seeders/processor.ts'
+import { seederProcessor } from './processor.ts'
 import { seederBaseWrapper } from './wrapper.ts'
 
 /** Seed processors for handler execution */
 const seedProcessor = {
   get mongo() {
-    return mongoSeederProcessor()
+    return seederProcessor((model) => model.modelName || model.name)
   },
   get postgress(): SeederProcessor {
     throw new Error('Not implemented')

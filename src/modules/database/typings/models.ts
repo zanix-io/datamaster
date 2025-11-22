@@ -78,3 +78,13 @@ export type ModelMetadata<T> = {
 
 /** Basic data object to save in a model */
 export type DataObject = Record<string, object | Primitive | Primitive[]> & { id: string }
+
+/** Seed Model Attributes */
+export type SeedModelAttrs = {
+  name: string
+  status: 'success' | 'failed'
+  version: `${number}.${number}.${number}`
+  executedBy?: string
+  duration?: number
+  notes?: string
+}

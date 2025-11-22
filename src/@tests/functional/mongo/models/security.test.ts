@@ -1,5 +1,5 @@
 import { registerModel } from 'modules/database/defs/models.ts'
-import { getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
+import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { assert, assertEquals } from '@std/assert'
 import { Schema } from 'mongoose'
 
@@ -64,6 +64,7 @@ Deno.test({
     const ModelByDSL = db.getModel('test-security-model')
 
     mongoPasswordValidation(ModelByDSL)
+    await DropCollection(ModelByDSL, db)
 
     const ModelBySchema = db.getModel(
       'test-security-model-by-schema',
@@ -75,6 +76,7 @@ Deno.test({
 
     mongoPasswordValidation(ModelBySchema)
 
+    await DropCollection(ModelBySchema, db)
     await db['close']()
   },
   ignore,

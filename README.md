@@ -45,6 +45,8 @@ local caching utilities, such as in-memory Map for fast, etc.
   - Recursive and shallow data transformations.
   - Built-in data access and protection policies.
   - `AsyncLocalStorage` (ALS) support.
+  - Supports **multiple databases** via model names <br>(e.g., `modelName: 'database:model'`), also
+    valid in population refs.
 
 - **Redis connector**
 
@@ -87,8 +89,10 @@ local caching utilities, such as in-memory Map for fast, etc.
 - **Model DSL definition support (Database Only)**
 
   - Define and load models dynamically with `registerModel`.
-  - Supports **seeders**: an array of async/sync functions
-    `(Model, connector) => void | Promise<void>` to populate initial data.
+  - Supports **seeders**: either **(a)** an array of async/sync functions
+    `handler: (Model, connector) => void | Promise<void>` **or (b)** an array of objects:
+    `{ handler, options: { version: '0.1.0', runOnWorker: true, verbose: false } }` to populate
+    initial data.
   - Allows callbacks to extend schemas with custom methods.
   - Simplifies querying and CRUD operations with the connector instance.
 
@@ -230,6 +234,7 @@ application.
 | **`DATA_RSA_PRIV`**         | RSA private key for asymmetric decryption.                                                                            | `BASE64...`                 |
 | **`REDIS_URI`**             | Connection URI for Redis cache.                                                                                       | `redis://localhost:6379`    |
 | **`LOCAL_CACHE_MAX_ITEMS`** | Maximum number of items in the local in-memory cache. Uses a Least Recently Used (LRU) strategy. Defaults to `50000`. | `1000`                      |
+| **`DATABASE_SEEDERS`**      | Enables or disables the execution of system seeders. Use `false` to disable all seed operations. Defaults to `true`   | `false`                     |
 
 #### 🌐 Versioned Keys
 

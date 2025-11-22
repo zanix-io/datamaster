@@ -1,24 +1,19 @@
-import { registerModel } from 'database/defs/models.ts'
+import type { SeedModelAttrs } from 'database/typings/models.ts'
 
-export type SeedModelAttrs = {
-  name: string
-  status: 'success' | 'failed'
-  version: `${number}.${number}.${number}`
-  duration?: number
-  notes?: string
-}
+import { registerModel } from 'database/defs/models.ts'
 
 /**
  * DSL function to define Seed Model
  * @param name  - Seed Model Name
  */
-export const defineSeedModel = (name: string) => {
+export const registerSeedModel = (name: string) => {
   registerModel<SeedModelAttrs>({
     name,
     definition: {
       name: { type: String, required: true, indexes: true },
       version: { type: String, default: '0.0.0' },
       status: { type: String, enum: ['success', 'failed'] },
+      executedBy: String,
       duration: Number,
       notes: String,
     },

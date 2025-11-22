@@ -1,6 +1,8 @@
 import { assert, assertEquals, assertFalse, assertStrictEquals } from '@std/assert'
 import { ZanixQLRUConnector } from 'modules/cache/providers/qlru/connector.ts'
 
+console.error = () => {}
+
 Deno.test('QuickLRU: basic set and get', () => {
   const cache = new ZanixQLRUConnector<string, number>({ capacity: 3 })
   cache.set('a', 1)

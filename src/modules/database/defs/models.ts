@@ -20,7 +20,7 @@ import { seederAdaptation } from '../utils/seeders/adaptation.ts'
  * @example
  * // Example usage with MyModel specification
  * registerModel({
- *   name: 'test',
+ *   name: 'test', // supports multi-DB notation: 'database:test' (also valid in population refs)
  *   definition: {
  *     name: {
  *       type: String,
@@ -49,7 +49,7 @@ export const registerModel: ModelDef = ({ extensions = {}, ...model }, type) => 
 
   ProgramModule.models.addModel({ ...model, extensions: exts }, type)
 
-  if (!seeders.length) return
+  if (!seeders.length || Deno.env.get('DATABASE_SEEDERS') === 'false') return
 
   ProgramModule.seeders.addSeeder({
     model: type === 'mongo' ? model.name : model,

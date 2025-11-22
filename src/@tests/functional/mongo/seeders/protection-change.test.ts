@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
-import { seedManyByIdIfMissing, seedRotateProtectionKeys } from 'mongo/utils/seeders/mod.ts'
+import { seedManyByIdIfMissing, seedRotateProtectionKeys } from 'mongo/utils/seeders.ts'
 import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
 import { registerModel } from 'modules/database/defs/models.ts'
 import { aesKey, keys } from '../../../(setup)/keys.ts'

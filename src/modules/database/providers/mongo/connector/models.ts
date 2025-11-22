@@ -1,9 +1,9 @@
-import type { AdaptedModelBySchema } from '../typings/models.ts'
+import type { AdaptedModel, AdaptedModelBySchema } from '../typings/models.ts'
 import type { SchemaModelInitOptions } from '../typings/schema.ts'
 import type { DefaultSchema } from '../typings/commons.ts'
 import type { ZanixMongoConnector } from './mod.ts'
 
-import { defineSeedModel } from '../models/seeders.ts'
+import { registerSeedModel } from '../defs/seeders.ts'
 import ProgramModule from 'modules/program/mod.ts'
 import { postBindModel } from '../processor/mod.ts'
 import { runSeedersBySchema } from './seeders.ts'
@@ -65,27 +65,36 @@ export function defineModelBySchema<S extends DefaultSchema>(
   return AdaptedModel
 }
 
-/** Load Seed Core Model */
+/** Load Seed Core Models */
 export async function defineSeedModelOnce(this: ZanixMongoConnector) {
   if (!this.seederModel) return
 
-  defineSeedModel(this.seederModel)
+  const dataToFind = ProgramModule.seeders.consumeDataToQuery('find')
+  const dataKeys = Object.keys(dataToFind)
+
+  const Models: Record<string, AdaptedModel> = {}
+  const modelBaseName = this.seederModel
+
+  const seedModelName = (db: string) => db === 'default' ? modelBaseName : `${db}:${modelBaseName}`
+
+  for await (const db of dataKeys) {
+    const seedModel = seedModelName(db)
+    registerSeedModel(seedModel)
+  }
+
   defineModels.call(this)
 
-  const Model = this.getModel(this.seederModel)
+  await Promise.all(
+    Object.entries(dataToFind).map(async ([db, data]) => {
+      Models[db] = this.getModel(seedModelName(db))
 
-  const seeders = await Model.find({
-    $or: ProgramModule.seeders.consumeDataToQuery('find') as never,
-  }, {
-    name: 1,
-    version: 1,
-  }).lean()
+      const seeders = await Models[db].find({ $or: data as never }, { name: 1, version: 1 }).lean()
 
-  seeders.forEach((doc) => {
-    ProgramModule.seeders.existInDB.add(doc.name + '@' + doc.version)
-  })
+      for (const doc of seeders) ProgramModule.seeders.existInDB.add(doc.name + '@' + doc.version)
+    }),
+  )
 
   this.seederModel = false
 
-  return Model
+  return Models
 }

@@ -8,10 +8,11 @@ import { findPathsWithAccessorsDeep } from '../utils/accessors.ts'
 import { processInternalAccessors } from 'mongo/utils/accessors.ts'
 import { mainVirtuals } from './schema/virtuals.ts'
 import { sanitizeModel } from './model/sanitize.ts'
+import ProgramModule from 'modules/program/mod.ts'
 import { statics } from './schema/statics/mod.ts'
 import { methods } from './schema/methods/mod.ts'
 import { hooks } from './middlewares/mod.ts'
-import ProgramModule from 'modules/program/mod.ts'
+import { Mongoose } from 'mongoose'
 
 /**
  * Process a database model before use.
@@ -99,4 +100,33 @@ export const preprocessSchema = <T extends BaseCustomSchema>(
 
   // return adapted schema
   return schema
+}
+
+/**
+ * Creates a MongoDB database instance with extended multi-database model support.
+ *
+ * Allows registering models using the notation `"dbName:modelName"`, automatically
+ * routing the model to the appropriate MongoDB database via `useDb()`.
+ * Falls back to default Mongoose behavior when no database prefix is provided.
+ *
+ * @returns {Mongoose} The enhanced Mongoose instance.
+ */
+export const createDatabase = (): Mongoose => {
+  const database: Mongoose = new Mongoose()
+
+  const originalModelFn = database.model.bind(database)
+  database.model = function model(modelInfo: string, ...args: [never]) {
+    const [entity, name] = modelInfo.split(':')
+    if (name) {
+      const connection = database.connection.useDb(entity)
+      const model = connection.model(name, ...args)
+
+      database.models[modelInfo] = model
+      model['modelName'] = modelInfo as never
+      return model
+    }
+    return originalModelFn(entity, ...args)
+  } as never
+
+  return database
 }

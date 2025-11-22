@@ -5,8 +5,8 @@ import type { MongoConnectorOptions } from '../typings/process.ts'
 import type { DefaultSchema, Model } from '../typings/commons.ts'
 
 import { ProgramModule as ServerProgram, ZanixDatabaseConnector } from '@zanix/server'
-import { postBindModel, preprocessSchema } from '../processor/mod.ts'
-import { Mongoose, Schema, type SchemaOptions } from 'mongoose'
+import { createDatabase, postBindModel, preprocessSchema } from '../processor/mod.ts'
+import { type Mongoose, Schema, type SchemaOptions } from 'mongoose'
 import { defineModelBySchema, defineModels } from './models.ts'
 import { runSeedersOnStart } from './seeders.ts'
 import { HttpError } from '@zanix/errors'
@@ -62,7 +62,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     this.#config = options.config
     this.seederModel = options.seedModel ?? 'zanix-seeders'
 
-    this.#database = new Mongoose()
+    this.#database = createDatabase()
   }
 
   /**
@@ -72,7 +72,11 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    * @param {Schema} schema - The schema definition for the model.
    * @returns {Model} The registered model instance.
    */
-  private bindModel(name: string, schema: Schema, extensions?: Omit<Extensions, 'seeders'>): Model {
+  protected bindModel(
+    name: string,
+    schema: Schema,
+    extensions?: Omit<Extensions, 'seeders'>,
+  ): Model {
     const baseSchema = schema as BaseCustomSchema
     baseSchema.statics.isReplicaSet = () => this.isReplicaSet
 

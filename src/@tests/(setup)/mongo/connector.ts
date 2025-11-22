@@ -40,6 +40,7 @@ export const getDB = async () => {
 export const DropCollection = async (model: any, db: any) => {
   try {
     await model.deleteMany({}).exec()
+    await model.collection.dropIndexes()
     await model.collection.drop()
     await new Promise((resolve) => setTimeout(resolve, db['isReplicaSet'] ? 2000 : 300)) // to warranty real drop
   } catch (err) {
