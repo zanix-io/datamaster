@@ -25,7 +25,7 @@ export function defineModels(this: ZanixMongoConnector) {
     const schema = new Schema(model.definition, model.options)
     const finalSchema = model.callback ? model.callback(schema) as typeof schema : schema
 
-    this['bindModel'](model.name, finalSchema, model.extensions)
+    this.bindModel(model.name, finalSchema, model.extensions)
   }
 
   ProgramModule.models.deleteModels()
@@ -53,7 +53,7 @@ export function defineModelBySchema<S extends DefaultSchema>(
   }
 
   // Bind the main model
-  const Model = this['bindModel'](modelName, entity, extensions)
+  const Model = this.bindModel(modelName, entity, extensions)
 
   const AdaptedModel = postBindModel(Model) as AdaptedModelBySchema<S>
 

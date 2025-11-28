@@ -2,6 +2,7 @@ import type { SchemaAccessor } from 'database/typings/general.ts'
 import type { DataAccessConfig, DataFieldAccess } from 'typings/protection.ts'
 
 import { ProgramModule, type Session } from '@zanix/server'
+import Program from 'modules/program/mod.ts'
 import { mask } from '@zanix/helpers'
 import logger from '@zanix/logger'
 
@@ -61,6 +62,7 @@ export function dataAccessGetterDefinition(
  * ⚠️ This function requires that **AsyncLocalStorage (ALS)** is activated in the controller or handler
  * in order to function correctly with the appropriate context.
  * Make sure to configure the connector with the `useALS` option set to `true`.
+ * You can also include the user session when performing the toJSON transformation.
  *
  * @param {DataFieldAccess} access - The access policy for the data field. This defines the
  *                                  rules or permissions associated with the field.
@@ -95,11 +97,14 @@ export function dataAccessGetter(
     return access as unknown as SchemaAccessor
   }
 
-  const dataAccess = (typeof access === 'string') ? { strategy: access } : access
-
-  return (value, options) => {
+  const accessor: SchemaAccessor = (value, options) => {
     const processedValue = baseGetter(value, options)
 
     return dataAccessGetterDefinition(dataAccess, processedValue)
   }
+
+  const dataAccess = (typeof access === 'string') ? { strategy: access } : access
+  Program.accessors.setDataAccess(accessor, dataAccess)
+
+  return accessor
 }

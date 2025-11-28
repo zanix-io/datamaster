@@ -34,7 +34,7 @@ export type SchemaStatics = {
    *
    * This function automatically selects the encryption method based on the key type provided.
    *
-   * @param {string | string[]} message - The message or array of messages to be encrypted.
+   * @param {T} message - The message or array of messages to be encrypted.
    *   Can be a single string or an array of strings. Each message will be encrypted separately.
    *
    * @param {EncryptSettings} settings - The encryption settings to be used for the encryption process.
@@ -50,19 +50,19 @@ export type SchemaStatics = {
    *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variables:
    *     `DATA_RSA_PRIVATE_KEY` as primary, and falls back to `DATA_RSA_PRIVATE_KEY`.
    *
-   * @returns {Promise<string | string[]>} A promise that resolves to the encrypted message(s).
+   * @returns {Promise<T>} A promise that resolves to the encrypted message(s).
    *
    * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
    */
-  encrypt: (
-    message: string | string[],
+  encrypt: <T extends string | string[]>(
+    message: T,
     settings?: EncryptSettings,
     version?: DataPolicyVersion,
-  ) => Promise<string | string[]>
+  ) => Promise<T>
   /**
    * Decrypts a message using either **AES-GCM** (symmetric) or **RSA-OAEP** (asymmetric) encryption.
    *
-   * @param {string | string[]} encryptedMessage - The encrypted message or array of encrypted messages to decrypt.
+   * @param {T} encryptedMessage - The encrypted message or array of encrypted messages to decrypt.
    *   Can be a single string or an array of strings. Each encrypted message will be decrypted separately.
    *
    * @param {EncryptSettings} settings - The decryption settings that match the settings used during encryption.
@@ -77,15 +77,15 @@ export type SchemaStatics = {
    *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variables:
    *     `DATA_RSA_PRIVATE_KEY` as primary, and falls back to `DATA_RSA_PRIVATE_KEY`.
    *
-   * @returns {Promise<string | string[]>} A promise that resolves to the decrypted message(s).
+   * @returns {Promise<T>} A promise that resolves to the decrypted message(s).
    *
    * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
    */
-  decrypt: (
-    encryptedMessage: string | string[],
+  decrypt: <T extends string | string[]>(
+    encryptedMessage: T,
     settings?: EncryptSettings,
     version?: DataPolicyVersion,
-  ) => Promise<string | string[]>
+  ) => Promise<T>
 
   /**
    * Hash generation. Unidirectional encryption.
@@ -122,11 +122,11 @@ export type SchemaStatics = {
    *
    * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
    */
-  mask: (
-    input: string | string[],
+  mask: <T extends string | string[]>(
+    input: T,
     settings?: MaskingSettings,
     version?: DataPolicyVersion,
-  ) => string | string[]
+  ) => T
   /**
    * Unmasks (reverses) the provided masked message(s) using the same secret key and configuration
    * that were used during masking.
@@ -151,11 +151,11 @@ export type SchemaStatics = {
    *
    * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
    */
-  unmask: (
-    input: string | string[],
+  unmask: <T extends string | string[]>(
+    input: T,
     settings?: MaskingBaseOptions,
     version?: DataPolicyVersion,
-  ) => string | string[]
+  ) => T
 
   /**
    * Initiates a transaction on the schema with commit and abort capabilities.

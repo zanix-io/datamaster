@@ -12,7 +12,7 @@ import { Connector } from '@zanix/server'
 
 /** Connector DSL definition */
 const registerConnector = () => {
-  if (!Deno.env.get('REDIS_URI')) return
+  if (!Deno.env.has('REDIS_URI')) return
 
   @Connector('cache:redis')
   class _ZanixRedisCoreConnector extends ZanixRedisConnector {}

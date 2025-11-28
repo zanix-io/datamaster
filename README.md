@@ -46,7 +46,9 @@ local caching utilities, such as in-memory Map for fast, etc.
   - Built-in data access and protection policies.
   - `AsyncLocalStorage` (ALS) support.
   - Supports **multiple databases** via model names <br>(e.g., `modelName: 'database:model'`), also
-    valid in population refs.
+    valid in population refs. <br>⚠️ **This approach is not recommended for microservices**, since
+    each microservice should have **its own independent database** to maintain decoupling, autonomy,
+    and scalability.
 
 - **Redis connector**
 

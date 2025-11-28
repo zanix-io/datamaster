@@ -1,4 +1,4 @@
-import type { HttpMethods } from '@zanix/server'
+import type { HttpMethod } from '@zanix/server'
 
 // TODO: IMPLEMENT TRIGGERS WHEN WORKER WILL BE DEVELOPED
 
@@ -64,14 +64,14 @@ type TriggerActionCommons = {
 /**
  * Defines the specific types of trigger actions.
  * @property {Partial<TriggerActionCommons> & { template: string }} mail - Email action with template.
- * @property {Partial<TriggerActionCommons> & { headers: Record<string, unknown>, url: string, method: HttpMethods }} request - HTTP request action.
+ * @property {Partial<TriggerActionCommons> & { headers: Record<string, unknown>, url: string, method: HttpMethod }} request - HTTP request action.
  */
 type TriggerActions = {
   mail: Partial<TriggerActionCommons> & { template: string }
   request: Partial<TriggerActionCommons> & {
     headers: Record<string, unknown>
     url: string
-    method: HttpMethods
+    method: HttpMethod
   }
 }
 

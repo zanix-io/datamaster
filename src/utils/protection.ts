@@ -248,17 +248,17 @@ export const createHashFrom = (
  *
  * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
  */
-export const encrypt = async (
-  input: string | string[],
+export const encrypt = async <T extends string | string[]>(
+  input: T,
   settings?: EncryptSettings,
   version?: DataPolicyVersion,
-): Promise<string | string[]> => {
+): Promise<T> => {
   if (!input[0]) return Promise.resolve(input)
   try {
     const { type } = settings || {}
     const key = getEncryptSecret('encrypt', type, version)
     const encrypted = await baseEncrypt(input, key)
-    return appendVersion(encrypted, version)
+    return appendVersion(encrypted, version) as T
   } catch (e) {
     logger.error('Encryption error', e, {
       meta: { operation: 'encrypt', source: 'zanix' },
@@ -290,11 +290,11 @@ export const encrypt = async (
  *
  * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
  */
-export const decrypt = async (
-  encryptedInput: string | string[],
+export const decrypt = async <T extends string | string[]>(
+  encryptedInput: T,
   settings?: EncryptSettings,
   version?: DataPolicyVersion,
-): Promise<string | string[]> => {
+): Promise<T> => {
   if (!encryptedInput[0]) return Promise.resolve(encryptedInput)
   try {
     const { type } = settings || {}
@@ -334,15 +334,15 @@ export const decrypt = async (
  *
  * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
  */
-export const mask = (
-  input: string | string[],
+export const mask = <T extends string | string[]>(
+  input: T,
   settings?: MaskingSettings,
   version?: DataPolicyVersion,
-): string | string[] => {
+): T => {
   if (!input[0]) return input
   try {
     const key = getMaskSecret(version)
-    return appendVersion(baseMask(input, key, settings), version)
+    return appendVersion(baseMask(input, key, settings), version) as T
   } catch (e) {
     logger.error('Masking error', e, {
       meta: { operation: 'mask', source: 'zanix' },
@@ -376,11 +376,11 @@ export const mask = (
  *
  * @see {@link https://jsr.io/@zanix/utils} to get information of the original function.
  */
-export const unmask = (
-  maskedInput: string | string[],
+export const unmask = <T extends string | string[]>(
+  maskedInput: T,
   settings?: MaskingSettings,
   version?: DataPolicyVersion,
-): string | string[] => {
+): T => {
   if (!maskedInput[0]) return maskedInput
   try {
     const key = getMaskSecret(version)

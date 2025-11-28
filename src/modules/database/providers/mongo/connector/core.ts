@@ -12,7 +12,7 @@ import { Connector } from '@zanix/server'
 
 /** Connector DSL definition */
 const registerConnector = () => {
-  if (!Deno.env.get('MONGO_URI')) return
+  if (!Deno.env.has('MONGO_URI')) return
 
   @Connector('database')
   class _ZanixMongoCoreConnector extends ZanixMongoConnector {}
