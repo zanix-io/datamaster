@@ -37,7 +37,7 @@ export type EncryptSettings = { type?: 'asymmetric' | 'symmetric' }
  * - 'medium-high': Enhanced security
  * - 'high': Maximum security
  */
-export type HashingSettings = { level?: HashingLevels }
+export type HashingSettings = { level?: HashingLevels; useSalt?: Uint8Array | number | false }
 
 /**
  * Group of all available data protection settings by strategy.

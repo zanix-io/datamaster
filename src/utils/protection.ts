@@ -217,10 +217,10 @@ export const createHashFrom = (
   settings?: HashingSettings,
   _version?: DataPolicyVersion,
 ): Promise<string | string[]> => {
-  const { level = 'medium' } = settings || {}
+  const { level = 'medium', useSalt } = settings || {}
   return Array.isArray(input)
-    ? Promise.all(input.map((v) => generateHash(v, level)))
-    : generateHash(input, level)
+    ? Promise.all(input.map((v) => generateHash(v, level, useSalt)))
+    : generateHash(input, level, useSalt)
 }
 
 /**
