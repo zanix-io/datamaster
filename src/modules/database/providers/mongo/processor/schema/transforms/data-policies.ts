@@ -6,6 +6,7 @@ import { dataProtectionGetterDefinition } from 'database/policies/protection.ts'
 import { dataAccessGetterDefinition } from 'database/policies/access.ts'
 import { ProgramModule as ServerProgram, type Session } from '@zanix/server'
 import { transformShallowByPaths } from './shallow.ts'
+import { transformClearIdMetadata } from './metadata.ts'
 
 /**
  * Enables and applies the data access policy during Mongoose document transformation
@@ -42,8 +43,9 @@ export const transformByDataAccess = (
       const opts = { ...options, getters: true, transform: false }
       const tranformData = json ? doc.toJSON(opts) : doc.toObject({ ...opts, flattenMaps: true })
       // Data access getters require `flattenMaps: true` in `toObject()` to function correctly.
-
       ServerProgram.asyncContext.enterWith(ctx) // restore the context
+
+      if (deleteMetadata) transformClearIdMetadata(doc, tranformData)
 
       return tranformData
     }

@@ -341,6 +341,10 @@ await connector['initialize']()
 
 const UsersModel = connector.getModel<Attrs>('users')
 
+// Additionally, you can enable `useALS` if it is currently enabled in the handler (e.g., using @Controller({ enableALS: true })).
+// This allows you to avoid manually managing context in data access policies.
+// Example: connector.getModel<Attrs>('users', { useALS: true })
+
 const user = await UsersModel.findById('68fb00b33405a3a540d9b971')
 
 console.log(user)

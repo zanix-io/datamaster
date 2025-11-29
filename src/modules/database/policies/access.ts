@@ -59,10 +59,9 @@ export function dataAccessGetterDefinition(
 /**
  * Set the access policy for a given data field (string or string array), applying the specified base getter function.
  *
- * ⚠️ This function requires that **AsyncLocalStorage (ALS)** is activated in the controller or handler
- * in order to function correctly with the appropriate context.
- * Make sure to configure the connector with the `useALS` option set to `true`.
- * You can also include the user session when performing the toJSON transformation.
+ * ⚠️ This function requires context to work correctly.
+ * You can achieve this either by activating AsyncLocalStorage (ALS) in the controller or handler and configuring the connector with useALS: true,
+ * or by including the user session (userSession property) when performing the toJSON transformation.
  *
  * @param {DataFieldAccess} access - The access policy for the data field. This defines the
  *                                  rules or permissions associated with the field.

@@ -32,7 +32,7 @@ export type SchemaMethods = {
    * Choose the approach that best fits your performance requirements.
    */
   toJSON<T = LeanDocument<Record<string, any>>>(
-    options: Omit<ToObjectOptions, 'getters'> & { userSession: { type: Session['type'] } },
+    options: Omit<ToObjectOptions, 'getters'> & { userSession?: { type: Session['type'] } },
   ): T
 }
 
