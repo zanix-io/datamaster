@@ -94,9 +94,13 @@ export type DataProtectionBase<S extends DataProtectionMethods> = {
   /** The currently active version identifier */
   activeVersion: DataPolicyVersion
   /** Map of version-specific configurations */
-  versionConfigs: {
-    [key in DataPolicyVersion]: DataProtectionConfig<S>
-  }
+  versionConfigs:
+    & {
+      [key in DataPolicyVersion]: DataProtectionConfig<S>
+    }
+    & {
+      default?: DataProtectionConfig<S>
+    }
 }
 
 /** Specific protection configurations */

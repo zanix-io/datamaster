@@ -73,7 +73,8 @@ export const transformByDataAccess = (
  * decrypt or unmask all protected fields when a document is serialized.
  *
  * @param {object} options - Transform by data protection options
- * @param {boolean} options.deleteMetadata - Optional deleteMetadata to indicate if is neccesary to delete metadata on allowed paths. (e.g. `_id`)
+ * @param {boolean} [options.deleteMetadata] - Optional deleteMetadata to indicate if is neccesary to delete metadata on allowed paths. (e.g. `_id`)
+ * @param {boolean} [options.excludeHashedFields] - Determines whether to exclude hashed fields in the MongoDB document. Defaults to `false`.
  *
  * @returns {Transform} A transformation function compatible with Mongoose schema options
  * (`toJSON.transform` or `toObject.transform`).
@@ -81,9 +82,9 @@ export const transformByDataAccess = (
  * when invoking it.
  */
 export const transformByDataProtection = (
-  options: { deleteMetadata?: boolean } = {},
+  options: { deleteMetadata?: boolean; excludeHashedFields?: boolean } = {},
 ): Transform => {
-  const { deleteMetadata } = options
+  const { deleteMetadata, excludeHashedFields = false } = options
 
   return async (doc, ret) => {
     const promises: Promise<unknown>[] = []
@@ -103,13 +104,17 @@ export const transformByDataProtection = (
           const unmaskableString: UnmaskableObject = decodedValue
           // deno-lint-ignore no-non-null-assertion
           return unmaskableString.unmask!()
-        } else if (Object.hasOwn(decodedValue, 'decrypt')) {
+        }
+        if (Object.hasOwn(decodedValue, 'decrypt')) {
           const decryptableObject: DecryptableObject = decodedValue
           // deno-lint-ignore no-non-null-assertion
           const decrypted = decryptableObject.decrypt!()
           promises.push(decrypted)
 
           return decrypted
+        }
+        if (Object.hasOwn(decodedValue, 'verify') && excludeHashedFields) {
+          return null
         }
       },
     })

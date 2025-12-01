@@ -13,7 +13,7 @@ import logger from '@zanix/logger'
  *
  * @function seedByIdIfMissing
  * @param {DataObject} data - Object representing the document to seed, containing a unique `id` property.
- * @param {boolean} useDataPolicies - Determines whether data policies should be applied to the seeded data.
+ * @param {boolean} [options.useDataPolicies] - Determines whether data policies should be applied to the seeded data.
  * For example, this could include masking sensitive fields or encrypting certain values. Defaults to `true`.
  *
  * @returns {MongoSeeder} A seeder function that upserts one document by ID.
@@ -23,8 +23,9 @@ import logger from '@zanix/logger'
  */
 export function seedByIdIfMissing(
   data: DataObject,
-  useDataPolicies: boolean = true,
+  options: { useDataPolicies?: boolean } = {},
 ): MongoSeeder {
+  const { useDataPolicies = true } = options
   return async function seedByIdIfMissing(Model) {
     await Model.upsertById(data, { useDataPolicies })
   }
@@ -38,7 +39,7 @@ export function seedByIdIfMissing(
  *
  * @function seedManyByIdIfMissing
  * @param {Array<DataObject>} data - Array of objects to seed, each containing a unique `id` property.
- * @param {boolean} useDataPolicies - Determines whether data policies should be applied to the seeded data.
+ * @param {boolean} [options.useDataPolicies] - Determines whether data policies should be applied to the seeded data.
  * For example, this could include masking sensitive fields or encrypting certain values. Defaults to `true`.
  *
  * @returns {MongoSeeder} A seeder function that upserts multiple documents by ID.
@@ -51,8 +52,9 @@ export function seedByIdIfMissing(
  */
 export function seedManyByIdIfMissing(
   data: Array<DataObject>,
-  useDataPolicies: boolean = true,
+  options: { useDataPolicies?: boolean } = {},
 ): MongoSeeder {
+  const { useDataPolicies = true } = options
   return async function seedManyByIdIfMissing(Model) {
     await Model.upsertManyById(data, { useDataPolicies })
   }
@@ -93,8 +95,7 @@ export function seedRotateProtectionKeys(
       ...options,
       useLean: false,
       onDocument: async (doc: Document) => {
-        await transformByDataProtection()(doc, doc)
-
+        await transformByDataProtection({ excludeHashedFields: true })(doc, doc)
         const response = doc.toJSON({ getters: false, transform: false })
         delete response.updatedAt
         delete response._id

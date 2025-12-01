@@ -154,13 +154,13 @@ const detectNumericIndex = (key: any, lenVal = true) => {
 
 /** validate a transformation response on map */
 const mapTValidation = (resp: any, idx: any, dst: Map<any, any>) => {
-  if (resp) return dst.set(idx, resp)
+  if (resp !== undefined) return dst.set(idx, resp)
   dst.delete(idx)
 }
 
 /** validate a transformation response on object */
 const objTValidation = (resp: any, idx: any, dst: Record<string, unknown>) => {
-  if (resp) return dst[idx] = resp
+  if (resp !== undefined) return dst[idx] = resp
   delete dst[idx]
 }
 

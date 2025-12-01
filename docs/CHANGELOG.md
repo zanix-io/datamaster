@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.8] - 2025-11-30
+
+### Fixed
+
+- Exclude hashed values during seed key rotation.
+- Include default `versionConfig` in versioning data policies.
+
 ## [0.4.4] - 2025-11-21
 
 ### Added

@@ -17,6 +17,7 @@ import {
   mask,
 } from 'utils/protection.ts'
 import ProgramModule from 'modules/program/mod.ts'
+import { InternalError } from '@zanix/errors'
 import logger from '@zanix/logger'
 
 /**
@@ -29,10 +30,10 @@ export const normalizeDataProtection = (
   dataProtection: DataProtectionOptions,
 ): DataProtection => {
   const protection: DataProtectionBase<DataProtectionMethods> = (typeof dataProtection === 'string')
-    ? { activeVersion: 'v0', versionConfigs: { 'v0': { strategy: dataProtection } } }
+    ? { activeVersion: 'v0', versionConfigs: { 'default': { strategy: dataProtection } } }
     : 'activeVersion' in dataProtection
     ? dataProtection
-    : { activeVersion: 'v0', versionConfigs: { 'v0': dataProtection } }
+    : { activeVersion: 'v0', versionConfigs: { 'default': dataProtection } }
 
   return protection as DataProtection
 }
@@ -56,7 +57,7 @@ export const dataProtectionGetterDefinition = (
   if (!value) return
   const { message, version } = extractVersion(value)
 
-  const variants = config.versionConfigs[version]
+  const variants = config.versionConfigs[version] || config.versionConfigs['default']
 
   if (!variants) return value
 
@@ -97,7 +98,20 @@ export const dataProtectionSetterDefinition = (
   if (!value) return
 
   const version = configs.activeVersion // Always ensure that data policies are applied using the latest version.
-  const { strategy, settings } = configs.versionConfigs[version]
+
+  const config = configs.versionConfigs[version] || configs.versionConfigs['default']
+  if (!config) {
+    throw new InternalError('An error occurred during data processing', {
+      cause: `Data protection version config is not defined for version '${version}'`,
+      meta: {
+        source: 'zanix',
+        suggestion:
+          'Check the data protection version object and define a default version as a fallback, e.g.: { default: { ... } }',
+        dataProtectionConfig: configs,
+      },
+    })
+  }
+  const { strategy, settings } = config
 
   switch (strategy) {
     case 'mask':

@@ -33,7 +33,7 @@ const checkOriginal = async ([seeder1, seeder2]: any) => {
     await seeder1.metadata.get('emails').value.decrypt(),
     ['pepito.perez@email.com', 'pepito12.perez@email.com'],
   )
-
+  assertEquals(seeder1.hashedValue.toString(), '9YRYkb9M9N2l0bID4W9m7I4qhUHEgGifFRd2baDNJ0c=')
   assertEquals(await seeder2.name.decrypt(), 'Ismael 2')
   assertEquals(seeder2.email.unmask(), 'pepito2@email.com')
   assertEquals(
@@ -73,6 +73,10 @@ Deno.test({
             },
           }),
         },
+        hashedValue: {
+          type: String,
+          get: dataProtectionGetter({ strategy: 'hash', settings: { useSalt: false } }),
+        },
       },
       options: {
         timestamps: true,
@@ -88,6 +92,7 @@ Deno.test({
                 value: ['pepito.perez@email.com', 'pepito12.perez@email.com'],
               },
             },
+            hashedValue: 'value to hash',
           }, {
             id: '68fb00b33405a3a540d9b972',
             name: 'Ismael 2',
@@ -157,6 +162,10 @@ Deno.test({
               }),
             },
           }),
+        },
+        hashedValue: {
+          type: String,
+          get: dataProtectionGetter({ strategy: 'hash', settings: { useSalt: false } }),
         },
       },
       options: {
