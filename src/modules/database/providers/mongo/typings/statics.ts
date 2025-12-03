@@ -325,4 +325,64 @@ export type SchemaStatics = {
     this: AdaptedModel<T> | AdaptedModelBySchema<S>,
     options: ReadDocumentsOptions<T>,
   ): Promise<void>
+
+  /**
+   * Paginate documents using traditional skip/limit strategy.
+   * @template T - Mongoose document type (plain or lean)
+   *
+   * @param {Object} params - Pagination parameters.
+   * @param {number} [params.page=1] - Current page number (1-based).
+   * @param {number} [params.limit=10] - Number of documents per page.
+   * @param {Record<string, unknown>} [params.filter={}] - MongoDB filter query.
+   * @param {Record<string, 1 | -1>} [params.sort={ _id: 1 }] - Sort object.
+   *
+   * @returns {Promise<Object>} Result containing docs and metadata.
+   * @returns {Array<Object>} return.docs - List of documents.
+   * @returns {number} return.page - Current page number.
+   * @returns {number} return.limit - Limit per page.
+   * @returns {number} return.total - Total number of matching documents.
+   * @returns {number} return.totalPages - Total number of pages.
+   * @returns {boolean} return.hasNextPage - Whether another page exists.
+   * @returns {boolean} return.hasPrevPage - Whether a previous page exists.
+   */
+  paginate<T extends Document>(this: AdaptedModel<T>, options?: {
+    page?: number
+    limit?: number
+    filter?: Record<string, unknown>
+    sort?: Record<string, 1 | -1>
+    omit?: string[]
+  }): Promise<{
+    docs: T[]
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPrevPage: boolean
+  }>
+
+  /**
+   * Paginate documents using cursor-based strategy (more efficient).
+   *
+   * @param {Object} params - Pagination parameters.
+   * @param {number} [params.limit=10] - Number of documents to return.
+   * @param {Object} [params.filter={}] - MongoDB filter query.
+   * @param {string|null} [params.cursor=null] - Last document _id for pagination.
+   *
+   * @returns {Promise<Object>} Result including cursor and documents.
+   * @returns {Array<Object>} return.docs - List of paginated documents.
+   * @returns {string|null} return.nextCursor - Cursor for next page, or null.
+   * @returns {boolean} return.hasNextPage - Whether another page exists.
+   */
+  paginateCursor<T extends Document>(this: AdaptedModel<T>, options?: {
+    limit?: number
+    filter?: Record<string, unknown>
+    cursor?: string | null
+    omit?: string[]
+  }): Promise<{
+    docs: T[]
+    limit: number
+    nextCursor: string
+    hasNextPage: boolean
+  }>
 }

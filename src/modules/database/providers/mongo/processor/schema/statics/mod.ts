@@ -6,6 +6,7 @@ import { generateHash, validateHash } from '@zanix/helpers'
 import { transactions } from './transactions.ts'
 import { upsertById, upsertManyById } from './upsert.ts'
 import { readBatch, readCursor, readDocuments, readFind } from './find.ts'
+import { paginate, paginateCursor } from './pagination.ts'
 
 /**
  * @function statics
@@ -57,4 +58,7 @@ export const statics = (
   schema.statics._getDataProtection = () => dataProtection
   schema.statics._getDataProtectionPaths = () => protectionPaths
   schema.statics._hasDataProtection = () => hasAProtection
+
+  schema.statics.paginate = paginate
+  schema.statics.paginateCursor = paginateCursor
 }

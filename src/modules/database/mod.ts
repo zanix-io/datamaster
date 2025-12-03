@@ -41,6 +41,8 @@ export type { SeedModelAttrs } from './typings/models.ts'
 // types
 export type { MongoSeeder } from 'mongo/typings/commons.ts'
 export type { MongoConnectorOptions } from 'mongo/typings/process.ts'
+export type { AdaptedModel } from 'mongo/typings/models.ts'
+export type { Document, Model } from 'mongoose'
 
 // utils
 export { getAllSubschemas } from 'mongo/utils/schemas.ts'

@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.9] - 2025-12-02
+
+### Added
+
+- Added a pagination cursor for scrolling through documents.
+- Implemented pagination support for search results.
+
 ## [0.4.8] - 2025-11-30
 
 ### Fixed
