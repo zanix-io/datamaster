@@ -96,10 +96,10 @@ export interface ReadDocumentsOptions<T> {
   batchSize?: number
 
   /** Optional query filter */
-  filter?: FilterQuery<T>
+  filter?: FilterQuery<T & Record<string, any>>
 
   /** Callback executed for each document (streamed or batched) */
-  onDocument: (doc: T, index: number) => Promise<void> | void
+  onDocument: (doc: T & Record<string, any>, index: number) => Promise<void> | void
 }
 
 /**

@@ -345,14 +345,18 @@ export type SchemaStatics = {
    * @returns {boolean} return.hasNextPage - Whether another page exists.
    * @returns {boolean} return.hasPrevPage - Whether a previous page exists.
    */
-  paginate<T extends Document>(this: AdaptedModel<T>, options?: {
-    page?: number
-    limit?: number
-    filter?: Record<string, unknown>
-    sort?: Record<string, 1 | -1>
-    omit?: string[]
-  }): Promise<{
-    docs: T[]
+  paginate<T extends Document, S extends Schema>(
+    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+    options?: {
+      page?: number
+      limit?: number
+      filter?: Record<string, unknown>
+      sort?: Record<string, 1 | -1>
+      omit?: string[]
+    },
+  ): Promise<{
+    // deno-lint-ignore no-explicit-any
+    docs: (T & Record<string, any>)[]
     page: number
     limit: number
     total: number
@@ -374,13 +378,17 @@ export type SchemaStatics = {
    * @returns {string|null} return.nextCursor - Cursor for next page, or null.
    * @returns {boolean} return.hasNextPage - Whether another page exists.
    */
-  paginateCursor<T extends Document>(this: AdaptedModel<T>, options?: {
-    limit?: number
-    filter?: Record<string, unknown>
-    cursor?: string | null
-    omit?: string[]
-  }): Promise<{
-    docs: T[]
+  paginateCursor<T extends Document, S extends Schema>(
+    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+    options?: {
+      limit?: number
+      filter?: Record<string, unknown>
+      cursor?: string | null
+      omit?: string[]
+    },
+  ): Promise<{
+    // deno-lint-ignore no-explicit-any
+    docs: (T & Record<string, any>)[]
     limit: number
     nextCursor: string
     hasNextPage: boolean
