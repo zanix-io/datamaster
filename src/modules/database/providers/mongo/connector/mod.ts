@@ -181,11 +181,11 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
       if (connected) {
         logger.success(`MongoDB Connected Successfully through '${this.name}' class`)
       } else {
-        logger.error(`Failed to connect to MongoDB in '${this.constructor.name}' class`, {
+        logger.error(`Failed to connect to MongoDB in '${this.name}' class`, {
           code: 'MONGODB_CONNECTION_FAILED',
           meta: {
             suggestion: 'Check MongoDB URI, credentials, and network connectivity',
-            connectorName: this.constructor.name,
+            connectorName: this.name,
             source: 'zanix',
           },
         })
@@ -193,12 +193,12 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     } catch (error) {
       const { message, name, stack } = error as Error
       logger.error(
-        `Unable to establish connection for database in '${this.constructor.name}' class.`,
+        `Unable to establish connection for database in '${this.name}' class.`,
         { message, name, stack },
         {
           code: 'MONGODB_CONNECTOR_MONGO_ERROR',
           meta: {
-            connectorName: this.constructor.name,
+            connectorName: this.name,
             suggestion: 'Please check configuration or network settings',
             method: 'initialize',
             source: 'zanix',
@@ -225,10 +225,11 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   protected async close(): Promise<void> {
     try {
       // Disconnect from mongo
+      logger.info('Closing the MongoDB connection...', 'noSave')
       await this.#database.disconnect()
     } catch (e) {
       logger.error(
-        `Failed to disconnect MongoDB in '${this.constructor.name}' class`,
+        `Failed to disconnect MongoDB in '${this.name}' class`,
         e,
         'noSave',
       )

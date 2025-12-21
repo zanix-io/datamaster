@@ -23,7 +23,6 @@ export const seederBaseWrapper = (
   const {
     name,
     version,
-    runOnWorker,
     verbose = true,
     runningMode = 'ifVersionChanged',
   } = options
@@ -67,11 +66,6 @@ export const seederBaseWrapper = (
 
     try {
       if (runningMode !== 'always' && avoidRun(version, name, Model)) return
-
-      if (runOnWorker) {
-        return handler(Model, connector) // TODO: implement worker when is ready instance['worker'],
-        // this.worker.task (deno worker) or this.worker.run (bull), preferible use task, seeders are local, neccesary to create a @Job
-      }
 
       loggerIntercepted?.info(`${initializationMsg}...`)
 

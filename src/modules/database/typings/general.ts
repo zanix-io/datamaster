@@ -63,12 +63,6 @@ export type SchemaAccessor = (value: any, options?: any) => any
  */
 export type SeederOptions = {
   /**
-   * Indicates whether the seeder should be executed in a the background worker.
-   * Useful for running heavy seed operations without blocking the main thread.
-   * @default false
-   */
-  runOnWorker?: boolean
-  /**
    * Enables verbose logging during the seeding process.
    * When true, additional details and progress information are printed to the console or logs.
    * @default true

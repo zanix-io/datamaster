@@ -132,7 +132,7 @@ Deno.test({
         seeders: [
           {
             handler: seedByIdIfMissing(bulk[0]),
-            options: { version: '0.1.0', runOnWorker: true, verbose: false },
+            options: { version: '0.1.0', verbose: false },
           },
           seedManyByIdIfMissing([bulk[1], bulk[2]]),
           seedByIdIfMissing(bulk[0]),

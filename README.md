@@ -93,8 +93,7 @@ local caching utilities, such as in-memory Map for fast, etc.
   - Define and load models dynamically with `registerModel`.
   - Supports **seeders**: either **(a)** an array of async/sync functions
     `handler: (Model, connector) => void | Promise<void>` **or (b)** an array of objects:
-    `{ handler, options: { version: '0.1.0', runOnWorker: true, verbose: false } }` to populate
-    initial data.
+    `{ handler, options: { version: '0.1.0', verbose: false } }` to populate initial data.
   - Allows callbacks to extend schemas with custom methods.
   - Simplifies querying and CRUD operations with the connector instance.
 
