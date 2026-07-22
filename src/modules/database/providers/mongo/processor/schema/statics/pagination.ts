@@ -1,11 +1,9 @@
-import type { AdaptedModel } from 'mongo/typings/models.ts'
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
 
 /**
  * Paginate documents using traditional skip/limit strategy.
  */
 export const paginate: SchemaStatics['paginate'] = async function (
-  this: AdaptedModel,
   options = {},
 ) {
   const { page = 1, limit = 10, filter = {}, sort = { _id: 1 }, omit = [] } = options
@@ -32,7 +30,6 @@ export const paginate: SchemaStatics['paginate'] = async function (
  * Paginate documents using cursor-based strategy (more efficient).
  */
 export const paginateCursor: SchemaStatics['paginateCursor'] = async function (
-  this: AdaptedModel,
   options = {},
 ) {
   const { limit = 10, filter = {}, cursor = null, omit = [] } = options
