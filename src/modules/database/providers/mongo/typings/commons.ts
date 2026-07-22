@@ -33,7 +33,7 @@ export type SchemaMethods<Attrs extends BaseAttributes = any> = {
    * Choose the approach that best fits your performance requirements.
    */
   toJSON<T = FlattenMaps<Attrs>>(
-    options: Omit<ToObjectOptions, 'getters'> & { userSession?: { type: Session['type'] } },
+    options: Omit<ToObjectOptions, 'getters'> & { userSession?: { type?: Session['type'] } },
   ): T
 }
 
