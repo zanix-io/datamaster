@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import type {
+  HydratedDocument,
   InferSchemaType,
   Model as MongoModel,
   ObtainSchemaGeneric,
@@ -68,6 +69,14 @@ export type ModelBySchema<S extends Schema> =
     ObtainSchemaGeneric<S, 'TQueryHelpers'>,
     ObtainSchemaGeneric<S, 'TInstanceMethods'> & SchemaMethods,
     ObtainSchemaGeneric<S, 'TVirtuals'>,
+    HydratedDocument<
+      InferSchemaType<S>,
+      & ObtainSchemaGeneric<S, 'TVirtuals'>
+      & ObtainSchemaGeneric<S, 'TInstanceMethods'>
+      & SchemaMethods,
+      ObtainSchemaGeneric<S, 'TQueryHelpers'>,
+      ObtainSchemaGeneric<S, 'TVirtuals'>
+    >,
     S
   >
   & ObtainSchemaGeneric<S, 'TStaticMethods'>
@@ -79,6 +88,13 @@ export type ModelBySchema<S extends Schema> =
         ObtainSchemaGeneric<S, 'TQueryHelpers'>,
         ObtainSchemaGeneric<S, 'TInstanceMethods'>,
         ObtainSchemaGeneric<S, 'TVirtuals'>,
+        HydratedDocument<
+          InferSchemaType<S>,
+          & ObtainSchemaGeneric<S, 'TVirtuals'>
+          & ObtainSchemaGeneric<S, 'TInstanceMethods'>,
+          ObtainSchemaGeneric<S, 'TQueryHelpers'>,
+          ObtainSchemaGeneric<S, 'TVirtuals'>
+        >,
         S
       >['schema']
   }

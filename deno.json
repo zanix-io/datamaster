@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -47,7 +47,7 @@
   },
   "imports": {
     "redis": "npm:redis@^5.9.0",
-    "mongoose": "npm:mongoose@^6.7",
+    "mongoose": "npm:mongoose@^8",
     "sqlite3": "jsr:@db/sqlite@^0.12.0",
     "@std/assert": "jsr:@std/assert@0.224",
     "@zanix/workers": "jsr:@zanix/utils@2.*/workers",

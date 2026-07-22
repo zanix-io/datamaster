@@ -1,3 +1,4 @@
+// deno-lint-ignore-file no-explicit-any
 import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
 
 import { dataProtectionSetterDefinition } from 'database/policies/protection.ts'
@@ -28,7 +29,11 @@ export const dataProtectionPreSave = (
   const allowedPaths = schema.statics._getDataProtectionPaths()
 
   // Base data protection transform function
-  const tranform = async function async(this: Document) {
+  // `Document` fully loosened: this runs against hydrated documents produced from
+  // arbitrary (often default-generic) schemas, whose computed document shape does not
+  // structurally match mongoose's own default `Document` (e.g. `_id` may resolve to
+  // `unknown` instead of `ObjectId`).
+  const tranform = async function async(this: Document<any, any, any, any, any>) {
     await transformShallowByPaths(this, {
       allowedPaths,
       transform: (value, path) => {

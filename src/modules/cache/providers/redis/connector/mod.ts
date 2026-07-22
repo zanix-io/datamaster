@@ -27,14 +27,38 @@ export class ZanixRedisConnector<K extends string = string, V = any>
   protected name: string
   private scanKeys = scanKeys
   private execWithRetry = execWithRetry
-  private accessor connected = false
-  private accessor reconnect = false
-  protected accessor scheduler!: RedisPipelineScheduler
   protected reconnectStrategy: RedisOptions['reconnectStrategy']
   protected commandRetryInterval: number
   protected maxCommandRetries: number
   protected commandTimeout: number
   private timeout: number
+  #connected = false
+  #reconnect = false
+  #scheduler!: RedisPipelineScheduler
+
+  private get connected(): boolean {
+    return this.#connected
+  }
+
+  private set connected(value: boolean) {
+    this.#connected = value
+  }
+
+  private get reconnect(): boolean {
+    return this.#reconnect
+  }
+
+  private set reconnect(value: boolean) {
+    this.#reconnect = value
+  }
+
+  protected get scheduler(): RedisPipelineScheduler {
+    return this.#scheduler
+  }
+
+  protected set scheduler(value: RedisPipelineScheduler) {
+    this.#scheduler = value
+  }
 
   /**
    * Creates a Redis-backed cache with retries and command queueing.

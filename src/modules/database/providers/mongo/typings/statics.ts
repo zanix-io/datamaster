@@ -1,9 +1,9 @@
 import type { Model, ReadContext, ReadDocumentsOptions } from './commons.ts'
 import type { generateHash, validateHash } from '@zanix/helpers'
 import type { MaskingBaseOptions } from '@zanix/types'
-import type { ClientSession, Document, Schema } from 'mongoose'
+import type { ClientSession, Document } from 'mongoose'
 import type { DataObject } from 'database/typings/models.ts'
-import type { AdaptedModel, AdaptedModelBySchema } from './models.ts'
+import type { AdaptedModel } from './models.ts'
 import type {
   DataAccessConfig,
   DataPolicyVersion,
@@ -265,8 +265,8 @@ export type SchemaStatics = {
    *  - `limit = 0`             : No limit, reads all documents
    *  - `filter = {}`           : No filter, reads all documents
    */
-  readFind<T extends Document, S extends Schema>(
-    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+  readFind<T extends Document>(
+    this: AdaptedModel,
     options: ReadContext<T>,
   ): Promise<void>
   /**
@@ -278,8 +278,8 @@ export type SchemaStatics = {
    *  - `limit = 0`             : No limit, reads all documents
    *  - `filter = {}`           : No filter, reads all documents
    */
-  readCursor<T extends Document, S extends Schema>(
-    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+  readCursor<T extends Document>(
+    this: AdaptedModel,
     options: ReadContext<T>,
   ): Promise<void>
   /**
@@ -292,8 +292,8 @@ export type SchemaStatics = {
    *  - `filter = {}`           : No filter, reads all documents
    *  - `batchSize` = 1000
    */
-  readBatch<T extends Document, S extends Schema>(
-    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+  readBatch<T extends Document>(
+    this: AdaptedModel,
     options: ReadContext<T>,
   ): Promise<void>
   /**
@@ -321,8 +321,8 @@ export type SchemaStatics = {
    *   - An array of documents for `'find'` mode
    *   - `void` for `'cursor'` and `'batch'` modes (callbacks or side-effects are used instead)
    */
-  readDocuments<T extends Document, S extends Schema>(
-    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+  readDocuments<T extends Document>(
+    this: AdaptedModel,
     options: ReadDocumentsOptions<T>,
   ): Promise<void>
 
@@ -345,8 +345,8 @@ export type SchemaStatics = {
    * @returns {boolean} return.hasNextPage - Whether another page exists.
    * @returns {boolean} return.hasPrevPage - Whether a previous page exists.
    */
-  paginate<T extends Document, S extends Schema>(
-    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+  paginate<T extends Document>(
+    this: AdaptedModel,
     options?: {
       page?: number
       limit?: number
@@ -378,8 +378,8 @@ export type SchemaStatics = {
    * @returns {string|null} return.nextCursor - Cursor for next page, or null.
    * @returns {boolean} return.hasNextPage - Whether another page exists.
    */
-  paginateCursor<T extends Document, S extends Schema>(
-    this: AdaptedModel<T> | AdaptedModelBySchema<S>,
+  paginateCursor<T extends Document>(
+    this: AdaptedModel,
     options?: {
       limit?: number
       filter?: Record<string, unknown>

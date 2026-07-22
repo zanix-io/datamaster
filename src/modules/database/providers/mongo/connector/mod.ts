@@ -210,7 +210,10 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
 
   public async isHealthy(): Promise<boolean> {
     try {
-      await this.#database.connection.db.command({ ping: 1 })
+      const db = this.#database.connection.db
+      if (!db) return false
+
+      await db.command({ ping: 1 })
       return true
     } catch {
       return false

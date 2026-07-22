@@ -88,7 +88,7 @@ export async function readBatch<T extends Document>(this: AdaptedModel, options:
  * @returns Array of documents (only for `find` mode) or void
  */
 export function readDocuments<T extends Document>(
-  this: AdaptedModel<T>,
+  this: AdaptedModel,
   options: ReadDocumentsOptions<T>,
 ): Promise<void> {
   const { mode = 'cursor', ...opts } = options

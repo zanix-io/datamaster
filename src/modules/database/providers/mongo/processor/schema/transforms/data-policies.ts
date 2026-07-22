@@ -40,7 +40,17 @@ export const transformByDataAccess = (
     if (!session && ctx?.session) {
       ServerProgram.asyncContext.enterWith({ ...ctx, useDataAccessGet: true })
 
-      const opts = { ...options, getters: true, transform: false }
+      // Mongoose (8+) snapshots the options it was "called with" the first time it sees them
+      // (`options._calledWithOptions`) and reuses that snapshot on nested `toJSON`/`toObject`
+      // calls that reuse the same options object — which is exactly what spreading `options`
+      // here does. Left alone, the snapshot from the *outer* call (which never set
+      // `transform: false`) wins, mongoose re-invokes this very transform on the nested call
+      // below, and it recurses forever. Stripping mongoose's internal (`_`-prefixed) bookkeeping
+      // keys forces it to recompute the snapshot from our explicit overrides instead.
+      const opts = Object.fromEntries(
+        Object.entries({ ...options, getters: true, transform: false })
+          .filter(([key]) => !key.startsWith('_')),
+      )
       const tranformData = json ? doc.toJSON(opts) : doc.toObject({ ...opts, flattenMaps: true })
       // Data access getters require `flattenMaps: true` in `toObject()` to function correctly.
       ServerProgram.asyncContext.enterWith(ctx) // restore the context

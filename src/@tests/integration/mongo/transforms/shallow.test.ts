@@ -99,9 +99,12 @@ Deno.test('Nested transformations over predefined paths, calling all getters', (
 
   getterCalls = 0
   const json = exampleDoc.toJSON({ getters: true, virtuals: false })
-  assertEquals(getterCalls, 8)
+  // 1 (name) + 1 (arr, single item) + 2 (arrayObject, one call per subdocument) +
+  // 2 (mapObject, one call per entry) = 6. Mongoose 8 no longer double-invokes getters
+  // for nested subdocuments/arrays (mongoose 6 called them twice, hence the old value of 8).
+  assertEquals(getterCalls, 6)
 
-  delete json.arrayObject[1]._id
+  delete (json.arrayObject[1] as { _id?: unknown })._id
   delete json['id' as never]
 
   assertEquals(json, {
@@ -177,7 +180,7 @@ Deno.test('Nested transformations over predefined paths', () => {
 
   const json = exampleDoc.toJSON()
   assertEquals(getterCalls, 0) // No getters should be called because the { getter } option is false
-  delete json.arrayObject[1]._id
+  delete (json.arrayObject[1] as { _id?: unknown })._id
   delete json['id' as never]
 
   assertEquals(json, {
@@ -228,7 +231,7 @@ Deno.test('Nested transformations async', async () => {
   assert(json instanceof Promise)
 
   json = await json
-  delete json.arrayObject[1]._id
+  delete (json.arrayObject[1] as { _id?: unknown })._id
   delete json['id' as never]
 
   assertEquals(json, {

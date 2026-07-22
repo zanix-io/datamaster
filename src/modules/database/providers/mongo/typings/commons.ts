@@ -6,7 +6,8 @@ import type { Session } from '@zanix/server'
 import type {
   Document,
   FilterQuery,
-  LeanDocument,
+  FlattenMaps,
+  HydratedDocument,
   Model as MongoModel,
   ResolveSchemaOptions,
   Schema,
@@ -31,7 +32,7 @@ export type SchemaMethods = {
    *
    * Choose the approach that best fits your performance requirements.
    */
-  toJSON<T = LeanDocument<Record<string, any>>>(
+  toJSON<T = FlattenMaps<Record<string, any>>>(
     options: Omit<ToObjectOptions, 'getters'> & { userSession?: { type: Session['type'] } },
   ): T
 }
@@ -43,7 +44,14 @@ export type SchemaMethods = {
  * @template S - The schema type, defaults to DefaultSchema<Attrs>.
  */
 export type Model<Attrs extends BaseAttributes = any, S extends Schema = DefaultSchema<Attrs>> =
-  MongoModel<Attrs, {}, SchemaMethods, {}, S>
+  MongoModel<
+    Attrs,
+    {},
+    SchemaMethods,
+    {},
+    HydratedDocument<Attrs, SchemaMethods, {}, {}>,
+    S
+  >
 
 /**
  * Represents the default schema type, with attributes extending BaseAttributes.

@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import type { BaseAttributes, Extensions, SchemaAccessor } from 'database/typings/general.ts'
-import type { Document, Schema, SchemaDefinition, SchemaDefinitionProperty } from 'mongoose'
+import type { AnyObject, Schema, SchemaDefinition, SchemaDefinitionProperty } from 'mongoose'
 import type { SchemaStatics } from './statics.ts'
 import type { AdaptedModelBySchema } from './models.ts'
 import type { SchemaMethods } from './commons.ts'
@@ -11,11 +11,17 @@ type MongoField<T> = SchemaDefinitionProperty<T>
 
 /**
  * Base custom schema
+ *
+ * The underlying `Schema` is pinned to fully-`any` generics (rather than left to default).
+ * Mongoose 8's default generics for `Schema` are large, mutually-recursive conditional types
+ * (`DocType`, `THydratedDocumentType`, ...) that get independently (re)expanded at each usage
+ * site (e.g. `schema.get(...)` vs `schema.set(...)`), producing structurally-similar but not
+ * identical anonymous types. Pinning them to `any` keeps every accessor consistent.
  */
 export type BaseCustomSchema = {
   statics: SchemaStatics & Schema['statics']
   methods: SchemaMethods & Schema['methods']
-} & Schema
+} & Schema<any, any, any, any, any, any, any, any, any>
 
 /**
  * Optional parameters to define a model by schema.
@@ -47,7 +53,11 @@ export type MongoSchemaDefinition<Attrs extends BaseAttributes> =
   | {
     [T in keyof SchemaDefinition<Attrs>]:
       & MongoField<Attrs>
-      & ConstructorParameters<typeof Schema>[0]
+      // Allows additional loosely-typed schema field options (e.g. custom or
+      // rarely-used SchemaType properties) without forcing TypeScript to fully
+      // resolve mongoose's `Schema` constructor generics for every field, which
+      // (in mongoose 8) is deep enough to trip the compiler's recursion limit.
+      & AnyObject
   }
   | Schema
 
@@ -73,7 +83,13 @@ export type AccessorsInfo = {
 
 /** Tranform function type */
 export type Transform = (
-  doc: Document,
-  ret: Document | Record<string, unknown>,
+  // `doc`/`ret` are left as `any` (like `options`/the return type below): transforms run
+  // against hydrated documents produced from arbitrary (often default-generic) schemas,
+  // whose computed document/serialized-output shape varies per schema (e.g. `_id` may
+  // resolve to `unknown` instead of `ObjectId`, and schema-added fields like `__v` are not
+  // declared members of the `Document` class itself). A concrete `Document<...>` shape here
+  // would reject the perfectly-valid, differently-shaped values mongoose actually passes in.
+  doc: any,
+  ret: any,
   options?: any,
 ) => any

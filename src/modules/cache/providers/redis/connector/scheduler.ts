@@ -15,7 +15,7 @@ export class RedisPipelineScheduler {
 
   private pipeline: ReturnType<RedisClientType['multi']>
   private counter = 0
-  private timer: number | null = null
+  private timer: NodeJS.Timeout | number | null = null
   private flushing = false
 
   /**

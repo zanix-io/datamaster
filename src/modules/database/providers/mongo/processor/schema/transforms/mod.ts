@@ -19,17 +19,20 @@ const applyTransformations = (
   transforms: Array<((doc: any, ret: any, options?: any) => any)>,
   type?: 'toJSON' | 'toObject',
 ) => {
-  const existingTransform = {
+  // Typed loosely as `Transform`: mongoose's own inferred type for `schema.get(...).transform`
+  // is tied to the schema's own (often default-generic) document type, which does not
+  // structurally match the document type mongoose expects back in `schema.set(...)`. Both
+  // sides are effectively "any document" in practice, so `Transform` reconciles them.
+  // `transform` may also be a plain `boolean` per mongoose's own `ToObjectOptions`.
+  const existingTransform: { toJSON?: Transform | boolean; toObject?: Transform | boolean } = {
     toJSON: schema.get('toJSON')?.transform,
     toObject: schema.get('toObject')?.transform,
   }
 
   const applyTransform = (transformType: 'toJSON' | 'toObject') => {
     if (!type || type === transformType) {
-      let baseTransform = existingTransform[transformType]
-      if (typeof baseTransform !== 'function') {
-        baseTransform = (_, ret) => ret // define a no-op
-      }
+      const existing = existingTransform[transformType]
+      const baseTransform: Transform = typeof existing === 'function' ? existing : (_, ret) => ret
 
       /**
        * ⚠️ WARNING: THIS SECTION IS RESERVED FOR TRANSFORMATIONS ⚠️

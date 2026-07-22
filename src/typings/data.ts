@@ -30,6 +30,7 @@ export type VerifiableObject =
     verify?: (hash: string) => Promise<boolean>
   }
   | VerifiableObject[]
+  | null
   | undefined
 
 /**
@@ -69,6 +70,7 @@ export type DecryptableObject =
        */
       decrypt?: () => Promise<string[]>
     }
+  | null
   | undefined
 
 /**
@@ -111,4 +113,5 @@ export type UnmaskableObject =
      */
     unmask?: () => string[]
   }
+  | null
   | undefined

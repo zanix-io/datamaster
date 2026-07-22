@@ -1,7 +1,7 @@
 import { InternalError } from '@zanix/errors'
 import type { ZanixRedisConnector } from './mod.ts'
 
-const timeoutIds: number[] = []
+const timeoutIds: (NodeJS.Timeout | number)[] = []
 
 /** Helper to clear timeouts */
 export function clearTimeouts() {
