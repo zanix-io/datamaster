@@ -21,7 +21,7 @@ import type {
  * for specific instances. Override them when concurrent modifications
  * need to be supported.
  */
-export type SchemaMethods = {
+export type SchemaMethods<Attrs extends BaseAttributes = any> = {
   /**
    * Custom `toJSON` transformation (override).
    *
@@ -32,7 +32,7 @@ export type SchemaMethods = {
    *
    * Choose the approach that best fits your performance requirements.
    */
-  toJSON<T = FlattenMaps<Record<string, any>>>(
+  toJSON<T = FlattenMaps<Attrs>>(
     options: Omit<ToObjectOptions, 'getters'> & { userSession?: { type: Session['type'] } },
   ): T
 }
@@ -47,9 +47,9 @@ export type Model<Attrs extends BaseAttributes = any, S extends Schema = Default
   MongoModel<
     Attrs,
     {},
-    SchemaMethods,
+    SchemaMethods<Attrs>,
     {},
-    HydratedDocument<Attrs, SchemaMethods, {}, {}>,
+    HydratedDocument<Attrs, SchemaMethods<Attrs>, {}, {}>,
     S
   >
 

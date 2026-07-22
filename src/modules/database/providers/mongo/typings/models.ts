@@ -67,13 +67,13 @@ export type ModelBySchema<S extends Schema> =
   & MongoModel<
     InferSchemaType<S>,
     ObtainSchemaGeneric<S, 'TQueryHelpers'>,
-    ObtainSchemaGeneric<S, 'TInstanceMethods'> & SchemaMethods,
+    ObtainSchemaGeneric<S, 'TInstanceMethods'> & SchemaMethods<InferSchemaType<S>>,
     ObtainSchemaGeneric<S, 'TVirtuals'>,
     HydratedDocument<
       InferSchemaType<S>,
       & ObtainSchemaGeneric<S, 'TVirtuals'>
       & ObtainSchemaGeneric<S, 'TInstanceMethods'>
-      & SchemaMethods,
+      & SchemaMethods<InferSchemaType<S>>,
       ObtainSchemaGeneric<S, 'TQueryHelpers'>,
       ObtainSchemaGeneric<S, 'TVirtuals'>
     >,

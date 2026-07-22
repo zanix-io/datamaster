@@ -119,7 +119,7 @@ Deno.test({
     const jsonSaved = userSaved.toJSON({ userSession: { type: 'user' } })
 
     const maskedValue: UnmaskableObject = userSaved.maskVersioned
-    assert(jsonSaved.maskVersioned.startsWith('v1:'))
+    assert(jsonSaved.maskVersioned?.startsWith('v1:'))
     assertEquals(maskedValue?.unmask?.(), json.maskVersioned)
 
     const maskedValueArr: UnmaskableObject = userSaved.maskVersionedArr
