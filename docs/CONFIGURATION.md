@@ -1,0 +1,69 @@
+# Configuration Reference
+
+Environment variables read by the database/cache connectors and by the data protection utilities.
+
+## Connection variables
+
+| Variable                | Description                                                                                                                                                                      | Default when unset       |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `MONGO_URI`             | Connection URI used by `ZanixMongoConnector` when no `uri` option is passed to its constructor.                                                                                  | `mongodb://localhost`    |
+| `REDIS_URI`             | Connection URI used by `ZanixRedisConnector` when no `redisUrl` option is passed to its constructor.                                                                             | `redis://localhost:6379` |
+| `LOCAL_CACHE_MAX_ITEMS` | Maximum number of items `ZanixQLRUConnector` holds before evicting the least recently used entry.                                                                                | `50000`                  |
+| `DATABASE_SEEDERS`      | Set to `'false'` to globally disable seeder execution for both `registerModel`'s DSL seeders and schema-based seeders (any other value, including unset, keeps seeders enabled). | seeders enabled          |
+
+An explicit constructor option always takes precedence over its matching environment variable (e.g.
+`new ZanixMongoConnector({ uri: '...' })` wins over `MONGO_URI`).
+
+## Data protection variables
+
+Read by `dataProtectionGetter`/`dataPoliciesGetter` and by the standalone `datamasterEncrypt`,
+`datamasterDecrypt`, `datamasterMask`, `datamasterUnmask` utilities — see
+[Data Protection](./DATA-PROTECTION.md) for what each strategy actually does.
+
+| Variable          | Used for                                      | Notes                                                                          |
+| ----------------- | --------------------------------------------- | ------------------------------------------------------------------------------ |
+| `DATA_SECRET_KEY` | Masking/unmasking.                            | Checked first; falls back to `DATA_AES_KEY` if unset.                          |
+| `DATA_AES_KEY`    | Symmetric encryption, and masking's fallback. | Value is used directly (not base64-decoded).                                   |
+| `DATA_RSA_PUB`    | Asymmetric **encryption**.                    | Must contain a **base64-encoded** public key — it's `atob()`-decoded on read.  |
+| `DATA_RSA_KEY`    | Asymmetric **decryption**.                    | Must contain a **base64-encoded** private key — it's `atob()`-decoded on read. |
+
+> ⚠️ The asymmetric-decryption variable is **`DATA_RSA_KEY`**, not `DATA_RSA_PRIV` — an older
+> revision of this document used the wrong name.
+
+### Versioned keys
+
+Every one of the variables above can be suffixed with a version to support key rotation without
+downtime: append `_V1`, `_V2`, etc. to the base name (e.g. `DATA_AES_KEY_V1`, `DATA_RSA_PUB_V1`). A
+`DataProtectionOptions`/`DataFieldAccess` config can declare an `activeVersion` and a
+`versionConfigs` map so different documents (or the same document over time) resolve to different
+strategies/settings per version.
+
+If no version is specified (or the version is `'v0'`), the **unsuffixed** variable is used — `v0` is
+treated as the implicit default and never gets a suffix.
+
+| Strategy              | Example variables                               |
+| --------------------- | ----------------------------------------------- |
+| Masking               | `DATA_SECRET_KEY_V1`, `DATA_SECRET_KEY_V2`, ... |
+| Symmetric encryption  | `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, ...       |
+| Asymmetric encryption | `DATA_RSA_PUB_V1`, `DATA_RSA_KEY_V1`, ...       |
+
+Rotate keys programmatically with `seedRotateProtectionKeys()` — see
+[Data Protection: key rotation](./DATA-PROTECTION.md#key-rotation).
+
+## Security
+
+- **Never commit encryption keys to version control.** During key rotation, keep every key version
+  accessible until all existing data has been re-encrypted under the new version.
+- **Never store sensitive data in plaintext** in an external cache. Only cache ephemeral or already
+  protected data, with a short TTL and a secure connection. Prefer applying data protection policies
+  at the database level, or the standalone `datamasterEncrypt`/`datamasterDecrypt`,
+  `datamasterMask`/`datamasterUnmask`, `datamasterHash` utilities for anything cached — see
+  [Data Protection](./DATA-PROTECTION.md).
+
+## See also
+
+- [Data Protection](./DATA-PROTECTION.md) — what each strategy does and how versioned keys and
+  rotation actually work.
+- [Database](./DATABASE.md) — `ZanixMongoConnector` construction options and multi-database model
+  names.
+- [Cache](./CACHE.md) — `ZanixRedisConnector`/`ZanixQLRUConnector` construction options.

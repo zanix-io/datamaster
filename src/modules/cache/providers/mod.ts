@@ -16,7 +16,8 @@ import logger from '@zanix/logger'
  * @extends ZanixCacheProvider
  */
 export class ZanixCacheCoreProvider extends ZanixCacheProvider {
-  private keyLockManager = new LockManager() // Exclusive lock per key, only one function runs at a time by default
+  /** Exclusive lock per key, only one function runs at a time by default. */
+  private keyLockManager = new LockManager()
 
   /**
    * Retrieves a value from cache with local fallback and optional fetch.

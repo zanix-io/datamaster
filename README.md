@@ -8,15 +8,15 @@
 
 ## 🧭 Table of Contents
 
-- [Description](#🧩-description)
-- [Features](#⚙️-features)
-- [Installation](#📦-installation)
-- [Basic Usage](#🚀-basic-usage)
-- [Documentation](#📚-documentation)
-- [Contributing](#🤝-contributing)
-- [Changelog](#🕒-changelog)
-- [License](#⚖️-license)
-- [Resources](#🔗-resources)
+- [Description](#-description)
+- [Features](#-features)
+- [Installation](#-installation)
+- [Basic Usage](#-basic-usage)
+- [Documentation](#-documentation)
+- [Contributing](#-contributing)
+- [Changelog](#-changelog)
+- [License](#-license)
+- [Resources](#-resources)
 
 ---
 
@@ -100,10 +100,14 @@ local caching utilities, such as in-memory Map for fast, etc.
 - **Extensible architecture**
 
   - Ready for future connectors (Memcached, PostgreSQL).
-  - Organized exports:
+  - Everything is available from the root package; two narrower entrypoints exist for consumers who
+    prefer to scope their imports:
 
-    - `./cache` → cache systems.
-    - `./database` → database connectors.
+    - `./cache` → cache systems only.
+    - `./database` → database connectors only.
+    - `./core` → side-effect-only import that auto-registers the default Mongo, Redis, local-cache,
+      and SQLite connectors/providers with the Zanix DI container, for apps that don't need to
+      customize their configuration.
 
 - **Seamless Zanix integration**
 
@@ -119,98 +123,22 @@ Install via **JSR** using [Deno](https://deno.com/):
 import * as datamaster from 'jsr:@zanix/datamaster@[version]'
 ```
 
-Or import specific modules:
+Rather than the wildcard import above, you'll typically import only what you need. The table below
+groups the main exports by category — each links to a guide with full usage examples:
+
+| Category                      | Key exports                                                                                                                                                                                           | Guide                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Mongo connector & models      | `ZanixMongoConnector`, `registerModel`, `Schema`                                                                                                                                                      | [Database](./docs/DATABASE.md)                                          |
+| Seeders                       | `seedByIdIfMissing`, `seedManyByIdIfMissing`, `seedRotateProtectionKeys`                                                                                                                              | [Database](./docs/DATABASE.md#seeders-registermodels-extensionsseeders) |
+| SQLite (KV store)             | `ZanixKVStoreConnector`, `LocalSQLite`                                                                                                                                                                | [Database](./docs/DATABASE.md#sqlite-key-value-store)                   |
+| Transforms & schema utilities | `transformRecursively`, `transformDeepByPaths`, `transformShallowByPaths`, `transformByDataAccess`, `transformByDataProtection`, `getAllSubschemas`, `findPathsWithAccessorsDeep`                     | [Transforms](./docs/TRANSFORMS.md)                                      |
+| Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject` | [Data Protection](./docs/DATA-PROTECTION.md)                            |
+| Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                                     | [Cache](./docs/CACHE.md)                                                |
+| Concurrency                   | `LockManager`, `Semaphore`                                                                                                                                                                            | [Concurrency](./docs/CONCURRENCY.md)                                    |
+| Configuration                 | Environment variables for connections and data protection                                                                                                                                             | [Configuration](./docs/CONFIGURATION.md)                                |
 
 ```ts
-/**
- *  ______               _
- * |___  /              (_)
- *    / /   __ _  _ __   _ __  __
- *   / /   / _` || '_ \ | |\ \/ /
- * ./ /___| (_| || | | || | >  <
- * \_____/ \__,_||_| |_||_|/_/\_\
- */
-
-/**
- * *************************************************
- * CACHE *******************************************
- * *************************************************
- */
-
-// Connectors & providers
-export {
-  ZanixCacheCoreProvider,
-  ZanixQLRUConnector,
-  ZanixRedisConnector,
-} from 'jsr:@zanix/datamaster@[version]/cache'
-
-/**
- * *************************************************
- * DATABASE ****************************************
- * *************************************************
- */
-
-// Mongo connector
-import { Schema, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
-
-// Models DSL definition
-import { registerModel } from 'jsr:@zanix/datamaster@[version]/database'
-
-// Access & protection policies
-import {
-  dataAccessGetter,
-  dataPoliciesGetter,
-  dataProtectionGetter,
-} from 'jsr:@zanix/datamaster@[version]/database'
-
-// Transform utilities
-import {
-  transformByDataAccess,
-  transformDeepByPaths,
-  transformRecursively,
-  transformShallowByPaths,
-} from 'jsr:@zanix/datamaster@[version]/database'
-
-// Seeders
-import {
-  seedByIdIfMissing,
-  seedManyByIdIfMissing,
-  seedRotateProtectionKeys,
-} from 'jsr:@zanix/datamaster@[version]/database'
-
-// Utils & types
-import {
-  findPathsWithAccessorsDeep,
-  getAllSubschemas,
-} from 'jsr:@zanix/datamaster@[version]/database'
-
-// SQLite
-import { LocalSQLite, ZanixKVStoreConnector } from 'jsr:@zanix/datamaster@[version]/database'
-
-/**
- * *************************************************
- * GENERAL *****************************************
- * *************************************************
- */
-
-// Data protection
-export {
-  createDecryptableObject,
-  createHashFrom as datamasterHash,
-  createUnmaskableObject,
-  createVerifiableObject,
-  decrypt as datamasterDecrypt,
-  encrypt as datamasterEncrypt,
-  mask as datamasterMask,
-  unmask as datamasterUnmask,
-} from 'utils/protection.ts'
-
-// Queues Utils
-export { LockManager } from 'utils/queues/lock-manager.ts'
-export { Semaphore } from 'utils/queues/semaphore.ts'
-
-// General types
-export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'
+import { registerModel, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]'
 ```
 
 > Replace `[version]` with the latest version from
@@ -220,60 +148,18 @@ export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typi
 
 ## 🚀 Basic Usage
 
-### 🔐 Environment Variables
+**Zanix Datamaster** reads a handful of environment variables for cache/database connectivity and
+data protection (masking, encryption, hashing) — see the [Configuration](./docs/CONFIGURATION.md)
+guide for the full list, the versioned-keys naming convention, and security notes on handling them.
 
-**Zanix Datamaster** uses specific environment variables for **cache/database connectivity** and
-**data protection** (masking, encryption, and hashing). These must be set before running your
-application.
-
-| Variable                    | Description                                                                                                           | Example Value               |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| **`MONGO_URI`**             | Connection URI for MongoDB.                                                                                           | `mongodb://localhost:27017` |
-| **`DATA_AES_KEY`**          | AES key used for symmetric data encryption.                                                                           | `my-aes-secret-key`         |
-| **`DATA_SECRET_KEY`**       | Additional secret key for masking/unmasking data.                                                                     | `supersecret123`            |
-| **`DATA_RSA_PUB`**          | RSA public key for asymmetric encryption.                                                                             | `BASE64...`                 |
-| **`DATA_RSA_PRIV`**         | RSA private key for asymmetric decryption.                                                                            | `BASE64...`                 |
-| **`REDIS_URI`**             | Connection URI for Redis cache.                                                                                       | `redis://localhost:6379`    |
-| **`LOCAL_CACHE_MAX_ITEMS`** | Maximum number of items in the local in-memory cache. Uses a Least Recently Used (LRU) strategy. Defaults to `50000`. | `1000`                      |
-| **`DATABASE_SEEDERS`**      | Enables or disables the execution of system seeders. Use `false` to disable all seed operations. Defaults to `true`   | `false`                     |
-
-#### 🌐 Versioned Keys
-
-Zanix supports **versioned environment variables** for controlled key rotation and migration on data
-protection policies. Simply append a version suffix (e.g. `_V1`, `_V2`, etc.) to your environment
-variable names:
-
-| Strategy                  | Example Variables                               |
-| ------------------------- | ----------------------------------------------- |
-| **Symmetric encryption**  | `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, ...       |
-| **Asymmetric encryption** | `DATA_RSA_PUB_V1`, `DATA_RSA_KEY_V1`, ...       |
-| **Masking**               | `DATA_SECRET_KEY_V1`, `DATA_SECRET_KEY_V2`, ... |
-
-If no version is specified, Zanix defaults to **v0** (non-suffixed variables). Key versions can be
-managed programmatically and rotated using the utility:
+Define a model and connect — the recommended way to use Zanix Datamaster:
 
 ```ts
-seedRotateProtectionKeys()
-```
-
----
-
-⚠️ **Security:**
-
-- **Encryption Keys:** Never commit encryption keys to version control. During key rotation, keep
-  all key versions accessible until data is re-encrypted.
-- **External Caching / Storage:** Never store sensitive data in plaintext. Only cache ephemeral or
-  encrypted data, using short TTLs and secure connections. Always apply data protection policies on
-  databases, or use data protection utilities such as `datamasterEncrypt`/`Decrypt`,
-  `datamasterMask`/`Unmask`, `datamasterHash`/`createVerifyObject` (or `validateHash` from
-  `zanix/utils`).
-
----
-
-#### Example
-
-```ts
-import { registerModel, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]/database'
+import {
+  dataPoliciesGetter,
+  registerModel,
+  ZanixMongoConnector,
+} from 'jsr:@zanix/datamaster@[version]'
 
 type Attrs = {
   name: string
@@ -328,15 +214,14 @@ registerModel<Attrs>({
 })
 
 // Mongo connector with seed registration
+// (auto-initializes on construction; no manual `initialize()` call needed)
 const connector = new ZanixMongoConnector({
   uri: process.env.MONGO_URI!,
   seedModel: 'my-seed-register-model',
   config: { dbName: 'my_database' },
 })
 
-await connector.connectorReady
-
-await connector['initialize']()
+await connector.isReady
 
 const UsersModel = connector.getModel<Attrs>('users')
 
@@ -355,8 +240,22 @@ await connector['close']()
 
 ## 📚 Documentation
 
-See the full documentation and examples at: 🔗
-[https://github.com/zanix-io](https://github.com/zanix-io)
+- [Database](./docs/DATABASE.md) — `ZanixMongoConnector`, the `registerModel` DSL, seeders,
+  multi-database support, and the SQLite key-value store.
+- [Data Protection](./docs/DATA-PROTECTION.md) — masking, encryption, and hashing strategies, access
+  strategies, versioned key rotation, and the standalone crypto utilities.
+- [Transforms](./docs/TRANSFORMS.md) — recursive/shallow document transforms and schema inspection
+  utilities.
+- [Cache](./docs/CACHE.md) — the Redis connector, the local LRU connector, and the multi-layer cache
+  provider (`getCachedOrFetch`/`getCachedOrRevalidate`/`withLock`).
+- [Concurrency](./docs/CONCURRENCY.md) — `Semaphore` and `LockManager`, the primitives `withLock` is
+  built on.
+- [Configuration](./docs/CONFIGURATION.md) — environment variables, defaults, and versioned-key
+  naming.
+
+The full API reference (every exported class, function, and type, generated from source) is
+published on [jsr.io/@zanix/datamaster](https://jsr.io/@zanix/datamaster/doc). For the broader Zanix
+ecosystem, see the [Zanix organization on GitHub](https://github.com/zanix-io).
 
 ---
 
@@ -372,13 +271,13 @@ See the full documentation and examples at: 🔗
 
 ## 🕒 Changelog
 
-See [`CHANGELOG`](./docs/CHANGELOG.md) for release history.
+See [`CHANGELOG`](./CHANGELOG.md) for release history.
 
 ---
 
 ## ⚖️ License
 
-Licensed under the **MIT License**. See [`LICENSE`](./docs/LICENSE) for details.
+Licensed under the **MIT License**. See [`LICENSE`](./LICENSE) for details.
 
 ---
 

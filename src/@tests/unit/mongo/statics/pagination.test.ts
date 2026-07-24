@@ -106,6 +106,35 @@ Deno.test('paginate: page 2 returns correct results', async () => {
   assertEquals(result.hasPrevPage, true)
 })
 
+Deno.test('paginate: applies an omit projection when provided', async () => {
+  const model = createMockModel([
+    { _id: 1, name: 'A' },
+    { _id: 2, name: 'B' },
+  ])
+
+  const result = await paginate.call(model as any, {
+    page: 1,
+    limit: 2,
+    omit: ['name'],
+  })
+
+  assertEquals(result.docs.length, 2)
+})
+
+Deno.test('paginateCursor: applies an omit projection when provided', async () => {
+  const model = createMockModel([
+    { _id: 1, name: 'A' },
+    { _id: 2, name: 'B' },
+  ])
+
+  const result = await paginateCursor.call(model as any, {
+    limit: 2,
+    omit: ['name'],
+  })
+
+  assertEquals(result.docs.length, 2)
+})
+
 Deno.test('paginateCursor: returns first page with nextCursor', async () => {
   const model = createMockModel([
     { _id: 1, x: 1 },

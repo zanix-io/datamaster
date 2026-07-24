@@ -3,18 +3,22 @@ import type { MongoModelDefinition } from 'mongo/typings/models.ts'
 import type { DatabaseTypes, Extensions } from './general.ts'
 import type { Primitive } from 'typings/system.ts'
 
-type ModelGeneralDefinition = Omit<ModelMetadata<unknown>, 'name'> & {
+/** Definition of a model for database types other than `'mongo'`. */
+export type ModelGeneralDefinition = Omit<ModelMetadata<unknown>, 'name'> & {
   /**
    * Represents optional extensions that can be added to a model definition.
    */
   extensions?: Extensions
 }
 
-type BaseModelDefinition = {
+/** Base shape shared by every model definition, regardless of database type. */
+export type BaseModelDefinition = {
+  /** Optional extensions for the model, excluding seeders (handled separately per database type). */
   extensions?: Omit<Extensions, 'seeders'>
 }
 
-type ModelDefinition<T extends DatabaseTypes, Attrs extends object> = 'mongo' extends T
+/** Resolves to the model definition shape appropriate for the given database type. */
+export type ModelDefinition<T extends DatabaseTypes, Attrs extends object> = 'mongo' extends T
   ? MongoModelDefinition<Attrs>
   : ModelGeneralDefinition
 
@@ -59,32 +63,44 @@ export type ModelDef = <Attrs extends object = any, T extends DatabaseTypes = 'm
  * @template T - The type of the model definition, typically representing a schema or structure for the model.
  *
  * @type ModelMetadata
- * @property {string} name - The name of the model. This is used to identify the model and is typically a
- *                            string like 'User', 'Product', etc.
- * @property {T} definition - The model's schema or structure, defining the properties and their types
- *                             (e.g., `String`, `Date`, `Number`). This often includes validations, access
- *                             control, and other metadata about the properties.
- * @property {Function} [callback] - An optional callback function that can be used for additional model
- *                                   configurations or custom logic. It receives the schema and can return
- *                                   a modified version of it.
- * @property {T} options - The model's schema options
  */
 export type ModelMetadata<T> = {
+  /** The name of the model. This is used to identify the model and is typically a string like 'User', 'Product', etc. */
   name: string
+  /**
+   * The model's schema or structure, defining the properties and their types
+   * (e.g., `String`, `Date`, `Number`). This often includes validations, access
+   * control, and other metadata about the properties.
+   */
   definition: T
+  /**
+   * An optional callback function that can be used for additional model
+   * configurations or custom logic. It receives the schema and can return
+   * a modified version of it.
+   */
   callback?: (...args: any[]) => unknown
+  /** The model's schema options. */
   options?: object
 } & BaseModelDefinition
 
-/** Basic data object to save in a model */
-export type DataObject = Record<string, object | Primitive | Primitive[]> & { id: string }
+/** Basic data object to save in a model. */
+export type DataObject = Record<string, object | Primitive | Primitive[]> & {
+  /** Unique identifier of the object, used to look it up or upsert it. */
+  id: string
+}
 
-/** Seed Model Attributes */
+/** Attributes tracked for each executed seeder in the internal seed model. */
 export type SeedModelAttrs = {
+  /** Composite name identifying the model and seeder (e.g. `'model:SeederName'`). */
   name: string
+  /** Whether the seeder run succeeded or failed. */
   status: 'success' | 'failed'
+  /** The semantic version associated with this seeder run. */
   version: `${number}.${number}.${number}`
+  /** Identifier of who or what triggered the seeder execution. */
   executedBy?: string
+  /** How long the seeder took to run, in milliseconds. */
   duration?: number
+  /** Additional free-form notes about the seeder run. */
   notes?: string
 }

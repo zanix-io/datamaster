@@ -23,3 +23,6 @@ export type {
    */
   RedisClientType,
 }
+export type { ExpiredValueEntry } from 'database/typings/general.ts'
+export type { RedisOptions } from './typings/general.ts'
+export type { RedisPipelineScheduler } from './providers/redis/connector/scheduler.ts'

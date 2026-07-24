@@ -2,7 +2,7 @@ import type { AdaptedModel, AdaptedModelBySchema, GetModelOptions } from '../typ
 import type { BaseCustomSchema, SchemaModelInitOptions } from '../typings/schema.ts'
 import type { BaseAttributes, Extensions } from 'database/typings/general.ts'
 import type { MongoConnectorOptions } from '../typings/process.ts'
-import type { DefaultSchema, Model } from '../typings/commons.ts'
+import type { Model } from '../typings/commons.ts'
 
 import { ProgramModule as ServerProgram, ZanixDatabaseConnector } from '@zanix/server'
 import { createDatabase, postBindModel, preprocessSchema } from '../processor/mod.ts'
@@ -42,11 +42,16 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   #uri: string
   #database: Mongoose
   #config: MongoConnectorOptions['config']
+  /** Whether the connection URI points to a replica set or sharded cluster. */
   private isReplicaSet?: boolean
+  /** The connector's display name, used in logs. */
   protected name: string
+  /** Name of the internal seed-tracking model, or `false` if seed tracking is disabled. */
   protected seederModel: string | false
+  /** Defines and binds a model initialized directly by a schema, bound as an instance method. */
   private defineModelBySchema = defineModelBySchema
 
+  /** Creates a new MongoDB connector instance. */
   constructor(
     /**
      * Configuration params to connector customization
@@ -126,7 +131,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     name: string,
     options?: GetModelOptions,
   ): AdaptedModel<Attrs, Opts>
-  public getModel<Attrs extends BaseAttributes, S extends DefaultSchema<Attrs>>(
+  public getModel<Attrs extends BaseAttributes, S extends Schema>(
     name: string,
     entity?: S | GetModelOptions,
     options: GetModelOptions & SchemaModelInitOptions<S> = {},
@@ -159,7 +164,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     return this.defineModelBySchema<S>(options, name, entity)
   }
 
-  /*
+  /**
    * Establishes a connection to the MongoDB database using the provided URI.
    *
    * It initializes the Mongoose instance, applies the database configuration,
@@ -208,6 +213,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     }
   }
 
+  /** Pings the MongoDB connection to check whether it is currently healthy. */
   public async isHealthy(): Promise<boolean> {
     try {
       const db = this.#database.connection.db

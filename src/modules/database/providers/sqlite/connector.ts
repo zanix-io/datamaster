@@ -16,7 +16,9 @@ import { LockManager } from 'utils/queues/lock-manager.ts'
 // deno-lint-ignore no-explicit-any
 export class ZanixKVStoreConnector<V = any> extends ZanixKVConnector {
   #sqlite!: LocalSQLite
-  private keyLockManager = new LockManager() // Exclusive lock per key, only one function runs at a time by default
+  /** Exclusive lock per key, only one function runs at a time by default. */
+  private keyLockManager = new LockManager()
+  /** The SQLite database filename this instance is backed by. */
   private filename: string
 
   /**

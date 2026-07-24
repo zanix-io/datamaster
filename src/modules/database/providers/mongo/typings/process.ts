@@ -8,35 +8,35 @@ import type { Document } from 'mongoose'
  * Transformation functions to apply to data.
  *
  * @template T
- * @property {(value: T) => T} [transformPrimitive] - Function to transform primitive values (string, number, boolean, etc.).
- * @property {boolean} [deleteMetadata] - Remove all metadata from each traversed path
- * @property {(value: any, type: 'array' | 'object') => NestedValue | Document} [transformNested] - Function to transform non-primitive values (objects, arrays, Maps, etc.).
  */
 export type RecoursiveTransformOptions = {
+  /** Remove all metadata from each traversed path. */
   deleteMetadata?: boolean
+  /** Function to transform primitive values (string, number, boolean, etc.). */
   transformPrimitive?: <T extends Primitive>(
     value: T,
   ) => T
+  /** Function to transform non-primitive values (objects, arrays, Maps, etc.). */
   transformNested?: (value: any, type: 'array' | 'object') => NestedValue | Document
 }
 
 /**
  * Transformation functions with optional path filtering.
- *
- * @property {string[]} [allowedPaths] - List of paths allowed to be transformed. Paths should be dot-separated strings.
  */
-export type PathDeepTransformOptions = RecoursiveTransformOptions & { allowedPaths: string[] }
+export type PathDeepTransformOptions = RecoursiveTransformOptions & {
+  /** List of paths allowed to be transformed. Paths should be dot-separated strings. */
+  allowedPaths: string[]
+}
 
 /**
  * Transformation functions with optional path filtering.
- *
- * @property {string[]} [allowedPaths] - List of paths allowed to be transformed. Paths should be dot-separated strings.
- * @property {boolean} [deleteMetadata] - Remove all metadata from each traversed path
- * @property {<T extends NestedValue>(value: T) => T} [transform] - Function to transform values
  */
 export type PathTransformOptions = {
+  /** List of paths allowed to be transformed. Paths should be dot-separated strings. */
   allowedPaths: string[]
+  /** Remove all metadata from each traversed path. */
   deleteMetadata?: boolean
+  /** Function to transform values at a given path. */
   transform?: (value: any, path: string) => any
 }
 

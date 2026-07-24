@@ -11,7 +11,7 @@ import ProgramModule from './mod.ts'
  *
  * @exports Program
  */
-class Program {
+export class Program {
   /**
    * Retrieves metadata handlers for the specified database type.
    *

@@ -5,9 +5,11 @@ import type { SchemaStatics } from './statics.ts'
 import type { AdaptedModelBySchema } from './models.ts'
 import type { SchemaMethods } from './commons.ts'
 
+/** A Mongoose `Schema` with its `paths` map exposed for inspection. */
 export type SchemaWithPaths = Schema & { paths: Record<string, any> }
 
-type MongoField<T> = SchemaDefinitionProperty<T>
+/** A single field definition within a Mongoose schema. */
+export type MongoField<T> = SchemaDefinitionProperty<T>
 
 /**
  * Base custom schema
@@ -19,7 +21,9 @@ type MongoField<T> = SchemaDefinitionProperty<T>
  * identical anonymous types. Pinning them to `any` keeps every accessor consistent.
  */
 export type BaseCustomSchema = {
+  /** Static methods attached to the schema's model. */
   statics: SchemaStatics & Schema['statics']
+  /** Instance methods attached to the schema's documents. */
   methods: SchemaMethods & Schema['methods']
 } & Schema<any, any, any, any, any, any, any, any, any>
 
@@ -75,9 +79,13 @@ export interface SubschemaInfo {
  * Accesors info path
  */
 export type AccessorsInfo = {
+  /** Getters found in the schema, keyed by their dot-notated path. */
   getters: { [path: string]: SchemaAccessor[] }
+  /** Setters found in the schema, keyed by their dot-notated path. */
   setters: { [path: string]: SchemaAccessor[] }
+  /** `getters` flattened into `[path, accessors]` entry pairs. */
   getterEntries: [string, SchemaAccessor[]][]
+  /** `setters` flattened into `[path, accessors]` entry pairs. */
   setterEntries: [string, SchemaAccessor[]][]
 }
 

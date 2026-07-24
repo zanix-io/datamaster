@@ -22,12 +22,17 @@ export type UpsertTypeOptions = { useDataPolicies?: boolean; type?: 'update' | '
  * Use this type to ensure proper typing and IntelliSense when extending `schema.statics`.
  */
 export type SchemaStatics = {
-  /** Data Policies Methods */
+  /** Returns the data protection configuration for each protected path, keyed by path. */
   _getDataProtection: () => Record<string, DataProtection>
+  /** Returns the data access configuration for each restricted path, keyed by path. */
   _getDataAccess: () => Record<string, DataAccessConfig>
+  /** Lists the schema paths that have a data access strategy configured. */
   _getDataAccessPaths: () => string[]
+  /** Lists the schema paths that have a data protection strategy configured. */
   _getDataProtectionPaths: () => string[]
+  /** Whether the schema has any field configured with data protection. */
   _hasDataProtection: () => boolean
+  /** Whether the schema has any field configured with data access restrictions. */
   _hasDataAccess: () => boolean
   /**
    * Encrypts a message using either **AES-GCM** (symmetric) or **RSA-OAEP** (asymmetric) encryption.
@@ -47,8 +52,8 @@ export type SchemaStatics = {
    *   This corresponds to specific environment variables that define keys for different versions of encryption:
    *   - For symmetric encryption, `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, etc.
    *   - For asymmetric encryption, `DATA_RSA_PUB_V1`, `DATA_RSA_PUB_V2`, etc.
-   *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variables:
-   *     `DATA_RSA_PRIVATE_KEY` as primary, and falls back to `DATA_RSA_PRIVATE_KEY`.
+   *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variable:
+   *     `DATA_AES_KEY` (symmetric) or `DATA_RSA_PUB` (asymmetric).
    *
    * @returns {Promise<T>} A promise that resolves to the encrypted message(s).
    *
@@ -68,14 +73,14 @@ export type SchemaStatics = {
    * @param {EncryptSettings} settings - The decryption settings that match the settings used during encryption.
    *   This includes the type of encryption (e.g., `symmetric` or `asymmetric`), as well as any other relevant settings.
    *   - If the type was `symmetric` during encryption, ensure the same key (e.g., `DATA_AES_KEY`) is available.
-   *   - If the type was `asymmetric` during encryption, ensure the corresponding private key (e.g., `DATA_RSA_PRIVATE_KEY`) is available.
+   *   - If the type was `asymmetric` during encryption, ensure the corresponding private key (e.g., `DATA_RSA_KEY`) is available.
    *
    * @param {DataPolicyVersion} [version] - The version of the encryption settings used during encryption.
    *   The environment variable keys for decryption must correspond to the same version used for encryption:
    *   - For symmetric encryption, use `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, etc.
-   *   - For asymmetric encryption, use `DATA_RSA_PRIVATE_KEY_V1`, `DATA_RSA_PRIVATE_KEY_V2`, etc.
-   *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variables:
-   *     `DATA_RSA_PRIVATE_KEY` as primary, and falls back to `DATA_RSA_PRIVATE_KEY`.
+   *   - For asymmetric encryption, use `DATA_RSA_KEY_V1`, `DATA_RSA_KEY_V2`, etc.
+   *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variable:
+   *     `DATA_AES_KEY` (symmetric) or `DATA_RSA_KEY` (asymmetric).
    *
    * @returns {Promise<T>} A promise that resolves to the decrypted message(s).
    *

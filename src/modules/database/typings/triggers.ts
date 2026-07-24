@@ -5,72 +5,75 @@ import type { HttpMethod } from '@zanix/server'
 /**
  * Represents a single condition for filtering or matching.
  * @interface SingleCondition
- * @property {string} field - The name of the field to evaluate.
- * @property {'<' | '>' | '=' | '<=' | '>=' | 'includes' | '!='} op - The operator to apply.
- * @property {string | boolean | number | '!$undefined'} value - The value to compare against.
  */
-interface SingleCondition {
+export interface SingleCondition {
+  /** The name of the field to evaluate. */
   field: string
+  /** The operator to apply. */
   op: '<' | '>' | '=' | '<=' | '>=' | 'includes' | '!='
+  /** The value to compare against. */
   value: string | boolean | number | '!$undefined'
 }
 
 /**
  * Represents a logical AND condition combining multiple conditions.
  * @interface AndCondition
- * @property {Condition[]} and - An array of conditions all of which must be true.
  */
-interface AndCondition {
+export interface AndCondition {
+  /** An array of conditions all of which must be true. */
   and: Condition[]
 }
 
 /**
  * Represents a logical OR condition combining multiple conditions.
  * @interface OrCondition
- * @property {Condition[]} or - An array of conditions where at least one must be true.
  */
-interface OrCondition {
+export interface OrCondition {
+  /** An array of conditions where at least one must be true. */
   or: Condition[]
 }
 
 /**
  * Represents a logical NOT condition negating multiple conditions.
  * @interface NotCondition
- * @property {Condition[]} not - An array of conditions all of which must be false.
  */
-interface NotCondition {
+export interface NotCondition {
+  /** An array of conditions all of which must be false. */
   not: Condition[]
 }
 
 /**
  * A condition which can be a single comparison or a composite logical condition.
  */
-type Condition = SingleCondition | AndCondition | OrCondition | NotCondition
+export type Condition = SingleCondition | AndCondition | OrCondition | NotCondition
 
 /**
  * Common properties for trigger actions.
- * @property {'high' | 'medium' | 'low'} priority - The priority level of the action.
- * @property {number} delay - Delay in milliseconds before the action executes.
- * @property {Record<string, unknown>} data - Additional data to pass along with the action.
- * @property {Condition[]} conditions - Conditions that must be met for the action to trigger.
  */
-type TriggerActionCommons = {
+export type TriggerActionCommons = {
+  /** The priority level of the action. */
   priority: 'high' | 'medium' | 'low'
+  /** Delay in milliseconds before the action executes. */
   delay: number
+  /** Additional data to pass along with the action. */
   data: Record<string, unknown>
+  /** Conditions that must be met for the action to trigger. */
   conditions: Condition[]
 }
 
 /**
  * Defines the specific types of trigger actions.
- * @property {Partial<TriggerActionCommons> & { template: string }} mail - Email action with template.
- * @property {Partial<TriggerActionCommons> & { headers: Record<string, unknown>, url: string, method: HttpMethod }} request - HTTP request action.
  */
-type TriggerActions = {
+export type TriggerActions = {
+  /** Email action with template. */
   mail: Partial<TriggerActionCommons> & { template: string }
+  /** HTTP request action. */
   request: Partial<TriggerActionCommons> & {
+    /** HTTP headers to send with the request. */
     headers: Record<string, unknown>
+    /** The URL to send the request to. */
     url: string
+    /** The HTTP method to use for the request. */
     method: HttpMethod
   }
 }
@@ -81,7 +84,7 @@ type TriggerActions = {
  * @property {Array<Partial<TriggerActions>>} updated - Actions triggered on update events.
  * @property {Array<Partial<TriggerActions>>} deleted - Actions triggered on deletion events.
  */
-type TriggerTypes = Record<
+export type TriggerTypes = Record<
   'created' | 'updated' | 'deleted',
   Array<Partial<TriggerActions>>
 >

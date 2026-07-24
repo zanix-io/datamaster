@@ -2,6 +2,7 @@ import type { ConnectorOptions } from '@zanix/server'
 
 /** Quick LRU cache options */
 export type QLRUCacheOptions = ConnectorOptions & {
+  /** The maximum number of items the cache can hold. Defaults to `50000`. */
   capacity?: number
   /** The time-to-live (TTL) in seconds */
   ttl?: number

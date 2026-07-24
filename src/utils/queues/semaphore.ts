@@ -29,7 +29,9 @@
  * @class
  */
 export class Semaphore {
+  /** Callbacks waiting to be resumed once a permit becomes available. */
   private queue: (() => void)[] = []
+  /** The number of permits currently available for concurrent tasks. */
   public permits: number
 
   /**

@@ -21,6 +21,7 @@ import { InternalError } from '@zanix/errors'
 // deno-lint-ignore no-explicit-any
 export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector<K, V, 'local'> {
   #cache!: Map<K, ExpiredValueEntry<V>>
+  /** The maximum number of items the cache can hold. */
   protected readonly capacity: number
 
   /**
@@ -52,6 +53,7 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
     if (!this['_znx_props_'].data.autoInitialize) this.initialize()
   }
 
+  /** Initializes the underlying in-memory cache map. */
   protected override initialize() {
     this.#cache = new Map<K, ExpiredValueEntry<V>>()
   }
@@ -197,12 +199,15 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
     return Array.from(this.#cache.values()).map((entry) => entry.value as unknown as O)
   }
 
+  /** Always reports healthy, since this is an in-memory cache with no external connection. */
   public override isHealthy(): boolean {
     return true
   }
 
+  /** No-op, since this in-memory cache has no external connection to close. */
   protected override close() {}
 
+  /** Returns the underlying in-memory cache map. */
   public getClient<T = Map<K, ExpiredValueEntry<V>>>(): T {
     return this.#cache as T
   }

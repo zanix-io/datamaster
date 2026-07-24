@@ -23,19 +23,29 @@ export class ZanixRedisConnector<K extends string = string, V = any>
   extends ZanixCacheConnector<K, V, 'redis'> {
   #uri: string
   #client!: RedisClientType
+  /** Options that configure the pipeline scheduler used to batch commands. */
   private schedulerOptions: RedisOptions['schedulerOptions']
+  /** The connector's display name, used in logs. */
   protected name: string
+  /** Lists all keys currently stored in the cache, bound as an instance method. */
   private scanKeys = scanKeys
+  /** Retries a Redis command according to the configured retry policy. */
   private execWithRetry = execWithRetry
+  /** Reconnect strategy applied when the underlying socket closes unexpectedly. */
   protected reconnectStrategy: RedisOptions['reconnectStrategy']
+  /** Delay in milliseconds between retries of a failed command. */
   protected commandRetryInterval: number
+  /** Maximum number of retries for a failed command. */
   protected maxCommandRetries: number
+  /** Timeout in milliseconds allowed for each Redis command. */
   protected commandTimeout: number
+  /** Maximum time in milliseconds to wait for the initial connection before failing. */
   private timeout: number
   #connected = false
   #reconnect = false
   #scheduler!: RedisPipelineScheduler
 
+  /** Whether the underlying client is currently connected and ready. */
   private get connected(): boolean {
     return this.#connected
   }
@@ -44,6 +54,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     this.#connected = value
   }
 
+  /** Whether a manual reconnect attempt is in progress. */
   private get reconnect(): boolean {
     return this.#reconnect
   }
@@ -52,6 +63,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     this.#reconnect = value
   }
 
+  /** The scheduler used to batch and pipeline Redis commands. */
   protected get scheduler(): RedisPipelineScheduler {
     return this.#scheduler
   }
@@ -102,6 +114,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     })
   }
 
+  /** Creates the underlying Redis client and connects to the server. */
   protected async initialize() {
     this.#client = createClient({
       url: this.#uri,
@@ -166,6 +179,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
   }
 
+  /** Stores a value under the given key, optionally scheduling the write and applying a TTL. */
   public async set(key: K, value: V, options: CacheSetOptions = {}): Promise<void> {
     const { exp, schedule, maxTTLOffset, minTTLForOffset } = options
     const ttlValue = exp ?? this.ttl
@@ -184,35 +198,42 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     } else await this.execWithRetry(() => this.#client.set(key, valueToSave, setterOptions))
   }
 
+  /** Retrieves the value stored under the given key, or `undefined` if it doesn't exist. */
   public async get<O = V>(key: K): Promise<O | undefined> {
     const val = await this.execWithRetry(() => this.#client.get(key))
     if (val === null) return undefined
     return JSON.parse(val) as O
   }
 
+  /** Checks whether a key currently exists in the cache. */
   public async has(key: K): Promise<boolean> {
     const exists = await this.execWithRetry(() => this.#client.exists(key))
     return exists === 1
   }
 
+  /** Removes a key from the cache, returning whether it was actually deleted. */
   public async delete(key: K): Promise<boolean> {
     const deleted = await this.execWithRetry(() => this.#client.del(key))
     return deleted === 1
   }
 
+  /** Flushes the entire Redis database used by this connector. */
   public async clear(): Promise<void> {
     await this.execWithRetry(() => this.#client.flushDb())
   }
 
+  /** Returns the number of keys currently stored in the cache. */
   public async size(): Promise<number> {
     const k = await this.keys()
     return k.length
   }
 
+  /** Lists all keys currently stored in the cache, optionally filtered by a match pattern. */
   public keys(match?: string): Promise<K[]> {
     return this.scanKeys(match)
   }
 
+  /** Retrieves all values currently stored in the cache. */
   public async values<O = V>(): Promise<O[]> {
     const keys = await this.keys()
     const values = keys.map((key) => this.#client.get(key).then((val) => val && JSON.parse(val)))
@@ -220,10 +241,12 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     return result.filter(Boolean) as O[]
   }
 
+  /** Reports whether the underlying Redis client is currently connected. */
   public override isHealthy(): boolean {
     return this.connected
   }
 
+  /** Gracefully closes the underlying Redis client connection. */
   protected close() {
     try {
       clearTimeouts()
@@ -235,6 +258,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
   }
 
+  /** Returns the underlying Redis client, queued through the retry mechanism. */
   public getClient<T = Promise<RedisClientType>>(): T {
     return this.execWithRetry(() => this.#client) as T
   }

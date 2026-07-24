@@ -241,8 +241,8 @@ export const createHashFrom = (
  *   This corresponds to specific environment variables that define keys for different versions of encryption:
  *   - For symmetric encryption, `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, etc.
  *   - For asymmetric encryption, `DATA_RSA_PUB_V1`, `DATA_RSA_PUB_V2`, etc.
- *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variables:
- *     `DATA_RSA_PRIVATE_KEY` as primary, and falls back to `DATA_RSA_PRIVATE_KEY`.
+ *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variable:
+ *     `DATA_AES_KEY` (symmetric) or `DATA_RSA_PUB` (asymmetric).
  *
  * @returns {Promise<string | string[]>} A promise that resolves to the encrypted message(s).
  *
@@ -277,14 +277,14 @@ export const encrypt = async <T extends string | string[]>(
  * @param {EncryptSettings} settings - The decryption settings that match the settings used during encryption.
  *   This includes the type of encryption (e.g., `symmetric` or `asymmetric`), as well as any other relevant settings.
  *   - If the type was `symmetric` during encryption, ensure the same key (e.g., `DATA_AES_KEY`) is available.
- *   - If the type was `asymmetric` during encryption, ensure the corresponding private key (e.g., `DATA_RSA_PRIVATE_KEY`) is available.
+ *   - If the type was `asymmetric` during encryption, ensure the corresponding private key (e.g., `DATA_RSA_KEY`) is available.
  *
  * @param {DataPolicyVersion} [version] - The version of the encryption settings used during encryption.
  *   The environment variable keys for decryption must correspond to the same version used for encryption:
  *   - For symmetric encryption, use `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, etc.
- *   - For asymmetric encryption, use `DATA_RSA_PRIVATE_KEY_V1`, `DATA_RSA_PRIVATE_KEY_V2`, etc.
- *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variables:
- *     `DATA_RSA_PRIVATE_KEY` as primary, and falls back to `DATA_RSA_PRIVATE_KEY`.
+ *   - For asymmetric encryption, use `DATA_RSA_KEY_V1`, `DATA_RSA_KEY_V2`, etc.
+ *   - If no version is provided (defaults to **v0**), it uses the non-suffixed variable:
+ *     `DATA_AES_KEY` (symmetric) or `DATA_RSA_KEY` (asymmetric).
  *
  * @returns {Promise<string | string[]>} A promise that resolves to the decrypted message(s).
  *

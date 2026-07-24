@@ -42,7 +42,7 @@ import { seederAdaptation } from '../utils/seeders/adaptation.ts'
  *   },
  * });
  */
-export const registerModel: ModelDef = ({ extensions = {}, ...model }, type) => {
+export const registerModel: ModelDef = ({ extensions = {}, ...model }, type): void => {
   if (!type) type = 'mongo' as never
 
   const { seeders = [], ...exts } = extensions

@@ -5,10 +5,10 @@ import { type BindValue, Database } from 'sqlite3'
  * @class LocalSQLite
  */
 export class LocalSQLite {
-  /** @protected */
+  /** The underlying SQLite database connection. */
   public db: Database
 
-  /** @protected */
+  /** The name of the table this instance operates on (stored in uppercase). */
   protected table: string
 
   /**

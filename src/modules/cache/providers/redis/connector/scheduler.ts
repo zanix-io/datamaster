@@ -9,16 +9,25 @@ import logger from '@zanix/logger'
  * or when a maximum delay has elapsed — whichever comes first.
  */
 export class RedisPipelineScheduler {
+  /** The Redis client used to build and execute the pipeline. */
   private redis: RedisClientType
+  /** Maximum number of commands per batch before an immediate flush is triggered. */
   private maxBatch: number
+  /** Maximum delay, in milliseconds, before a pending batch is flushed. */
   private maxDelay: number
 
+  /** The Redis pipeline currently accumulating queued commands. */
   private pipeline: ReturnType<RedisClientType['multi']>
+  /** Number of commands queued in the current pipeline. */
   private counter = 0
+  /** Handle of the pending flush timer, if one is scheduled. */
   private timer: NodeJS.Timeout | number | null = null
+  /** Whether a flush is currently in progress. */
   private flushing = false
 
   /**
+   * Creates a scheduler that batches commands for the given Redis client.
+   *
    * @param redis - An ioredis client instance.
    * @param options - Configuration options.
    * @param options.maxBatch - Maximum number of commands per batch (default: 200).
@@ -26,8 +35,9 @@ export class RedisPipelineScheduler {
    */
   constructor(
     redis: RedisClientType,
+    /** Wraps a Redis command execution with the connector's retry logic. */
     private execWithRetry: (fn: () => Promise<unknown>) => Promise<unknown>,
-    { maxBatch = 200, maxDelay = 100 }: RedisOptions['schedulerOptions'] = {},
+    { maxBatch = 200, maxDelay = 100 }: NonNullable<RedisOptions['schedulerOptions']> = {},
   ) {
     this.redis = redis
     this.maxBatch = maxBatch

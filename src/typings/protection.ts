@@ -26,7 +26,10 @@ export type MaskingSettings = MaskingBaseOptions
  * - 'asymmetric': Uses a public/private key pair
  * - 'symmetric': Uses a single secret key
  */
-export type EncryptSettings = { type?: 'asymmetric' | 'symmetric' }
+export type EncryptSettings = {
+  /** The encryption strategy: 'asymmetric' (public/private key pair) or 'symmetric' (single secret key). */
+  type?: 'asymmetric' | 'symmetric'
+}
 
 /**
  * Hashing data protection settings.
@@ -37,14 +40,22 @@ export type EncryptSettings = { type?: 'asymmetric' | 'symmetric' }
  * - 'medium-high': Enhanced security
  * - 'high': Maximum security
  */
-export type HashingSettings = { level?: HashingLevels; useSalt?: Uint8Array | number | false }
+export type HashingSettings = {
+  /** The security level of the hash. */
+  level?: HashingLevels
+  /** Salt to apply before hashing, or `false` to hash without a salt. */
+  useSalt?: Uint8Array | number | false
+}
 
 /**
  * Group of all available data protection settings by strategy.
  */
 export type DataProtectionSettings = {
+  /** Settings for the 'mask' strategy. */
   mask: MaskingSettings
+  /** Settings for the 'hash' strategy. */
   hash: HashingSettings
+  /** Settings for the 'encrypt' strategy. */
   encrypt: EncryptSettings
 }
 
@@ -103,9 +114,11 @@ export type DataProtectionBase<S extends DataProtectionMethods> = {
     }
 }
 
-/** Specific protection configurations */
+/** Hashing protection configuration. */
 export type HashingProtectionConfig = DataProtectionConfig<'hash'>
+/** Masking protection configuration. */
 export type MaskingProtectionConfig = DataProtectionConfig<'mask'>
+/** Encryption protection configuration. */
 export type EncryptionProtectionConfig = DataProtectionConfig<'encrypt'>
 
 /** Versioned hashing protection configuration */
@@ -145,8 +158,10 @@ export type ProtectedDataSettings = {
   virtualMask?: MaskingBaseOptions
 }
 
-type PrivateDataSettings = never
-type InternalDataSettings = never
+/** The field is never visible outside the owning process; no settings apply. */
+export type PrivateDataSettings = never
+/** The field is visible only to internal/trusted callers; no settings apply. */
+export type InternalDataSettings = never
 
 /**
  * Group of all available data access settings by strategy.
@@ -182,9 +197,11 @@ export type DataAccessBaseConfig<S extends AccessStrategies> = {
   settings?: AccessStrategiesSettings[S]
 }
 
-/** Specific access configurations */
+/** Access configuration for the 'private' strategy. */
 export type PrivateDataAccessConfig = DataAccessBaseConfig<'private'>
+/** Access configuration for the 'internal' strategy. */
 export type InternalDataAccessConfig = DataAccessBaseConfig<'internal'>
+/** Access configuration for the 'protected' strategy. */
 export type ProtectedDataAccessConfig = DataAccessBaseConfig<'protected'>
 
 /** Union of all single-strategy configurations */

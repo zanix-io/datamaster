@@ -25,13 +25,17 @@ import { Semaphore } from './semaphore.ts'
  * @class
  */
 export class LockManager {
+  /** Active semaphores, one per locked key. */
   private locks: Map<string, Semaphore> = new Map()
+  /** Number of concurrent permits granted per key. */
   private readonly permitsPerKey: number
 
+  /** Creates a lock manager where each key allows up to `permitsPerKey` concurrent operations. */
   constructor(permitsPerKey = 1) {
     this.permitsPerKey = permitsPerKey // normalmente 1 para un lock exclusivo
   }
 
+  /** Gets (creating if needed) the semaphore associated with the given key. */
   private getSemaphore(key: string): Semaphore {
     let sem = this.locks.get(key)
     if (!sem) {
@@ -41,6 +45,7 @@ export class LockManager {
     return sem
   }
 
+  /** Runs `fn` under an exclusive lock for the given key, releasing it afterward. */
   public async withLock<T>(key: string, fn: () => T | Promise<T>): Promise<T> {
     const sem = this.getSemaphore(key)
 

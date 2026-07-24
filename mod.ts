@@ -22,6 +22,9 @@
 // Main
 import ProgramModule from 'modules/program/public.ts'
 export { ProgramModule }
+export type { Program } from 'modules/program/public.ts'
+export type { DatabaseTypes } from 'database/typings/general.ts'
+export type { ModelMetadata } from 'database/typings/models.ts'
 
 // Global modules
 export * from 'modules/database/mod.ts'

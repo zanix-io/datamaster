@@ -17,7 +17,7 @@ export function getAllSubschemas(schema: Schema, parentPath = ''): SubschemaInfo
   const subschemas: SubschemaInfo[] = []
   const entries = Object.entries(schema.paths) as [
     string,
-    SchemaType & { schemaType?: SchemaType },
+    SchemaType & { caster?: SchemaType },
   ][]
   // Iterate through all paths defined in the schema
   for (const [pathName, pathType] of entries) {
@@ -27,9 +27,9 @@ export function getAllSubschemas(schema: Schema, parentPath = ''): SubschemaInfo
     // 🧩 Case 1: direct subdocument
     if (pathType.schema instanceof Schema) {
       subSchema = pathType.schema
-    } // 📦 Case 2: array or maps of subdocuments
-    else if (pathType.schemaType?.schema instanceof Schema) {
-      subSchema = pathType.schemaType.schema
+    } // 📦 Case 2: nested arrays of subdocuments (e.g. an array of arrays)
+    else if (pathType.caster?.schema instanceof Schema) {
+      subSchema = pathType.caster.schema
     }
 
     // 🔁 If a subschema is found, register it and recurse into it

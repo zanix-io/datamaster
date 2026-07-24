@@ -28,19 +28,15 @@ export type BaseSeederHandler = Seeders[0]['handlers'][0]
  * database initialization or testing.
  */
 export type SeederHandler = BaseSeederHandler | {
+  /** The seeder function to execute. */
   handler: BaseSeederHandler
+  /** Configuration options that customize how the seeder runs. */
   options?: SeederOptions
 }
 
 /**
  * Represents optional extensions that can be added to a model definition.
- *
- * @property {SeederHandler} [seeders] - Optional array of seeder handler functions
- *   used to populate initial data in the model.
- * @property {Triggers} [triggers] - Optional triggers that define reactive behaviors or
- *   side effects tied to model events.
  */
-
 export type Extensions = {
   /**
    * Optional array of seeder handler functions used to populate initial data in the model.
@@ -89,10 +85,13 @@ export type SeederOptions = {
   runningMode?: 'always' | 'ifVersionChanged'
 }
 
-/** Seeder processor to execute actions on handler */
+/** Seeder processor to execute actions on handler. */
 export type SeederProcessor = {
+  /** Registers the seeder's expected version and name before it runs, so it can later be tracked. */
   prepare?: (version: SeederOptions['version'], name: string, model: any) => void
+  /** Determines whether a seeder run should be skipped (e.g. because it already ran at this version). */
   avoidRun: (version: SeederOptions['version'], name: string, model: any) => boolean
+  /** Called after a seeder finishes, reporting whether it succeeded or failed. */
   onFinish: (
     status: 'success' | 'failed',
     options: SeederOptions & { duration: number; error?: string },
@@ -104,14 +103,18 @@ export type SeederProcessor = {
  * Represents a single Expired Value entry.
  */
 export interface ExpiredValueEntry<V> {
+  /** The stored value. */
   value: V
-  expirationTime: number // 0 if no TTL
-  ttl: number // ttl saved in milliseconds
+  /** The absolute expiration timestamp in milliseconds, or `0` if no TTL was set. */
+  expirationTime: number
+  /** The TTL, in milliseconds, that was used to compute `expirationTime`. */
+  ttl: number
 }
 
 /**
  * Represents a single KV entry.
  */
 export interface KVEntry<V> extends ExpiredValueEntry<V> {
+  /** The key this entry is stored under. */
   key: string
 }
