@@ -84,6 +84,7 @@ export type ModelBySchema<S extends Schema> =
   >
   & ObtainSchemaGeneric<S, 'TStaticMethods'>
   & {
+    /** The underlying Mongoose schema instance, merged with its model type. */
     schema:
       & S
       & MongoModel<

@@ -92,7 +92,12 @@ export type TriggerActions = {
      * or a literal string for templates that accept plain content directly. String values within
      * `data` support `{{field}}` interpolation, same as any other field.
      */
-    body: { template: string; data?: Record<string, unknown> | string }
+    body: {
+      /** The name of the notification template to render. */
+      template: string
+      /** The template's render data, or a literal string for plain-content templates. */
+      data?: Record<string, unknown> | string
+    }
   }
   /**
    * HTTP request action.

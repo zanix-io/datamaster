@@ -6,7 +6,10 @@ import type { AdaptedModelBySchema } from './models.ts'
 import type { SchemaMethods } from './commons.ts'
 
 /** A Mongoose `Schema` with its `paths` map exposed for inspection. */
-export type SchemaWithPaths = Schema & { paths: Record<string, any> }
+export type SchemaWithPaths = Schema & {
+  /** Map of field names to their internal Mongoose path definitions. */
+  paths: Record<string, any>
+}
 
 /** A single field definition within a Mongoose schema. */
 export type MongoField<T> = SchemaDefinitionProperty<T>

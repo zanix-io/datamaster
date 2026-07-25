@@ -110,6 +110,7 @@ export type DataProtectionBase<S extends DataProtectionMethods> = {
       [key in DataPolicyVersion]: DataProtectionConfig<S>
     }
     & {
+      /** Fallback configuration used when no config exists for the active version. */
       default?: DataProtectionConfig<S>
     }
 }

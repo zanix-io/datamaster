@@ -258,7 +258,12 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
   }
 
-  /** Returns the underlying Redis client, queued through the retry mechanism. */
+  /**
+   * Returns the underlying Redis client, queued through the retry mechanism.
+   *
+   * The concrete client type isn't part of this package's public API — pass your own
+   * `RedisClientType` (from the `redis` package) as `T` if you need it typed.
+   */
   public getClient<T = Promise<RedisClientType>>(): T {
     return this.execWithRetry(() => this.#client) as T
   }

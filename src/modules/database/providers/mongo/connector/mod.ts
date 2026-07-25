@@ -135,6 +135,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     name: string,
     options?: GetModelOptions,
   ): AdaptedModel<Attrs, Opts>
+  /** Implementation shared by the {@link getModel} overloads above. */
   public getModel<Attrs extends BaseAttributes, S extends Schema>(
     name: string,
     entity?: S | GetModelOptions,
