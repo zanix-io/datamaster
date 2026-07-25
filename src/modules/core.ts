@@ -7,6 +7,20 @@
  * \_____/ \__,_||_| |_||_|/_/\_\
  */
 
+/**
+ * Side-effect-only module that auto-registers the default Mongo, Redis, local-cache, and
+ * SQLite connectors/providers with the Zanix DI container.
+ *
+ * Import it for its side effects only, for apps that don't need to customize their
+ * connector configuration:
+ *
+ * ```ts
+ * import 'jsr:@zanix/datamaster@[version]/core'
+ * ```
+ *
+ * @module zanixCore
+ */
+
 export * from 'mongo/connector/core.ts'
 export * from 'cache/providers/core.ts'
 export * from 'sqlite/core.ts'

@@ -14,6 +14,7 @@ import { ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]'
 const connector = new ZanixMongoConnector({
   uri: process.env.MONGO_URI, // falls back to MONGO_URI env var, then 'mongodb://localhost'
   seedModel: 'my-seed-register-model', // default: 'zanix-seeders'; false disables seed tracking
+  triggersModel: 'my-triggers', // default: 'zanix-triggers'; false disables persisted triggers
   config: { dbName: 'my_database' },
 })
 
@@ -25,7 +26,9 @@ const UsersModel = connector.getModel<Attrs>('users')
 `isReady` (inherited, a `Promise<boolean>`) is the property to await — there's no `connectorReady`.
 `seedModel` names (or disables, with `false`) the internal collection used to track which seeders
 have already run, so restarts don't re-run them — see
-[Seeders](#seeders-registermodels-extensionsseeders).
+[Seeders](#seeders-registermodels-extensionsseeders). `triggersModel` names (or disables) the
+internal collection used to add/toggle triggers at runtime — see
+[Triggers: persisted triggers](./TRIGGERS.md#persisted-triggers-online-adaptation).
 
 ### `getModel`
 
@@ -111,6 +114,9 @@ Skip execution globally with the `DATABASE_SEEDERS` environment variable — see
 To rotate protection keys across every document in a model, see
 [Data Protection: key rotation](./DATA-PROTECTION.md#key-rotation).
 
+`extensions` also accepts `triggers` — reactive `mail`/`request`/`custom` actions tied to a model's
+create/update/delete lifecycle — see [Triggers](./TRIGGERS.md).
+
 ## Multi-database support
 
 A model name (or a schema `ref`) can be prefixed with a database name using `'database:model'`:
@@ -144,12 +150,13 @@ const kv = new MyKVStore({ filename: 'my-store.sqlite' }) // default: 'znx.kv.tm
 
 await kv.set('key', 'value', 60) // TTL in seconds; 'KEEPTTL' preserves the current expiration
 const value = await kv.get('key')
-await kv.withLock('key', async () => {/* exclusive per-key access, same LockManager as cache */})
+await kv.withLock('key', async () => {/* exclusive per-key access, same lock manager as cache */})
 ```
 
 TTL expiry is **lazy** — an expired entry is skipped on read, not proactively deleted. `withLock`
-uses the same [`LockManager`](./CONCURRENCY.md) the cache module uses. For direct SQLite table
-access without the KV/TTL semantics, use `LocalSQLite(table, filename?)` directly.
+uses the same internal keyed lock manager the cache module uses (see [Cache](./CACHE.md#withlock)).
+For direct SQLite table access without the KV/TTL semantics, use `LocalSQLite(table, filename?)`
+directly.
 
 ## Pagination statics
 
@@ -165,6 +172,7 @@ const cursorPage = await UsersModel.paginateCursor({ limit: 10, cursor: page.doc
 
 ## See also
 
+- [Triggers](./TRIGGERS.md) — `extensions.triggers`, reactive actions tied to the model lifecycle.
 - [Data Protection](./DATA-PROTECTION.md) — `dataProtectionGetter`/`dataAccessGetter`, used inside a
   model's `definition`.
 - [Transforms](./TRANSFORMS.md) — the schema/document transform utilities, and when to call them

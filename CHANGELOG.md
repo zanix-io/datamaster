@@ -7,6 +7,71 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-24
+
+### Added
+
+- **Triggers system**: reactive `mail`/`request`/`custom` actions tied to a Mongoose model's
+  create/update/delete lifecycle, declared via `extensions.triggers` in `registerModel`. Actions
+  support condition evaluation (`=`, `!=`, `<`, `>`, `<=`, `>=`, `includes`, plus `and`/`or`/`not`
+  composition), `{{field}}`/`{{nested.path}}` interpolation against the record the trigger fired
+  for, and dispatch via `@zanix/server`'s worker provider — `runJob` (queue-backed) when `AMQP_URI`
+  is configured, `runTask` (local) otherwise. `mail`/`request` dispatch to well-known job names
+  (`DEFAULT_TRIGGER_JOBS.mail`/`.request`) that a consuming app (e.g. `@zanix/core`) is expected to
+  register handlers for; `custom` dispatches to a caller-registered job by name. `request` actions
+  with a bodyless HTTP method (`GET`/`HEAD`/`DELETE`) have `body` converted to query parameters
+  instead of being dropped. See `docs/TRIGGERS.md`.
+- **Persisted (runtime) triggers**: a new `triggersModel` connector option (default
+  `'zanix-triggers'`, `false` to disable) backs an internal collection for adding/toggling triggers
+  at runtime without redeploying code. A model's own static `extensions.triggers` is auto-seeded
+  into this collection as a "default" entry on first boot with a triggers model enabled; from then
+  on the persisted entry — not the code — governs that model, so it can be edited or disabled from
+  the database without ever double-firing alongside its own code definition. Default entries stay in
+  sync with later code changes automatically, but a manual edit always wins over a subsequent code
+  change. Non-default entries (created independently, e.g. via an admin endpoint) simply combine
+  with a model's static triggers. New `TriggersModelAttrs` type and `registerTriggersModel` DSL
+  helper.
+- New exports: `DEFAULT_TRIGGER_JOBS` (well-known job names for `mail`/`request` dispatch) and the
+  `TriggersModelAttrs` type, from both the root and `./database` entrypoints.
+- Full test coverage for the triggers feature: condition evaluation, dispatch (interpolation,
+  bodyless-method query conversion, job routing), the static/persisted trigger registry, the
+  default-entry sync planner, and end-to-end Mongoose hook behavior (functional + unit tests).
+
+### Changed
+
+- **Breaking**: `Semaphore` and `LockManager` are no longer exported from this package's public
+  entrypoints (`mod.ts`). They've moved to `@zanix/utils`'s helpers module — import them from
+  `@zanix/helpers` (or `jsr:@zanix/utils/helpers`) instead of `@zanix/datamaster`.
+  `docs/CONCURRENCY.md` (which documented them) has been removed; `README.md`, `docs/CACHE.md`, and
+  `docs/DATABASE.md` were updated to drop references to it and describe `withLock` in terms of an
+  internal lock manager instead.
+- `@zanix/server` dependency bumped to `2.*` (from `1.*`) to align with `@zanix/server@2.0.0`.
+- `mail` trigger action's shape changed from `{ template: string }` (plus common fields) to a
+  structured `{ to, subject, body: { template, data? }, from?, date? }` — every string field
+  supports `{{field}}` interpolation.
+- `request` trigger action's `body` is now optional.
+- `MongoModelDefinition.extensions.seeders` is now optional (`seeders?:` instead of a required
+  array), matching that seeders are opt-in.
+- Internal `LockManager` usages (`sqlite/connector.ts`, `cache/providers/mod.ts`) now import from
+  `@zanix/helpers` instead of the removed internal module.
+- `docs/DATABASE.md`, `docs/DATA-PROTECTION.md`, and `README.md` updated with `Triggers`
+  documentation, cross-links, and a `@zanix/core` mention as the recommended full-app entrypoint
+  that auto-registers the `mail`/`request` trigger job handlers.
+
+### Fixed
+
+- Removed a broken, dangling `mod.ts` export
+  (`export { LockManager } from
+  'utils/queues/lock-manager.ts'` and the equivalent `Semaphore`
+  line) that pointed at now-deleted internal files.
+
+### Removed
+
+- `Semaphore` and `LockManager` internal implementations (`src/utils/queues/semaphore.ts`,
+  `src/utils/queues/lock-manager.ts`) — superseded by `@zanix/utils`'s helpers (see Changed).
+- `docs/CONCURRENCY.md` — superseded by the `@zanix/helpers`-based documentation now inline in
+  `docs/CACHE.md`/`docs/DATABASE.md`.
+
 ## [0.4.16] - 2026-07-23
 
 ### Added

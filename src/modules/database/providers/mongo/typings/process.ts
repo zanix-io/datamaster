@@ -62,4 +62,13 @@ export type MongoConnectorOptions = ConnectorOptions & {
    * - If omitted, a default model named `"zanix-seeders"` is created **only if seeders are used**.
    */
   seedModel?: string | false
+  /**
+   * Controls the creation of the persisted triggers model (see `registerTriggersModel`), used to
+   * add/toggle triggers at runtime ("online adaptation") in addition to a model's static
+   * `extensions.triggers`:
+   * - If `false`, no model is created and no persisted triggers are loaded.
+   * - If a `string` is provided, a model is created with that name.
+   * - If omitted, a default model named `"zanix-triggers"` is always created.
+   */
+  triggersModel?: string | false
 }

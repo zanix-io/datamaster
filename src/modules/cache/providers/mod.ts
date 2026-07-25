@@ -4,7 +4,7 @@ import {
   type CoreCacheConnectors,
   ZanixCacheProvider,
 } from '@zanix/server'
-import { LockManager } from 'utils/queues/lock-manager.ts'
+import { LockManager } from '@zanix/helpers'
 import logger from '@zanix/logger'
 
 /**

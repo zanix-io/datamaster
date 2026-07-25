@@ -40,6 +40,7 @@ export type {
   ModelDefinition,
   ModelGeneralDefinition,
   SeedModelAttrs,
+  TriggersModelAttrs,
 } from './typings/models.ts'
 export type {
   BaseAttributes,
@@ -50,6 +51,7 @@ export type {
   SeederHandler,
   SeederOptions,
 } from './typings/general.ts'
+export { DEFAULT_TRIGGER_JOBS } from './typings/triggers.ts'
 export type {
   AndCondition,
   Condition,

@@ -1,7 +1,5 @@
 import type { HttpMethod } from '@zanix/server'
 
-// TODO: IMPLEMENT TRIGGERS WHEN WORKER WILL BE DEVELOPED
-
 /**
  * Represents a single condition for filtering or matching.
  * @interface SingleCondition
@@ -65,16 +63,71 @@ export type TriggerActionCommons = {
  * Defines the specific types of trigger actions.
  */
 export type TriggerActions = {
-  /** Email action with template. */
-  mail: Partial<TriggerActionCommons> & { template: string }
-  /** HTTP request action. */
+  /**
+   * Email action.
+   *
+   * Dispatched to the well-known {@link DEFAULT_TRIGGER_JOBS.mail} job — an app bootstrapped via
+   * `@zanix/core`'s `Zanix.start()`/`Zanix.startWorker()` gets this registered automatically
+   * (`@zanix/core` is the layer that depends on datamaster, asyncmq, and notifications
+   * simultaneously, so it — not asyncmq itself — owns this handler), mapping `body` directly onto
+   * `NotifyMessageWithTemplate`'s `{ template, data }` shape.
+   *
+   * Every string field (`to`, `subject`, `body.data`'s own values, ...) supports `{{field}}`/
+   * `{{nested.path}}` placeholders, resolved against the record the trigger fired for — e.g.
+   * `to: '{{email}}'`, `subject: 'Welcome {{name}}'`.
+   */
+  mail: Partial<TriggerActionCommons> & {
+    /** The recipient email address. Supports `{{field}}` interpolation. */
+    to: string
+    /** The email subject line. Supports `{{field}}` interpolation. */
+    subject: string
+    /** The sender email address. Defaults to whatever the notifier provider configures. */
+    from?: string
+    /** The message date. Defaults to whatever the notifier provider sets it to. */
+    date?: string
+    /**
+     * The email body: a template reference. `data` is the template's render data — an object of
+     * fields the template expects (for templates that support custom styling, a `styles.css` key
+     * appends additional CSS to the template's own base stylesheet, concatenated, not replaced),
+     * or a literal string for templates that accept plain content directly. String values within
+     * `data` support `{{field}}` interpolation, same as any other field.
+     */
+    body: { template: string; data?: Record<string, unknown> | string }
+  }
+  /**
+   * HTTP request action.
+   *
+   * Dispatched to the well-known {@link DEFAULT_TRIGGER_JOBS.request} job — an app bootstrapped
+   * via `@zanix/core`'s `Zanix.start()`/`Zanix.startWorker()` gets this registered automatically
+   * with a generic `fetch`-based job.
+   *
+   * Every string field (`url`, `headers`' values, `body`'s own values, ...) supports `{{field}}`/
+   * `{{nested.path}}` placeholders, resolved against the record the trigger fired for — e.g.
+   * `headers: { authorization: 'Bearer {{apiKey}}' }`.
+   */
   request: Partial<TriggerActionCommons> & {
-    /** HTTP headers to send with the request. */
+    /** HTTP headers to send with the request. Values support `{{field}}` interpolation. */
     headers: Record<string, unknown>
-    /** The URL to send the request to. */
+    /** The URL to send the request to. Supports `{{field}}` interpolation. */
     url: string
     /** The HTTP method to use for the request. */
     method: HttpMethod
+    /**
+     * The request body. **Nothing is sent automatically** — omit this to send no body at all,
+     * even though the trigger fired for a real record; only what's explicitly listed here (with
+     * `{{field}}` interpolation applied) is sent.
+     */
+    body?: Record<string, unknown>
+  }
+  /**
+   * A reference to a custom job, by name, that the consuming app has already registered itself
+   * via `@zanix/asyncmq`'s `registerJob` (the same pattern as calling `this.worker.runJob(name,
+   * ...)` directly from an interactor). Datamaster only dispatches to this job name — it never
+   * registers a handler for it.
+   */
+  custom: Partial<TriggerActionCommons> & {
+    /** The name of the job to dispatch to, as registered via `registerJob`. */
+    name: string
   }
 }
 
@@ -94,3 +147,19 @@ export type TriggerTypes = Record<
  * @typedef {Partial<Record<'pre' | 'post', Partial<TriggerTypes>>>} Triggers
  */
 export type Triggers = Partial<Record<'pre' | 'post', Partial<TriggerTypes>>>
+
+/**
+ * The well-known job names datamaster dispatches built-in trigger actions to via
+ * `ProgramModule.providers.get('worker').runJob(...)`.
+ *
+ * These names are the contract that must have a job handler registered for them (via
+ * `registerJob`) in order for `mail`/`request` trigger actions to actually run — apps bootstrapped
+ * via `@zanix/core` get this automatically; standalone `@zanix/asyncmq` usage must register them
+ * itself. `custom` actions reference their own job name directly instead of one of these.
+ */
+export const DEFAULT_TRIGGER_JOBS = {
+  /** Job name for the built-in `mail` trigger action. */
+  mail: 'zanix-datamaster:trigger:mail',
+  /** Job name for the built-in `request` trigger action. */
+  request: 'zanix-datamaster:trigger:request',
+} as const

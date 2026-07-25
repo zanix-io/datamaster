@@ -2,6 +2,7 @@
 import type { MongoModelDefinition } from 'mongo/typings/models.ts'
 import type { DatabaseTypes, Extensions } from './general.ts'
 import type { Primitive } from 'typings/system.ts'
+import type { Triggers } from './triggers.ts'
 
 /** Definition of a model for database types other than `'mongo'`. */
 export type ModelGeneralDefinition = Omit<ModelMetadata<unknown>, 'name'> & {
@@ -103,4 +104,46 @@ export type SeedModelAttrs = {
   duration?: number
   /** Additional free-form notes about the seeder run. */
   notes?: string
+}
+
+/**
+ * Attributes for a persisted entry in the internal triggers model — the storage layer for
+ * adding/toggling triggers at runtime ("online adaptation"), as opposed to the static
+ * `extensions.triggers` declared in code. See `registerTriggersModel`.
+ *
+ * At connector startup, every `active` entry's `triggers` are merged into the target model's
+ * (`model`) current effective trigger set. A non-default entry (`isDefault: false`) combines
+ * with — never replacing — that model's static `extensions.triggers`. A **default** entry
+ * (`isDefault: true`, auto-seeded from a model's own static `extensions.triggers` the first time
+ * its connector boots with a triggers model enabled) instead **replaces** that model's static
+ * layer entirely — this is what makes a code-defined trigger editable/disableable from this
+ * collection without ever double-firing alongside its own code definition.
+ *
+ * A default entry stays in sync with its model's code: if the code no longer declares
+ * `extensions.triggers` for it at all, the entry is deleted; if the code's content changed and
+ * nobody edited `triggers` away from the last value synced from code, it's updated to match. An
+ * entry someone DID edit directly (so `triggers` no longer matches `lastSyncedTriggers`) is left
+ * alone — a manual edit always wins over a later code change, and is never silently overwritten.
+ */
+export type TriggersModelAttrs = {
+  /** The name of the model this trigger configuration applies to. */
+  model: string
+  /** Whether this trigger configuration is currently active (merged in at startup). */
+  active: boolean
+  /** The trigger configuration to merge in, in the same shape as `extensions.triggers`. */
+  triggers: Triggers
+  /**
+   * Whether this entry was auto-seeded from a model's static `extensions.triggers` (as opposed
+   * to one created from scratch, e.g. via an admin endpoint). A default entry fully replaces its
+   * target model's static trigger layer instead of combining with it — see the type-level doc.
+   */
+  isDefault: boolean
+  /**
+   * The code's `extensions.triggers` content as of the last time it was synced into `triggers`
+   * (initial seed, or a later re-sync). Only meaningful for a default entry (`isDefault: true`) —
+   * comparing this against the model's *current* static triggers is how a re-sync decides whether
+   * `triggers` still matches what code last provided (safe to overwrite) or was edited directly
+   * (must be left alone). Not present on non-default entries.
+   */
+  lastSyncedTriggers?: Triggers
 }

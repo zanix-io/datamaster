@@ -1,6 +1,6 @@
 import { assertEquals } from '@std/assert'
 import { ZanixQLRUConnector } from 'modules/cache/providers/qlru/connector.ts'
-import { LockManager } from 'utils/queues/lock-manager.ts'
+import { LockManager } from '@zanix/helpers'
 
 Deno.test('QuickLRU: can support concurrency using lock manager', async () => {
   const cache = new ZanixQLRUConnector<string, number>({ capacity: 100 })

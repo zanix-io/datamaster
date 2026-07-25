@@ -27,9 +27,6 @@ Read by `dataProtectionGetter`/`dataPoliciesGetter` and by the standalone `datam
 | `DATA_RSA_PUB`    | Asymmetric **encryption**.                    | Must contain a **base64-encoded** public key — it's `atob()`-decoded on read.  |
 | `DATA_RSA_KEY`    | Asymmetric **decryption**.                    | Must contain a **base64-encoded** private key — it's `atob()`-decoded on read. |
 
-> ⚠️ The asymmetric-decryption variable is **`DATA_RSA_KEY`**, not `DATA_RSA_PRIV` — an older
-> revision of this document used the wrong name.
-
 ### Versioned keys
 
 Every one of the variables above can be suffixed with a version to support key rotation without

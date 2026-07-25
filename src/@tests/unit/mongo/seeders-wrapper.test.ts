@@ -2,6 +2,9 @@ import { assertEquals, assertThrows } from '@std/assert'
 import { seederBaseWrapper } from 'database/utils/seeders/wrapper.ts'
 import type { SeederProcessor } from 'database/typings/general.ts'
 
+console.error = () => {}
+console.warn = () => {}
+
 const buildProcessor = (avoidRun: SeederProcessor['avoidRun'] = () => false) => {
   const calls: unknown[] = []
   const processor: SeederProcessor = {

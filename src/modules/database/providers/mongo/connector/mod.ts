@@ -8,6 +8,7 @@ import { ProgramModule as ServerProgram, ZanixDatabaseConnector } from '@zanix/s
 import { createDatabase, postBindModel, preprocessSchema } from '../processor/mod.ts'
 import { type Mongoose, Schema, type SchemaOptions } from 'mongoose'
 import { defineModelBySchema, defineModels } from './models.ts'
+import { loadPersistedTriggersOnStart } from './triggers.ts'
 import { runSeedersOnStart } from './seeders.ts'
 import { HttpError } from '@zanix/errors'
 import logger from '@zanix/logger'
@@ -48,6 +49,8 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   protected name: string
   /** Name of the internal seed-tracking model, or `false` if seed tracking is disabled. */
   protected seederModel: string | false
+  /** Name of the internal persisted triggers model, or `false` if it's disabled. */
+  protected triggersModel: string | false
   /** Defines and binds a model initialized directly by a schema, bound as an instance method. */
   private defineModelBySchema = defineModelBySchema
 
@@ -66,6 +69,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     this.isReplicaSet = this.#uri?.includes('replicaSet=') || this.#uri?.includes('mongodb+srv://')
     this.#config = options.config
     this.seederModel = options.seedModel ?? 'zanix-seeders'
+    this.triggersModel = options.triggersModel ?? 'zanix-triggers'
 
     this.#database = createDatabase()
   }
@@ -85,7 +89,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     const baseSchema = schema as BaseCustomSchema
     baseSchema.statics.isReplicaSet = () => this.isReplicaSet
 
-    return this.#database.model(name, preprocessSchema(baseSchema, extensions))
+    return this.#database.model(name, preprocessSchema(baseSchema, name, extensions))
   }
 
   /**
@@ -178,6 +182,8 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
       defineModels.call(this)
 
       await this.#database.connect(this.#uri, dbConfig)
+
+      await loadPersistedTriggersOnStart.call(this)
 
       await runSeedersOnStart.call(this)
 

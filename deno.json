@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "0.4.16",
+  "version": "0.5.0",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -54,7 +54,7 @@
     "@zanix/errors": "jsr:@zanix/utils@2.*/errors",
     "@zanix/logger": "jsr:@zanix/utils@2.*/logger",
     "@zanix/types": "jsr:@zanix/utils@2.*/types",
-    "@zanix/server": "jsr:@zanix/server@1.*",
+    "@zanix/server": "jsr:@zanix/server@2.*",
     "@zanix/helpers": "jsr:@zanix/utils@2.*/helpers",
     "modules/": "./src/modules/",
     "shared/": "./src/shared/",

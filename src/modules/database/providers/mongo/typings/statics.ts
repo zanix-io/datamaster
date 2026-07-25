@@ -13,7 +13,12 @@ import type {
 } from 'typings/protection.ts'
 
 /** Upsert type options */
-export type UpsertTypeOptions = { useDataPolicies?: boolean; type?: 'update' | 'insert' }
+export type UpsertTypeOptions = {
+  /** Whether data policies (protection/access) should be applied to the upserted data. */
+  useDataPolicies?: boolean
+  /** The type of the operation to perform. Defaults to `'insert'`. */
+  type?: 'update' | 'insert'
+}
 
 /**
  * Defines the shape of **static methods** attached to a schema (e.g., a Mongoose schema).

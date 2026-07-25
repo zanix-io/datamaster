@@ -220,3 +220,5 @@ performing the protection operation itself.
 - [Configuration](./CONFIGURATION.md) — the exact environment variable names (`DATA_AES_KEY`,
   `DATA_RSA_PUB`/`DATA_RSA_KEY`, `DATA_SECRET_KEY`) and versioned-key naming convention.
 - [Database](./DATABASE.md) — where these getters attach to a model's schema definition.
+- [Triggers](./TRIGGERS.md) — the other schema-level lifecycle hook, covering both document- and
+  query-level operations.

@@ -8,15 +8,15 @@
 
 ## 🧭 Table of Contents
 
-- [Description](#-description)
-- [Features](#-features)
-- [Installation](#-installation)
-- [Basic Usage](#-basic-usage)
-- [Documentation](#-documentation)
-- [Contributing](#-contributing)
-- [Changelog](#-changelog)
-- [License](#-license)
-- [Resources](#-resources)
+1. [Description](#-description)
+2. [Features](#-features)
+3. [Installation](#-installation)
+4. [Basic Usage](#-basic-usage)
+5. [Documentation](#-documentation)
+6. [Contributing](#-contributing)
+7. [Changelog](#-changelog)
+8. [License](#-license)
+9. [Resources](#-resources)
 
 ---
 
@@ -34,9 +34,15 @@ local caching utilities, such as in-memory Map for fast, etc.
 > 💡 Special thanks to the external database and cache providers whose technologies make this module
 > possible.
 
+> 💡 If you're building a full application, the recommended entrypoint is
+> **[`@zanix/core`](https://jsr.io/@zanix/core)**, which wires this package together with
+> `@zanix/asyncmq`, `@zanix/auth`, and `@zanix/notifications` via
+> `Zanix.start()`/`Zanix.startWorker()` — including automatic registration of the `mail`/`request`
+> trigger job handlers (see [TRIGGERS.md](docs/TRIGGERS.md)).
+
 ---
 
-## ⚙️ Features
+## ✨ Features
 
 - **MongoDB connector**
 
@@ -71,11 +77,6 @@ local caching utilities, such as in-memory Map for fast, etc.
   - Includes **per-key exclusive locking** for safe concurrent access.
   - Ideal for local storage, caching, and lightweight persistence scenarios.
 
-- **Queues & concurrency helpers**
-  - **Semaphores**: Limit the number of concurrent operations with FIFO queuing.
-  - **Keyed Lock Manager**: Provides exclusive, per-key locks for safe serialized operations **in
-    non-distributed systems**.
-
 - **Cache provider & strategies**
 
   - `getCachedOrFetch`: Retrieves a value from cache with local fallback and optional fetch.
@@ -86,7 +87,6 @@ local caching utilities, such as in-memory Map for fast, etc.
     non-distributed systems**.
     - Prevents race conditions in write-heavy scenarios.
     - Guarantees only one mutation for the same key runs at a time.
-    - Built on top of the `LockManager` and semaphores for predictable and safe execution.
 
 - **Model DSL definition support (Database Only)**
 
@@ -130,11 +130,11 @@ groups the main exports by category — each links to a guide with full usage ex
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Mongo connector & models      | `ZanixMongoConnector`, `registerModel`, `Schema`                                                                                                                                                      | [Database](./docs/DATABASE.md)                                          |
 | Seeders                       | `seedByIdIfMissing`, `seedManyByIdIfMissing`, `seedRotateProtectionKeys`                                                                                                                              | [Database](./docs/DATABASE.md#seeders-registermodels-extensionsseeders) |
+| Triggers                      | `extensions.triggers`, `DEFAULT_TRIGGER_JOBS`                                                                                                                                                         | [Triggers](./docs/TRIGGERS.md)                                          |
 | SQLite (KV store)             | `ZanixKVStoreConnector`, `LocalSQLite`                                                                                                                                                                | [Database](./docs/DATABASE.md#sqlite-key-value-store)                   |
 | Transforms & schema utilities | `transformRecursively`, `transformDeepByPaths`, `transformShallowByPaths`, `transformByDataAccess`, `transformByDataProtection`, `getAllSubschemas`, `findPathsWithAccessorsDeep`                     | [Transforms](./docs/TRANSFORMS.md)                                      |
 | Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject` | [Data Protection](./docs/DATA-PROTECTION.md)                            |
 | Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                                     | [Cache](./docs/CACHE.md)                                                |
-| Concurrency                   | `LockManager`, `Semaphore`                                                                                                                                                                            | [Concurrency](./docs/CONCURRENCY.md)                                    |
 | Configuration                 | Environment variables for connections and data protection                                                                                                                                             | [Configuration](./docs/CONFIGURATION.md)                                |
 
 ```ts
@@ -242,14 +242,14 @@ await connector['close']()
 
 - [Database](./docs/DATABASE.md) — `ZanixMongoConnector`, the `registerModel` DSL, seeders,
   multi-database support, and the SQLite key-value store.
+- [Triggers](./docs/TRIGGERS.md) — reactive `mail`/`request`/`custom` actions tied to a model's
+  create/update/delete lifecycle, with conditions and worker-based dispatch.
 - [Data Protection](./docs/DATA-PROTECTION.md) — masking, encryption, and hashing strategies, access
   strategies, versioned key rotation, and the standalone crypto utilities.
 - [Transforms](./docs/TRANSFORMS.md) — recursive/shallow document transforms and schema inspection
   utilities.
 - [Cache](./docs/CACHE.md) — the Redis connector, the local LRU connector, and the multi-layer cache
   provider (`getCachedOrFetch`/`getCachedOrRevalidate`/`withLock`).
-- [Concurrency](./docs/CONCURRENCY.md) — `Semaphore` and `LockManager`, the primitives `withLock` is
-  built on.
 - [Configuration](./docs/CONFIGURATION.md) — environment variables, defaults, and versioned-key
   naming.
 
@@ -275,7 +275,7 @@ See [`CHANGELOG`](./CHANGELOG.md) for release history.
 
 ---
 
-## ⚖️ License
+## 📜 License
 
 Licensed under the **MIT License**. See [`LICENSE`](./LICENSE) for details.
 

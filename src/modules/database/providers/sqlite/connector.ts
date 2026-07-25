@@ -3,7 +3,7 @@ import type { Database } from 'sqlite3'
 
 import { ZanixKVConnector } from '@zanix/server'
 import { LocalSQLite } from 'database/utils/sqlite.ts'
-import { LockManager } from 'utils/queues/lock-manager.ts'
+import { LockManager } from '@zanix/helpers'
 
 /**
  * A lightweight and fast key-value local store backed by SQLite, with optional TTL (Time-To-Live) support.

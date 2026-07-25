@@ -42,7 +42,7 @@ const userSchema = new Schema({
   ],
 })
 
-preprocessSchema(userSchema as never)
+preprocessSchema(userSchema as never, 'test-model')
 
 const userModel = model('Example-accessor', userSchema)
 const UserModel = userModel as typeof userModel & SchemaStatics

@@ -58,11 +58,13 @@ export const postBindModel = <T extends Model>(Model: T): T => {
  *
  * @template T
  * @param {T} schema - A Mongoose `Schema` instance to preprocess.
+ * @param {string} modelName - The model's name, used to key the per-model trigger registry.
  * @param {Omit<Extensions, 'seeders'>} extensions - Schema extensions options.
  * @returns {T} The same schema instance after preprocessing.
  */
 export const preprocessSchema = <T extends BaseCustomSchema>(
   schema: T,
+  modelName: string,
   extensions: Omit<Extensions, 'seeders'> = {},
 ): T => {
   // Data protection process
@@ -92,11 +94,8 @@ export const preprocessSchema = <T extends BaseCustomSchema>(
   // `toObject` and `toJSON`
   baseTransformations(schema)
 
-  // triggers
-  extensions.triggers
-
-  // hooks
-  hooks(schema)
+  // hooks (data protection, triggers)
+  hooks(schema, modelName, extensions.triggers)
 
   // return adapted schema
   return schema

@@ -43,7 +43,7 @@ export type MongoModelDefinition<
    */
   extensions?: Omit<Extensions, 'seeders'> & {
     /** Seeder functions (or handler/options pairs) run sequentially to populate initial data. */
-    seeders: Array<
+    seeders?: Array<
       MongoSeeder | {
         /** The seeder function to execute. */
         handler: MongoSeeder

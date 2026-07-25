@@ -96,12 +96,10 @@ await provider.withLock(`user:${id}`, async () => {
 })
 ```
 
-A thin delegate to an internal, per-instance `LockManager` — see
-[Concurrency: `withLock`](./CONCURRENCY.md#withlock) for the exclusivity guarantees (in short:
-single process, in-memory only, not distributed across replicas).
+A thin delegate to an internal, per-instance keyed lock manager (single process, in-memory only, not
+distributed across replicas): only one call for the same key runs at a time on this provider
+instance; other keys run fully in parallel.
 
 ## See also
 
-- [Concurrency](./CONCURRENCY.md) — `Semaphore`/`LockManager`, the primitives `withLock` is built
-  on.
 - [Configuration](./CONFIGURATION.md) — `REDIS_URI`, `LOCAL_CACHE_MAX_ITEMS`.

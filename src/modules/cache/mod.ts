@@ -7,6 +7,15 @@
  * \_____/ \__,_||_| |_||_|/_/\_\
  */
 
+/**
+ * This module provides cache connectors and utilities for the Zanix project.
+ *
+ * It includes the Redis connector, the local LRU (QLRU) connector, and the multi-layer
+ * cache provider that combines them with configurable fetch/revalidate strategies.
+ *
+ * @module zanixCache
+ */
+
 import type { RedisClientType } from 'redis'
 
 export { ZanixCacheCoreProvider } from './providers/mod.ts'

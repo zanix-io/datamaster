@@ -42,9 +42,5 @@ export {
   unmask as datamasterUnmask,
 } from 'utils/protection.ts'
 
-// Utils
-export { LockManager } from 'utils/queues/lock-manager.ts'
-export { Semaphore } from 'utils/queues/semaphore.ts'
-
 // General types
 export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'
