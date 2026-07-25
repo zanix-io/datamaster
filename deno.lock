@@ -30,6 +30,7 @@
     "jsr:@std/streams@~0.224.5": "0.224.5",
     "jsr:@zanix/server@2": "2.0.1",
     "jsr:@zanix/server@^2.0.1": "2.0.1",
+    "jsr:@zanix/utils@*": "2.3.0",
     "jsr:@zanix/utils@2": "2.3.0",
     "jsr:@zanix/utils@2.3": "2.3.0",
     "npm:@types/node@*": "24.2.0",
