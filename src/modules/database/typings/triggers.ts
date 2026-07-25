@@ -159,7 +159,7 @@ export type Triggers = Partial<Record<'pre' | 'post', Partial<TriggerTypes>>>
  */
 export const DEFAULT_TRIGGER_JOBS = {
   /** Job name for the built-in `mail` trigger action. */
-  mail: 'zanix-datamaster:trigger:mail',
+  mail: 'zanix:trigger:mail',
   /** Job name for the built-in `request` trigger action. */
-  request: 'zanix-datamaster:trigger:request',
+  request: 'zanix:trigger:request',
 } as const
