@@ -16,14 +16,35 @@
  * @module zanixCache
  */
 
-export { ZanixCacheCoreProvider } from './providers/mod.ts'
-export { ZanixQLRUConnector } from './providers/qlru/connector.ts'
-export { ZanixRedisConnector } from './providers/redis/connector/mod.ts'
+export {
+  /** Core cache provider with multi-level caching (local + external). */
+  ZanixCacheCoreProvider,
+} from './providers/mod.ts'
+export {
+  /** A fast and lightweight Least Recently Used (LRU) cache with optional TTL support. */
+  ZanixQLRUConnector,
+} from './providers/qlru/connector.ts'
+export {
+  /** A Redis-backed cache implementation with automatic retry and command queuing. */
+  ZanixRedisConnector,
+} from './providers/redis/connector/mod.ts'
 
 // Utils, extensions
-export { scanKeys } from './providers/redis/connector/scan.ts'
+export {
+  /** Returns all keys currently stored in the redis cache. */
+  scanKeys,
+} from './providers/redis/connector/scan.ts'
 
 // Types
-export type { ExpiredValueEntry } from 'database/typings/general.ts'
-export type { RedisOptions } from './typings/general.ts'
-export type { RedisPipelineScheduler } from './providers/redis/connector/scheduler.ts'
+export type {
+  /** Represents a single Expired Value entry. */
+  ExpiredValueEntry,
+} from 'database/typings/general.ts'
+export type {
+  /** Redis cache connector options. */
+  RedisOptions,
+} from './typings/general.ts'
+export type {
+  /** Helper that batches Redis commands and executes them in scheduled pipelines. */
+  RedisPipelineScheduler,
+} from './providers/redis/connector/scheduler.ts'
