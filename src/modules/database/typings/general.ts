@@ -11,9 +11,12 @@ import type { Triggers } from './triggers.ts'
 export type BaseAttributes = Record<any, any>
 
 /**
- * Database types
+ * Only `'mongo'` is currently supported.
+ *
+ * Datamaster's persistence layer is MongoDB-only. Supporting additional database backends would
+ * require dedicated implementations beyond the current architecture.
  */
-export type DatabaseTypes = 'mongo' | 'postgress'
+export type DatabaseTypes = 'mongo'
 
 /**
  * Base seeder handler

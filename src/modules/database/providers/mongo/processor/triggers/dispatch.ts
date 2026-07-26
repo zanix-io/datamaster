@@ -2,7 +2,7 @@
 import type { TriggerActionCommons, TriggerActions } from 'database/typings/triggers.ts'
 import { DEFAULT_TRIGGER_JOBS } from 'database/typings/triggers.ts'
 import { ProgramModule as ServerProgram, type ZanixWorkerProvider } from '@zanix/server'
-import { interpolate, interpolateUrl, toSearchParams } from '@zanix/helpers'
+import { interpolate, interpolateEnv, interpolateUrl, toSearchParams } from '@zanix/helpers'
 import { validateConditions } from './conditions.ts'
 
 type TriggerActionType = keyof TriggerActions
@@ -49,10 +49,16 @@ const dispatchAction = async <T extends TriggerActionType>(
   // query-string-aware interpolation (see `interpolateUrl`) instead of the generic pass, so an
   // array/object whole-value placeholder in a query param expands correctly.
   const { url: rawUrl, ...restFields } = actionFields as { url?: string } & Record<string, any>
-  const interpolatedFields: any = interpolate(restFields, currentData)
+  const modelInterpolatedFields: any = interpolate(restFields, currentData)
   if (rawUrl !== undefined) {
-    interpolatedFields.url = interpolateUrl(rawUrl, currentData)
+    modelInterpolatedFields.url = interpolateUrl(rawUrl, currentData)
   }
+
+  // `${{ENV_VAR}}` placeholders (see `interpolateEnv`) are resolved next, against `Deno.env` — a
+  // separate pass from the `{{field}}` one above, so secrets never need to be written into the
+  // trigger definition itself (see the security note on `TriggerActions`). Runs over every field
+  // (including the already-resolved `url`), so both conventions can coexist in the same string.
+  const interpolatedFields: any = interpolateEnv(modelInterpolatedFields)
 
   // For methods that conventionally carry no body, send `body`'s fields as query parameters
   // instead — see `BODYLESS_METHODS`.
@@ -95,17 +101,29 @@ const dispatchAction = async <T extends TriggerActionType>(
  * document event.
  *
  * Each action's `conditions` are evaluated against `data` first (see {@link validateConditions});
- * actions whose conditions don't pass are skipped. Passing actions have their own string fields
- * (`to`, `subject`, `headers`, `body`, ...) interpolated against `data` (see {@link interpolate});
- * `url` gets its own query-string-aware interpolation instead (see {@link interpolateUrl}). This
- * is the only way a field sees per-record data — nothing is merged in beyond what its own
- * `{{field}}` placeholders resolve to. For `request` actions whose `method` conventionally carries
- * no body (`GET`, `HEAD`, `DELETE`), a configured `body` is converted into query parameters
- * appended to `url` instead of being sent as a fetch body. Actions are dispatched via
- * `ProgramModule.providers.get('worker')` to their corresponding job name ({@link
- * DEFAULT_TRIGGER_JOBS} for `mail`/`request`, or the action's own `name` for `custom`) — via
- * `runJob` (queue-backed) when `AMQP_URI` is configured, or `runTask` (local, in-process) when it
- * isn't, since there's no queue to publish to in that case.
+ * actions whose conditions don't pass are skipped. Passing actions go through two interpolation
+ * passes, in order:
+ *
+ * 1. **Model interpolation** — every string field (`to`, `subject`, `headers`, `body`, ...) is
+ *    interpolated against `data` (see {@link interpolate}); `url` gets its own query-string-aware
+ *    interpolation instead (see {@link interpolateUrl}). This is the only way a field sees
+ *    per-record data — nothing is merged in beyond what its own `{{field}}` placeholders resolve
+ *    to.
+ * 2. **Environment interpolation** — every field (including the already-resolved `url`) is then
+ *    interpolated again for `${{ENV_VAR}}` placeholders against `Deno.env` (see
+ *    {@link interpolateEnv}). This is how a trigger reaches a secret (an API key, a bearer token,
+ *    a webhook URL) **without writing it into the trigger definition itself** — see the security
+ *    note on {@link TriggerActions}. The two placeholder conventions coexist in the same string
+ *    (e.g. `'Bearer ${{TOKEN}}'` next to a `{{field}}` elsewhere) without either one resolving the
+ *    other's placeholders.
+ *
+ * For `request` actions whose `method` conventionally carries no body (`GET`, `HEAD`, `DELETE`), a
+ * configured `body` is converted into query parameters appended to `url` instead of being sent as
+ * a fetch body — after both interpolation passes, so an env-resolved value can also be sent this
+ * way. Actions are dispatched via `ProgramModule.providers.get('worker')` to their corresponding
+ * job name ({@link DEFAULT_TRIGGER_JOBS} for `mail`/`request`, or the action's own `name` for
+ * `custom`) — via `runJob` (queue-backed) when `AMQP_URI` is configured, or `runTask` (local,
+ * in-process) when it isn't, since there's no queue to publish to in that case.
  *
  * @param data - The document (or plain payload) the trigger fired for. If it carries an `_old`
  * property (the pre-change document, for `updated`/`deleted` events), it's forwarded to the job

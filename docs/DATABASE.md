@@ -32,22 +32,30 @@ internal collection used to add/toggle triggers at runtime — see
 
 ### `getModel`
 
-Two overloads, depending on whether you already registered the model via `registerModel`:
+Three overloads, depending on whether you already registered the model via `registerModel`:
 
 ```ts
 // 1. Create a model directly from a schema you provide
 const Model = connector.getModel('users', schema, { useALS: true })
 
-// 2. Look up a model that was already bound via registerModel (throws if not found)
+// 2. Create a model from a plain definition (registerModel's own {definition, options, extensions,
+//    callback} shape) — the connector builds the Schema for you, so callers that only need this
+//    one model never have to import `mongoose` themselves
+const Model = connector.getModel<Attrs>('users', {
+  definition: { name: { type: String, required: true } },
+  extensions: { triggers: { post: { created: [{ custom: { name: 'my-job' } }] } } },
+})
+
+// 3. Look up a model that was already bound via registerModel (throws if not found)
 const Model = connector.getModel<Attrs>('users')
 ```
 
 `GetModelOptions.useALS: boolean` re-enters the current request's `AsyncLocalStorage` session
 context before resolving the model, so accessors that read the session (like
 [`dataAccessGetter`](./DATA-PROTECTION.md#access-strategies-dataaccessgetter)) see it — enable this
-if `useALS`/`enableALS` is already active on the handler that's calling `getModel`. The schema
-overload's `SchemaModelInitOptions` also accepts `extensions` and `relatedModels` (models to bind
-and populate together with the main one).
+if `useALS`/`enableALS` is already active on the handler that's calling `getModel`. Both the schema
+and the plain-definition overloads' `SchemaModelInitOptions` also accept `extensions` and
+`relatedModels` (models to bind and populate together with the main one).
 
 ## `registerModel` DSL
 

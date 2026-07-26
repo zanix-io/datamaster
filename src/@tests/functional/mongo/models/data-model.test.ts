@@ -73,6 +73,30 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
+  name: 'Mongo connector should add model by a plain definition, without a caller-built Schema',
+  fn: async () => {
+    type Attrs = {
+      name?: string
+      description?: string
+    }
+
+    const db = await getDB()
+    const Model = db.getModel<Attrs>('test-by-definition-get-model', {
+      definition: { name: String, description: String },
+      options: { methods: { myFirstMethod: () => 'my first value' } },
+      callback: (schema) => {
+        schema.methods.myMethod = () => 'my value'
+        return schema
+      },
+    })
+
+    await modelValidation(Model, db)
+  },
+  ignore,
+})
+
+Deno.test({
+  ...sanitize,
   name: 'Mongo connector should disponibilize model before initialize connection',
   fn: async () => {
     const schema = new Schema({ name: String, description: String }, {

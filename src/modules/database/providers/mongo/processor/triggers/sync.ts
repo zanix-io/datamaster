@@ -1,6 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import type { Triggers } from 'database/typings/triggers.ts'
 
+import { planCodeSync } from '@zanix/helpers'
+
 /**
  * Structural equality for plain JSON-shaped values (the `Triggers` configuration is always one:
  * strings, numbers, booleans, arrays, and plain objects) — used to detect whether a persisted
@@ -59,38 +61,38 @@ export type TriggerSyncPlan = {
  * - **Not yet persisted at all** (a model with static triggers and no entry, default or not) →
  *   seeded fresh.
  *
- * Non-default entries (`isDefault: false`) are never touched by any of this — they're unrelated to
- * any static code configuration.
+ * Non-default entries (`isDefault: false`) are never orphaned/resynced by any of this — they're
+ * unrelated to any static code configuration — but they DO still count against `toSeed`: a model
+ * with only a custom entry never gets a duplicate default one auto-seeded on top of it.
+ *
+ * The actual reconciliation (orphan/resync detection via the "does the live value still match
+ * what code last synced in" mirror-field check) is `@zanix/helpers`' `planCodeSync` — shared with
+ * `@zanix/notifications`' own code-to-database template sync, the other real consumer of this
+ * exact algorithm.
  */
 export const planTriggerSync = (
   staticEntries: Array<[string, Triggers]>,
   existing: ExistingTriggerEntry[],
 ): TriggerSyncPlan => {
-  const staticTriggersByModel = new Map(staticEntries)
-  const existingModels = new Set(existing.map((entry) => entry.model))
+  const defaultEntries = existing.filter((entry) => entry.isDefault)
+  const allExistingModels = new Set(existing.map((entry) => entry.model))
 
-  const toDelete: unknown[] = []
-  const toResync: Array<{ _id: unknown; triggers: Triggers }> = []
+  const plan = planCodeSync<Triggers>(
+    staticEntries.map(([model, triggers]) => ({ key: model, value: triggers })),
+    defaultEntries.map((entry) => ({
+      _id: entry._id,
+      key: entry.model,
+      value: entry.triggers,
+      lastSyncedValue: entry.lastSyncedTriggers,
+    })),
+    deepEqual,
+  )
 
-  for (const entry of existing) {
-    if (!entry.isDefault) continue
-
-    const currentCode = staticTriggersByModel.get(entry.model)
-    if (currentCode === undefined) {
-      toDelete.push(entry._id)
-      continue
-    }
-
-    const untouchedSinceLastSync = deepEqual(entry.triggers, entry.lastSyncedTriggers)
-    const codeChanged = !deepEqual(currentCode, entry.lastSyncedTriggers)
-    if (untouchedSinceLastSync && codeChanged) {
-      toResync.push({ _id: entry._id, triggers: currentCode })
-    }
+  return {
+    toDelete: plan.toOrphan.map((entry) => entry._id),
+    toResync: plan.toResync.map((entry) => ({ _id: entry._id, triggers: entry.value })),
+    toSeed: staticEntries
+      .filter(([model]) => !allExistingModels.has(model))
+      .map(([model, triggers]) => ({ model, triggers })),
   }
-
-  const toSeed = staticEntries
-    .filter(([model]) => !existingModels.has(model))
-    .map(([model, triggers]) => ({ model, triggers }))
-
-  return { toDelete, toResync, toSeed }
 }

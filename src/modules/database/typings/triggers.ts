@@ -61,6 +61,20 @@ export type TriggerActionCommons = {
 
 /**
  * Defines the specific types of trigger actions.
+ *
+ * > ⚠️ **Security: never hardcode secrets in a trigger definition.** A trigger's fields are
+ * > declarative config — they can be read back (e.g. via the persisted triggers collection, a
+ * > plain document in the database), so a literal API key, bearer token, password, or other
+ * > credential written directly into `headers`, `body`, `url`, or any other field is exposed to
+ * > anyone who can read that config, not just whoever executes the trigger. Don't write
+ * > `headers: { authorization: 'Bearer sk_live_xxxxx' }` or `password: 'my-secret-password'`.
+ * > Instead, reference an environment variable with the `${{VARIABLE_NAME}}` placeholder — e.g.
+ * > `headers: { authorization: 'Bearer ${{API_KEY}}' }` — which is resolved automatically from
+ * > `Deno.env` (`handleTrigger` in `dispatch.ts`, via `@zanix/helpers`'s `interpolateEnv`) right
+ * > before the action executes, **as long as that variable is registered in the environment of
+ * > the application where the trigger (or the model/schema that owns it) actually runs**. If the
+ * > variable isn't set there, the placeholder resolves to the literal text `'undefined'` rather
+ * > than throwing — so a missing variable fails loudly in the dispatched payload, not silently.
  */
 export type TriggerActions = {
   /**
@@ -74,7 +88,9 @@ export type TriggerActions = {
    *
    * Every string field (`to`, `subject`, `body.data`'s own values, ...) supports `{{field}}`/
    * `{{nested.path}}` placeholders, resolved against the record the trigger fired for — e.g.
-   * `to: '{{email}}'`, `subject: 'Welcome {{name}}'`.
+   * `to: '{{email}}'`, `subject: 'Welcome {{name}}'` — and, separately, `${{ENV_VAR}}`
+   * placeholders resolved from `Deno.env` (see the security note on {@link TriggerActions}). Both
+   * conventions can coexist in the same field.
    */
   mail: Partial<TriggerActionCommons> & {
     /** The recipient email address. Supports `{{field}}` interpolation. */
@@ -108,7 +124,11 @@ export type TriggerActions = {
    *
    * Every string field (`url`, `headers`' values, `body`'s own values, ...) supports `{{field}}`/
    * `{{nested.path}}` placeholders, resolved against the record the trigger fired for — e.g.
-   * `headers: { authorization: 'Bearer {{apiKey}}' }`.
+   * `headers: { authorization: 'Bearer {{apiKey}}' }` — and, separately, `${{ENV_VAR}}`
+   * placeholders resolved from `Deno.env` — e.g. `headers: { authorization: 'Bearer ${{TOKEN}}'
+   * }`. **Use `${{ENV_VAR}}` for any credential** (API keys, bearer tokens, webhook secrets)
+   * instead of writing it literally — see the security note on {@link TriggerActions}. Both
+   * conventions can coexist in the same field.
    */
   request: Partial<TriggerActionCommons> & {
     /** HTTP headers to send with the request. Values support `{{field}}` interpolation. */

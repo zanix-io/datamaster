@@ -56,6 +56,12 @@ Rotate keys programmatically with `seedRotateProtectionKeys()` — see
   at the database level, or the standalone `datamasterEncrypt`/`datamasterDecrypt`,
   `datamasterMask`/`datamasterUnmask`, `datamasterHash` utilities for anything cached — see
   [Data Protection](./DATA-PROTECTION.md).
+- **Never hardcode secrets in a trigger definition** (`extensions.triggers`) — a `headers`/`body`/
+  `url` field with a literal API key, token, or password is exposed to anyone who can read that
+  config, not just whoever executes the trigger. Reference any variable name you choose with
+  `${{VARIABLE_NAME}}` instead; unlike the fixed variables in this document, this one reads whatever
+  name you reference from `Deno.env` — see
+  [Triggers: environment variable interpolation](./TRIGGERS.md#environment-variable-interpolation-envvar).
 
 ## See also
 
@@ -64,3 +70,5 @@ Rotate keys programmatically with `seedRotateProtectionKeys()` — see
 - [Database](./DATABASE.md) — `ZanixMongoConnector` construction options and multi-database model
   names.
 - [Cache](./CACHE.md) — `ZanixRedisConnector`/`ZanixQLRUConnector` construction options.
+- [Triggers](./TRIGGERS.md) — `${{ENV_VAR}}` interpolation for secrets referenced from a trigger
+  definition.

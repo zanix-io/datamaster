@@ -4,7 +4,15 @@ import type { DatabaseTypes, Extensions } from './general.ts'
 import type { Primitive } from 'typings/system.ts'
 import type { Triggers } from './triggers.ts'
 
-/** Definition of a model for database types other than `'mongo'`. */
+/**
+ * Definition of a model for database types other than `'mongo'`.
+ *
+ * Kept as a public type (still re-exported from `database/mod.ts`) for backward compatibility,
+ * but unreachable in practice today: `DatabaseTypes` only has one real member (`'mongo'`), so
+ * {@link ModelDefinition}'s conditional below always resolves to `MongoModelDefinition`. This
+ * isn't a bug — see `DatabaseTypes`' own doc comment for why a second backend isn't a small
+ * follow-up.
+ */
 export type ModelGeneralDefinition = Omit<ModelMetadata<unknown>, 'name'> & {
   /**
    * Represents optional extensions that can be added to a model definition.
@@ -18,7 +26,10 @@ export type BaseModelDefinition = {
   extensions?: Omit<Extensions, 'seeders'>
 }
 
-/** Resolves to the model definition shape appropriate for the given database type. */
+/**
+ * Resolves to the model definition shape appropriate for the given database type. Always resolves
+ * to `MongoModelDefinition` today — see {@link ModelGeneralDefinition}'s doc comment.
+ */
 export type ModelDefinition<T extends DatabaseTypes, Attrs extends object> = 'mongo' extends T
   ? MongoModelDefinition<Attrs>
   : ModelGeneralDefinition
@@ -42,15 +53,14 @@ export type BaseModel<Attrs extends object, T extends DatabaseTypes> = {
  * This type represents a function that takes a model, along with an optional type, and modifies or extends the model.
  * The default type is `'mongo'`, but it can be customized for different database types.
  *
- * @template T - The database type (default is `'mongo'`). This can be extended to support different database systems.
+ * @template T - The database type (default is `'mongo'`) — `DatabaseTypes` only has one real member today, see its own doc comment for why.
  * @template Attrs - The attributes or schema of the model, defaulting to `any`. This represents the structure or shape
  *                   of the model's data.
  *
  * @type ModelDef
  *
  * @param {BaseModel & ModelDefinition<T, Attrs>} model - The base model and its definition that will be enhanced by the DSL definition.
- * @param {T} [type='mongo'] - An optional parameter to specify the database type (e.g., `'mongo'`, `'postgres'`, etc.).
- *                              Defaults to `'mongo'`.
+ * @param {T} [type='mongo'] - An optional parameter to specify the database type. Defaults to, and today can only be, `'mongo'`.
  */
 export type ModelDef = <Attrs extends object = any, T extends DatabaseTypes = 'mongo'>(
   model: BaseModel<Attrs, T>,

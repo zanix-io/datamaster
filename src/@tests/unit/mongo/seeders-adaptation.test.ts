@@ -1,9 +1,9 @@
 import { assertThrows } from '@std/assert'
 import { seederAdaptation } from 'database/utils/seeders/adaptation.ts'
 
-Deno.test('seederAdaptation throws for database types with no processor implementation yet', () => {
+Deno.test('seederAdaptation throws for a database type with no processor implemented', () => {
   assertThrows(
-    () => seederAdaptation([function Seeder() {}], { name: 'test' }, 'postgress' as never),
+    () => seederAdaptation([function Seeder() {}], { name: 'test' }, 'sqlite' as never),
     Error,
     'Not implemented',
   )

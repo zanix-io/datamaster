@@ -367,3 +367,136 @@ Deno.test('handleTrigger dispatches via runJob when AMQP_URI is configured', asy
     Deno.env.delete('AMQP_URI')
   }
 })
+
+Deno.test('handleTrigger resolves a ${{ENV_VAR}} placeholder against an existing var', async () => {
+  reset()
+  Deno.env.set('TEST_API_TOKEN', '123')
+
+  try {
+    await handleTrigger({ id: '1' }, {
+      request: {
+        url: 'http://localhost.com',
+        method: 'POST',
+        headers: { authorization: 'Bearer ${{TEST_API_TOKEN}}' },
+      },
+    })
+
+    assertEquals(calls[0].options.args.headers, { authorization: 'Bearer 123' })
+  } finally {
+    Deno.env.delete('TEST_API_TOKEN')
+  }
+})
+
+Deno.test('handleTrigger resolves ${{ENV_VAR}} to "undefined" when the var is unset', async () => {
+  reset()
+  Deno.env.delete('TEST_MISSING_TOKEN')
+
+  await handleTrigger({ id: '1' }, {
+    request: {
+      url: 'http://localhost.com',
+      method: 'POST',
+      headers: { authorization: 'Bearer ${{TEST_MISSING_TOKEN}}' },
+    },
+  })
+
+  assertEquals(calls[0].options.args.headers, { authorization: 'Bearer undefined' })
+})
+
+Deno.test('handleTrigger resolves ${{ENV_VAR}} in the url, after model interpolation', async () => {
+  reset()
+  Deno.env.set('TEST_WEBHOOK_URL', 'https://hooks.example.com/user-updated')
+
+  try {
+    await handleTrigger({ id: '1', name: 'Ann' }, {
+      request: {
+        url: '${{TEST_WEBHOOK_URL}}?name={{name}}',
+        method: 'GET',
+        headers: {},
+      },
+    })
+
+    assertEquals(calls[0].options.args.url, 'https://hooks.example.com/user-updated?name=Ann')
+  } finally {
+    Deno.env.delete('TEST_WEBHOOK_URL')
+  }
+})
+
+Deno.test('handleTrigger resolves ${{ENV_VAR}} inside nested body/data fields', async () => {
+  reset()
+  Deno.env.set('TEST_API_URL', 'https://api.example.com')
+
+  try {
+    await handleTrigger({ id: '1' }, {
+      request: {
+        url: 'http://localhost.com',
+        method: 'POST',
+        headers: {},
+        body: { apiUrl: '${{TEST_API_URL}}' },
+      },
+    })
+
+    assertEquals(calls[0].options.args.body, { apiUrl: 'https://api.example.com' })
+  } finally {
+    Deno.env.delete('TEST_API_URL')
+  }
+})
+
+Deno.test('handleTrigger keeps {{field}} and ${{ENV_VAR}} independent in one trigger', async () => {
+  reset()
+  Deno.env.set('TEST_WEBHOOK_TOKEN', 'secret-token')
+
+  try {
+    await handleTrigger({ id: '1', email: 'a@b.com' }, {
+      request: {
+        url: 'http://localhost.com',
+        method: 'POST',
+        headers: { authorization: 'Bearer ${{TEST_WEBHOOK_TOKEN}}' },
+        body: { email: '{{email}}' },
+      },
+    })
+
+    assertEquals(calls[0].options.args.headers, { authorization: 'Bearer secret-token' })
+    assertEquals(calls[0].options.args.body, { email: 'a@b.com' })
+  } finally {
+    Deno.env.delete('TEST_WEBHOOK_TOKEN')
+  }
+})
+
+Deno.test('handleTrigger resolves ${{ENV_VAR}} for "mail" too, not just "request"', async () => {
+  reset()
+  Deno.env.set('TEST_MAIL_FROM', 'noreply@example.com')
+
+  try {
+    await handleTrigger({ id: '1', email: 'a@b.com' }, {
+      mail: {
+        to: '{{email}}',
+        subject: 'Hi',
+        from: '${{TEST_MAIL_FROM}}',
+        body: { template: 'welcome' },
+      },
+    })
+
+    assertEquals(calls[0].options.args.from, 'noreply@example.com')
+    assertEquals(calls[0].options.args.to, 'a@b.com')
+  } finally {
+    Deno.env.delete('TEST_MAIL_FROM')
+  }
+})
+
+Deno.test('handleTrigger resolves ${{ENV_VAR}} in "custom" fields too', async () => {
+  reset()
+  Deno.env.set('TEST_CUSTOM_VALUE', 'resolved-value')
+
+  try {
+    await handleTrigger({ id: '1' }, {
+      custom: { name: '${{TEST_CUSTOM_VALUE}}' },
+    })
+
+    // The dispatched job name is picked from the raw, uninterpolated `name` (a pre-existing
+    // characteristic of `jobNameFor`, unrelated to env interpolation) — but the interpolated
+    // value still lands in the payload's own `args.name`, proving the same pass ran for `custom`.
+    assertEquals(calls[0].options.args.name, 'resolved-value')
+  } finally {
+    Deno.env.delete('TEST_CUSTOM_VALUE')
+  }
+})

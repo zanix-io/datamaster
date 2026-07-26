@@ -1,4 +1,9 @@
-import type { AdaptedModel, AdaptedModelBySchema, GetModelOptions } from '../typings/models.ts'
+import type {
+  AdaptedModel,
+  AdaptedModelBySchema,
+  GetModelOptions,
+  MongoModelDefinition,
+} from '../typings/models.ts'
 import type { BaseCustomSchema, SchemaModelInitOptions } from '../typings/schema.ts'
 import type { BaseAttributes, Extensions } from 'database/typings/general.ts'
 import type { MongoConnectorOptions } from '../typings/process.ts'
@@ -119,6 +124,27 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     options?: GetModelOptions & SchemaModelInitOptions<S>,
   ): AdaptedModelBySchema<S>
   /**
+   * Retrieves a model instance by creating a new one from a plain model definition — the same
+   * `{definition, options, extensions, callback}` shape `registerModel` accepts — instead of an
+   * already-constructed `Schema`. `definition`'s field markers (`String`, `Boolean`, `Date`, ...)
+   * are plain JS globals, so a caller never needs to import `mongoose` to use this overload; the
+   * `Schema` itself is built internally, the same way `defineModels()` builds one for every model
+   * registered via `registerModel`.
+   *
+   * Prefer this over the `schema`-instance overload above whenever you don't already have a
+   * `Schema` built (e.g. a caller that intentionally avoids a `mongoose` dependency) and don't
+   * need `registerModel`'s full DSL (seeders auto-registration, deferred bootstrap-time binding).
+   *
+   * @param {MongoModelDefinition<Attrs>} definition - The model's plain definition, options, extensions, and optional schema callback.
+   * @param {GetModelOptions} [options] - The general model options (e.g. `useALS`).
+   * @returns {AdaptedModel<Attrs>} The created model instance.
+   */
+  public getModel<Attrs extends BaseAttributes>(
+    name: string,
+    definition: MongoModelDefinition<Attrs>,
+    options?: GetModelOptions,
+  ): AdaptedModel<Attrs>
+  /**
    * Retrieves an already registered model by its name.
    *
    * **Note:** To have schemas available in this context, please use `registerModel`.
@@ -138,13 +164,17 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   /** Implementation shared by the {@link getModel} overloads above. */
   public getModel<Attrs extends BaseAttributes, S extends Schema>(
     name: string,
-    entity?: S | GetModelOptions,
+    entity?: S | MongoModelDefinition<Attrs> | GetModelOptions,
     options: GetModelOptions & SchemaModelInitOptions<S> = {},
   ): Model<Attrs> | AdaptedModelBySchema<S> {
     const hasSchema = entity instanceof Schema
+    const hasDefinition = !hasSchema && !!entity && typeof entity === 'object' &&
+      'definition' in entity
 
     // extending the ALS session for Model use
-    if (hasSchema ? options.useALS : entity?.useALS) {
+    if (
+      hasSchema || hasDefinition ? options.useALS : (entity as GetModelOptions | undefined)?.useALS
+    ) {
       ServerProgram.asyncContext.enterWith({
         id: this.context.id,
         session: { type: this.context.session?.type },
@@ -154,6 +184,24 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     const Model = this.#database.models[name] as Model<Attrs>
 
     if (Model) return postBindModel(Model)
+
+    if (hasDefinition) {
+      const { definition, options: schemaOptions, callback, extensions } =
+        entity as MongoModelDefinition<Attrs>
+      // `Schema`'s own generic constructor signature doesn't compose with a caller-supplied
+      // `Attrs` the same way `defineModels()` gets away with it (that path works against loosely
+      // typed registry metadata, not a real generic) — same mongoose typing friction, same `any`
+      // escape hatch already used throughout this file's sibling modules.
+      // deno-lint-ignore no-explicit-any
+      const schema: any = new Schema(definition as any, schemaOptions)
+      const finalSchema = callback ? callback(schema) : schema
+      return this.defineModelBySchema(
+        // deno-lint-ignore no-explicit-any
+        { ...options, extensions: extensions as any },
+        name,
+        finalSchema,
+      )
+    }
 
     if (!hasSchema) {
       throw new HttpError('INTERNAL_SERVER_ERROR', {

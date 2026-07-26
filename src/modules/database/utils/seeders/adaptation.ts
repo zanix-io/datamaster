@@ -1,21 +1,19 @@
-import type { DatabaseTypes, SeederHandler, SeederProcessor } from 'database/typings/general.ts'
+import type { DatabaseTypes, SeederHandler } from 'database/typings/general.ts'
 
 import { seederProcessor } from './processor.ts'
 import { seederBaseWrapper } from './wrapper.ts'
 
-/** Seed processors for handler execution */
+/** Seed processors for handler execution — only `mongo` is implemented (see `DatabaseTypes`). */
 const seedProcessor = {
   get mongo() {
     return seederProcessor((model) => model.modelName || model.name)
-  },
-  get postgress(): SeederProcessor {
-    throw new Error('Not implemented')
   },
 }
 
 /** Custom seeder adaptation */
 export const seederAdaptation = (seeders: unknown[], model: unknown, type: DatabaseTypes) => {
   const processor = seedProcessor[type]
+  if (!processor) throw new Error(`Not implemented: no seed processor for database type "${type}"`)
 
   const baseVersion = '0.0.0'
 

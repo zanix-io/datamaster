@@ -7,6 +7,58 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-26
+
+### Added
+
+- `getModel` has a new, additive overload:
+  `getModel(name, { definition, options, extensions,
+  callback })` — the same plain
+  `{definition, options, extensions, callback}` shape `registerModel` itself accepts, with field
+  markers (`String`, `Boolean`, `Date`, ...) that are plain JS globals, not `mongoose` symbols. The
+  connector builds the real `Schema` internally, the same way `defineModels()` already does for
+  `registerModel` — so a caller that only needs one ad-hoc model no longer has to import `mongoose`
+  themselves just to construct a `Schema` by hand. Both existing `getModel` overloads
+  (schema-instance, name-only lookup) are unchanged.
+- Functional test confirming a model created via the new plain-definition overload dispatches its
+  `extensions.triggers` for real (including editing the persisted trigger directly in MongoDB and
+  confirming the edited job fires instead of the original one on the next boot) — the same behavior
+  already proven for the schema-instance/`registerModel` paths, now covered for this one too.
+- Small `getModel` documentation addition in `docs/DATABASE.md` for the new overload.
+
+### Changed
+
+- **Breaking (type-level only)**: `DatabaseTypes` narrowed from `'mongo' | 'postgress'` to just
+  `'mongo'`. The removed member was never functional — its only real usage
+  (`seedProcessor.postgress` in `utils/seeders/adaptation.ts`) was a hardcoded
+  `throw new
+  Error('Not implemented')` — so this doesn't change behavior for anyone, only removes
+  a misleading type-level option. See the type's own doc comment for why a real second backend isn't
+  a small follow-up (schema/DDL construction and trigger dispatch would each need a full,
+  independent implementation, not a thin adapter over the existing Mongo code).
+- `seederAdaptation` now throws a clear, generic "no seed processor for database type" error for any
+  unsupported `type`, instead of relying on one hardcoded fake getter that only covered the
+  now-removed `'postgress'` case.
+
+## [0.5.2] - 2026-07-25
+
+### Fixed
+
+- `deno_doc`/JSR's symbol-documentation check doesn't follow named re-export reference chains
+  (`export { X } from './y.ts'`) back to the original declaration's JSDoc — each re-exported name
+  needed its own inline doc comment placed inside the export's braces, or it was counted
+  undocumented even though the real declaration was fully documented. Added inline JSDoc to every
+  named re-export in `database/mod.ts` and `cache/mod.ts`, bringing symbol-documentation coverage to
+  100%.
+
+## [0.5.1] - 2026-07-25
+
+### Changed
+
+- Completed JSDoc coverage across the model/trigger/protection typings, and removed
+  `RedisClientType` from `cache/mod.ts`'s public exports so JSR's symbol-documentation score no
+  longer counts Redis's own undocumented internal type graph against this package.
+
 ## [0.5.0] - 2026-07-24
 
 ### Added

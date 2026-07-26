@@ -3,6 +3,34 @@
 Reactive side effects (send an email, fire an HTTP request, run a custom job) tied to a model's
 create/update/delete lifecycle, declared as data instead of imperative code.
 
+> ⚠️ **Security: never hardcode secrets in a trigger definition.** A trigger's fields are
+> declarative config that can be read back (e.g. via the
+> [persisted triggers collection](#persisted-triggers-online-adaptation), a plain document in the
+> database) — a literal API key, bearer token, password, or other credential written directly into
+> `headers`, `body`, `url`, or any other field is exposed to anyone who can read that config, not
+> just whoever executes the trigger. Don't write this:
+>
+> ```ts
+> headers: {
+>   authorization: 'Bearer sk_live_xxxxx'
+> }
+> // or:
+> password: 'my-secret-password'
+> ```
+>
+> Instead, reference an environment variable with the `${{VARIABLE_NAME}}` placeholder:
+>
+> ```ts
+> headers: {
+>   authorization: 'Bearer ${{API_KEY}}'
+> }
+> ```
+>
+> `${{ENV_VAR}}` is resolved automatically from `Deno.env` right before the action executes — **as
+> long as that variable is registered in the environment of the application where the trigger (or
+> the model/schema that owns it) actually runs**. See
+> [Environment variable interpolation](#environment-variable-interpolation-envvar) below.
+
 ## Declaring triggers (`extensions.triggers`)
 
 ```ts
@@ -23,9 +51,9 @@ registerModel({
         }],
         updated: [{
           request: {
-            url: 'https://hooks.example.com/user-updated',
+            url: '${{USER_UPDATED_WEBHOOK_URL}}',
             method: 'POST',
-            headers: { authorization: 'Bearer {{apiKey}}' },
+            headers: { authorization: 'Bearer ${{WEBHOOK_TOKEN}}' },
             body: { email: '{{email}}' },
           },
         }],
@@ -39,6 +67,13 @@ registerModel({
   },
 })
 ```
+
+`{{email}}` comes from the model/event context — the record the trigger fired for.
+`${{USER_UPDATED_WEBHOOK_URL}}`/`${{WEBHOOK_TOKEN}}` come from `Deno.env` instead, so the webhook
+URL and its bearer token never appear as literal text in the trigger definition. Both systems
+coexist freely, even within the same field — see
+[Environment variable interpolation](#environment-variable-interpolation-envvar) for the full
+resolution rules.
 
 `Triggers` is `{ pre?, post? } × { created?, updated?, deleted? } → Array<Partial<TriggerActions>>`
 — each event can list several actions, and an action can mix `mail`, `request`, and `custom` on the
@@ -75,7 +110,9 @@ to dispatch either way; it's purely a matter of how you want to read the config.
 values, ...) supports `{{field}}`/`{{nested.path}}` placeholders, resolved against the record the
 trigger fired for. This is the **only** way a field sees per-record data — nothing is merged in
 automatically beyond what a field's own placeholders resolve to (see
-[Dispatched payload](#dispatched-payload)).
+[Dispatched payload](#dispatched-payload)). The same fields also support `${{ENV_VAR}}`
+placeholders, resolved from `Deno.env` — see
+[Environment variable interpolation](#environment-variable-interpolation-envvar) below.
 
 - **A field whose entire value is one placeholder** (nothing before or after it, e.g.
   `amount: '{{amount}}'`) resolves to the record's **real value, of whatever type it is** — a
@@ -141,6 +178,63 @@ All three also accept the common fields from `TriggerActionCommons`: `priority`
 > `runTask` (local, in-process) when it isn't — there's no queue to publish to in that case, the
 > same way [Cache](./CACHE.md) only registers the Redis connector when `REDIS_URI` is set.
 
+## Environment variable interpolation (`${{ENV_VAR}}`)
+
+Any string field that supports `{{field}}` interpolation also supports a second, independent
+placeholder convention — `${{VARIABLE_NAME}}` — resolved from `Deno.env` instead of the record. This
+is the mechanism the security warning at the top of this document relies on: it lets a trigger reach
+a secret (an API key, a bearer token, a webhook URL) without writing it into the trigger definition
+itself.
+
+```ts
+headers: {
+  authorization: 'Bearer ${{API_KEY}}'
+}
+```
+
+resolves, given `API_KEY=my-secret-key` in the environment, to:
+
+```ts
+headers: {
+  authorization: 'Bearer my-secret-key'
+}
+```
+
+**Resolution rules:**
+
+- Every `${{VARIABLE_NAME}}` occurrence is replaced with `Deno.env.get('VARIABLE_NAME')`'s value —
+  this works for a whole-value field (`token: '${{API_TOKEN}}'`), a value mixed with other text
+  (`'Bearer ${{API_TOKEN}}'`), and a string with multiple placeholders
+  (`'${{HOST}}/${{PATH}}/${{TOKEN}}'`).
+- **If the variable isn't registered**, `Deno.env.get` returns `undefined`, which is substituted as
+  the literal text `'undefined'` — e.g. `'Bearer ${{MISSING}}'` becomes `'Bearer undefined'`. This
+  **never throws**: a missing variable fails loudly and visibly in the dispatched payload, instead
+  of silently or by crashing the trigger.
+- The variable must be registered **in the environment of the application where the trigger (or the
+  model/schema that owns it) actually runs** — not just wherever the trigger was authored. A worker
+  process dispatching `runJob`/`runTask` needs the same variable set in its own environment.
+- Nested objects and arrays are walked recursively, exactly like `{{field}}` interpolation — this
+  works in `headers`, `body`, `url`, and any other field, for `mail`, `request`, and any future
+  action type. It isn't request-specific.
+- **`{{field}}` and `${{ENV_VAR}}` are fully independent and can coexist** in the same string or the
+  same object — resolving one never touches the other's placeholders:
+
+  ```ts
+  request: {
+    url: '${{USER_UPDATED_WEBHOOK_URL}}',
+    method: 'POST',
+    headers: { authorization: 'Bearer ${{WEBHOOK_TOKEN}}' },
+    body: { email: '{{email}}' },
+  }
+  ```
+
+  Here `{{email}}` resolves against the record the trigger fired for, while
+  `${{USER_UPDATED_WEBHOOK_URL}}`/`${{WEBHOOK_TOKEN}}` resolve from `Deno.env` — both in the same
+  action, without either system interfering with the other.
+- Model interpolation (`{{field}}`) always runs first, then `${{ENV_VAR}}` interpolation — so an
+  env-resolved value can itself sit next to record data in the same already-assembled string (e.g. a
+  `url` whose path came from `{{field}}` and whose query-string token came from `${{ENV_VAR}}`).
+
 ## Conditions
 
 ```ts
@@ -182,9 +276,10 @@ either) and bulk operations (`bulkWrite`, `updateMany`, `deleteMany`).
 
 ## Dispatched payload
 
-A dispatched job's `args` carries the action's own fields — already interpolated (`to`/`subject`/
-`body`/`from`/`date` for `mail`, `url`/`method`/`headers`/`body` for `request`) — plus `priority`,
-`delay`, and a nested `data` object with the full record:
+A dispatched job's `args` carries the action's own fields — already interpolated, both against the
+record (`{{field}}`) and against `Deno.env` (`${{ENV_VAR}}`) — (`to`/`subject`/`body`/`from`/`date`
+for `mail`, `url`/`method`/`headers`/`body` for `request`) — plus `priority`, `delay`, and a nested
+`data` object with the full record:
 
 ```ts
 const args = {
