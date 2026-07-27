@@ -3,13 +3,13 @@ import type { ZanixMongoConnector } from './mod.ts'
 
 import {
   getStaticTriggerEntries,
+  refreshPersistedTriggers,
   resetPersistedTriggers,
-  setDefaultSuppressed,
-  setPersistedTriggers,
 } from '../processor/triggers/registry.ts'
 import { planTriggerSync } from '../processor/triggers/sync.ts'
 import { registerTriggersModel } from '../defs/triggers.ts'
 import { defineModels } from './models.ts'
+import logger from '@zanix/logger'
 
 /**
  * Extends the ZanixMongoConnector to load the persisted triggers collection (if enabled via
@@ -40,6 +40,20 @@ import { defineModels } from './models.ts'
  * (in the same process) loaded into these module-level stores; without that, a connector built
  * with `triggersModel: false` wouldn't reliably mean "only code triggers" whenever an earlier
  * connector had already loaded persisted entries.
+ *
+ * After this initial load, three complementary mechanisms keep the in-memory registry from going
+ * stale without a redeploy — see {@link refreshPersistedTriggers}, the shared operation behind
+ * all three:
+ *
+ * 1. **The triggers model's own post-save/update/delete hooks** (see `registerTriggersModel`) —
+ *    always on, refreshes instantly for any write made through this connector's own model (e.g.
+ *    an admin endpoint in this same app calling `TriggersModel.updateOne(...)`).
+ * 2. **Polling** (see {@link startTriggersPolling}) — opt-in via `triggersPollInterval`, a safety
+ *    net for writes this process can't otherwise see (a separate service, another replica, a
+ *    direct database edit).
+ * 3. **A Change Stream watcher** (see {@link startTriggersChangeStream}) — opt-in via
+ *    `triggersChangeStream`, near-instant and cross-replica, but requires a replica set/sharded
+ *    cluster.
  */
 export async function loadPersistedTriggersOnStart(this: ZanixMongoConnector) {
   resetPersistedTriggers()
@@ -78,14 +92,95 @@ export async function loadPersistedTriggersOnStart(this: ZanixMongoConnector) {
     )
   }
 
-  const current = (toDelete.length || toResync.length || toSeed.length)
-    ? await Model.find({}).lean()
-    : existing
-
-  for (const entry of current) {
-    if (entry.active) setPersistedTriggers(entry.model, entry.triggers)
-    if (entry.isDefault) setDefaultSuppressed(entry.model)
-  }
+  await refreshPersistedTriggers(Model)
 
   this.triggersModel = false
+
+  startTriggersPolling.call(this, Model)
+  startTriggersChangeStream.call(this, Model)
+}
+
+/**
+ * Starts polling the persisted triggers collection every `triggersPollInterval` milliseconds,
+ * calling {@link refreshPersistedTriggers} on each tick. A no-op unless `triggersPollInterval` was
+ * set to a positive number.
+ *
+ * Self-reschedules with `setTimeout` (stored on `triggersPollTimer`, cleared by `close()`) rather
+ * than `setInterval`, so a slow tick can never overlap with the next one. A tick that fails (e.g. a
+ * transient connection error) is logged but never stops future polling.
+ *
+ * Checks `triggersPollStopped` right before rescheduling, not just at the top of `tick` — a tick
+ * already past that check when `close()` runs would otherwise still schedule one more timer via
+ * `.finally()` *after* `close()`'s own `clearTimeout` already ran, leaking a poll against an
+ * already-closed connection.
+ *
+ * @param Model - The bound triggers model to re-read on every tick.
+ */
+function startTriggersPolling(
+  this: ZanixMongoConnector,
+  Model: Parameters<typeof refreshPersistedTriggers>[0],
+): void {
+  const interval = this.triggersPollInterval
+  if (!interval) return
+
+  const tick = () => {
+    refreshPersistedTriggers(Model)
+      .catch((e) => logger.error('Failed to poll the persisted triggers collection', e, 'noSave'))
+      .finally(() => {
+        if (this.triggersPollStopped) return
+        this.triggersPollTimer = setTimeout(tick, interval)
+      })
+  }
+
+  this.triggersPollTimer = setTimeout(tick, interval)
+}
+
+/**
+ * Starts watching the persisted triggers collection via a MongoDB Change Stream, calling
+ * {@link refreshPersistedTriggers} the instant any write is committed to it — including writes
+ * from other processes/replicas, without waiting for `triggersPollInterval`. A no-op unless
+ * `triggersChangeStream` is `true`.
+ *
+ * Change Streams require a replica set or sharded cluster. `Model.watch()` throws synchronously
+ * against a standalone instance — that failure (and any later stream `'error'` event) is caught
+ * and logged as a warning instead of failing connector startup; the poll/on-write refresh paths
+ * keep working regardless.
+ *
+ * @param Model - The bound triggers model to watch.
+ */
+function startTriggersChangeStream(
+  this: ZanixMongoConnector,
+  Model: Parameters<typeof refreshPersistedTriggers>[0] & {
+    watch: () => {
+      on: (event: 'change' | 'error', listener: (arg: unknown) => void) => void
+      close: () => Promise<void>
+    }
+  },
+): void {
+  if (!this.triggersChangeStream) return
+
+  try {
+    const stream = Model.watch()
+
+    stream.on(
+      'change',
+      () =>
+        void refreshPersistedTriggers(Model).catch((e) =>
+          logger.error('Failed to refresh persisted triggers from change stream', e, 'noSave')
+        ),
+    )
+    stream.on(
+      'error',
+      (e) => logger.error('Persisted triggers change stream error', e, 'noSave'),
+    )
+
+    this.triggersChangeStreamHandle = stream
+  } catch (e) {
+    logger.warn(
+      'Could not start a Change Stream for persisted triggers — this requires a replica set or ' +
+        'sharded cluster. Falling back to on-write and/or polling-based refresh only.',
+      e,
+      'noSave',
+    )
+  }
 }

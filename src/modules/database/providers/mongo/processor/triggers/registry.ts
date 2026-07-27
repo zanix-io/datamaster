@@ -1,4 +1,5 @@
 import type { Triggers } from 'database/typings/triggers.ts'
+import type { TriggersModelAttrs } from 'database/typings/models.ts'
 
 const TIMINGS = ['pre', 'post'] as const
 const EVENTS = ['created', 'updated', 'deleted'] as const
@@ -128,4 +129,34 @@ export const getTriggers = (modelName: string): Triggers | undefined => {
   if (!persistedTriggers) return staticTriggers
 
   return mergeTriggers(staticTriggers, persistedTriggers)
+}
+
+/** The minimal shape needed to re-read the persisted triggers collection. */
+type TriggersModelLike = {
+  find(filter: Record<string, never>): { lean(): Promise<TriggersModelAttrs[]> }
+}
+
+/**
+ * Re-reads every entry in the persisted triggers collection and replaces the in-memory
+ * persisted-triggers layer with it (via {@link resetPersistedTriggers} followed by
+ * {@link setPersistedTriggers}/{@link setDefaultSuppressed} per active entry) — the shared
+ * refresh operation behind the triggers model's post-write hooks (instant, same-process),
+ * `triggersPollInterval` polling (a safety net for changes made elsewhere), and its Change Stream
+ * watcher (near-instant, cross-replica, when available).
+ *
+ * Idempotent: calling it repeatedly against the same database state produces the same registry
+ * state, so it's safe for more than one of those three sources to invoke it for the same
+ * underlying write (e.g. a post-save hook and a Change Stream event both firing for one write
+ * made through this process's own model).
+ *
+ * @param Model - The bound triggers model (or anything with the same `find(...).lean()` shape).
+ */
+export const refreshPersistedTriggers = async (Model: TriggersModelLike): Promise<void> => {
+  const entries = await Model.find({}).lean()
+
+  resetPersistedTriggers()
+  for (const entry of entries) {
+    if (entry.active) setPersistedTriggers(entry.model, entry.triggers)
+    if (entry.isDefault) setDefaultSuppressed(entry.model)
+  }
 }

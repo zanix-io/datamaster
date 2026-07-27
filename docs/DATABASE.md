@@ -15,6 +15,8 @@ const connector = new ZanixMongoConnector({
   uri: process.env.MONGO_URI, // falls back to MONGO_URI env var, then 'mongodb://localhost'
   seedModel: 'my-seed-register-model', // default: 'zanix-seeders'; false disables seed tracking
   triggersModel: 'my-triggers', // default: 'zanix-triggers'; false disables persisted triggers
+  triggersPollInterval: 5000, // default: false (disabled); re-reads persisted triggers every 5s
+  triggersChangeStream: true, // default: false; requires a replica set/sharded cluster
   config: { dbName: 'my_database' },
 })
 
@@ -27,8 +29,23 @@ const UsersModel = connector.getModel<Attrs>('users')
 `seedModel` names (or disables, with `false`) the internal collection used to track which seeders
 have already run, so restarts don't re-run them — see
 [Seeders](#seeders-registermodels-extensionsseeders). `triggersModel` names (or disables) the
-internal collection used to add/toggle triggers at runtime — see
-[Triggers: persisted triggers](./TRIGGERS.md#persisted-triggers-online-adaptation).
+internal collection used to add/toggle triggers at runtime, and `triggersPollInterval`/
+`triggersChangeStream` control how quickly a change made there takes effect without a restart — see
+[Triggers: keeping the registry fresh](./TRIGGERS.md#keeping-the-registry-fresh-without-a-restart).
+
+Every option above also has an environment variable counterpart, for when you'd rather configure it
+per-deployment than in code — the explicit option always wins if both are set:
+
+| Option                 | Env var                  |
+| ---------------------- | ------------------------ |
+| `uri`                  | `MONGO_URI`              |
+| `seedModel`            | `SEED_MODEL_NAME`        |
+| `triggersModel`        | `TRIGGERS_MODEL_NAME`    |
+| `triggersPollInterval` | `TRIGGERS_POLL_INTERVAL` |
+| `triggersChangeStream` | `TRIGGERS_CHANGE_STREAM` |
+
+See [Configuration](./CONFIGURATION.md#connection-variables) for each one's exact defaults and
+disabling convention (`'false'` for the two model-name variables).
 
 ### `getModel`
 
@@ -56,6 +73,23 @@ context before resolving the model, so accessors that read the session (like
 if `useALS`/`enableALS` is already active on the handler that's calling `getModel`. Both the schema
 and the plain-definition overloads' `SchemaModelInitOptions` also accept `extensions` and
 `relatedModels` (models to bind and populate together with the main one).
+
+`SchemaModelInitOptions.onSeedersDone?: (Model, msg: string) => void` — the schema-instance
+overload's own way to wait for `extensions.seeders` to finish, since `getModel` itself returns
+synchronously before seeders settle:
+
+```ts
+await new Promise((resolve) => {
+  connector.getModel('users', schema, {
+    extensions: { seeders: [seedAdmin] },
+    onSeedersDone: (Model, msg) => resolve(msg), // msg: 'seeders executed', or the failing error's message
+  })
+})
+```
+
+Not the same as `MongoModelDefinition`'s `callback` above (overload 2) — that one transforms the
+schema itself, synchronously, before the model is even bound; `onSeedersDone` fires later, once
+binding and seeding are both done.
 
 ## `registerModel` DSL
 

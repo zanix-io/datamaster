@@ -3,11 +3,15 @@ import {
   getStaticTriggerEntries,
   getTriggers,
   mergeTriggers,
+  refreshPersistedTriggers,
   resetPersistedTriggers,
   setDefaultSuppressed,
   setPersistedTriggers,
   setStaticTriggers,
 } from 'mongo/processor/triggers/registry.ts'
+
+// deno-lint-ignore no-explicit-any
+const fakeModel = (entries: any[]) => ({ find: () => ({ lean: () => Promise.resolve(entries) }) })
 
 Deno.test('mergeTriggers concatenates action arrays per timing x event', () => {
   const base = { post: { created: [{ custom: { name: 'a' } }] } }
@@ -156,6 +160,56 @@ Deno.test('a suppressed model with an inactive default entry dispatches nothing 
   // No setPersistedTriggers call — the default entry exists but is currently inactive.
 
   assertEquals(getTriggers('registry-test-model-suppressed-off'), undefined)
+})
+
+Deno.test('refreshPersistedTriggers repopulates the persisted layer', async () => {
+  const triggers = { post: { created: [{ custom: { name: 'refreshed' } }] } }
+  await refreshPersistedTriggers(
+    fakeModel([{ model: 'registry-test-model-refresh', active: true, triggers }]),
+  )
+
+  assertEquals(getTriggers('registry-test-model-refresh'), triggers)
+})
+
+Deno.test('refreshPersistedTriggers drops a model no longer active in the read', async () => {
+  setPersistedTriggers(
+    'registry-test-model-refresh-drop',
+    { post: { created: [{ custom: { name: 'stale' } }] } },
+  )
+
+  await refreshPersistedTriggers(fakeModel([]))
+
+  assertEquals(getTriggers('registry-test-model-refresh-drop'), undefined)
+})
+
+Deno.test('refreshPersistedTriggers skips an inactive entry', async () => {
+  await refreshPersistedTriggers(
+    fakeModel([{
+      model: 'registry-test-model-refresh-inactive',
+      active: false,
+      triggers: { post: { created: [{ custom: { name: 'x' } }] } },
+    }]),
+  )
+
+  assertEquals(getTriggers('registry-test-model-refresh-inactive'), undefined)
+})
+
+Deno.test('refreshPersistedTriggers marks a default entry as suppressing static', async () => {
+  setStaticTriggers(
+    'registry-test-model-refresh-default',
+    { post: { created: [{ custom: { name: 'static' } }] } },
+  )
+
+  await refreshPersistedTriggers(fakeModel([{
+    model: 'registry-test-model-refresh-default',
+    active: true,
+    isDefault: true,
+    triggers: { post: { created: [{ custom: { name: 'seeded' } }] } },
+  }]))
+
+  assertEquals(getTriggers('registry-test-model-refresh-default'), {
+    post: { created: [{ custom: { name: 'seeded' } }] },
+  })
 })
 
 Deno.test('resetPersistedTriggers also clears the default-suppression set', () => {

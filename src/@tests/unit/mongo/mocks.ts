@@ -1,3 +1,5 @@
+// deno-coverage-ignore-file
+
 // Document type
 export interface Document {
   id?: number

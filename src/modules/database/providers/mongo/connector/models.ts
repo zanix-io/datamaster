@@ -42,7 +42,7 @@ export function defineModelBySchema<S extends DefaultSchema>(
   entity: S,
 ) {
   const {
-    callback = () => {},
+    onSeedersDone = () => {},
     extensions: { seeders = [], ...extensions } = {},
     relatedModels = {},
   } = options
@@ -59,8 +59,8 @@ export function defineModelBySchema<S extends DefaultSchema>(
 
   // Run seeders
   runSeedersBySchema.call(this, seeders, modelName)
-    .then(() => callback(AdaptedModel, 'seeders executed'))
-    .catch((e) => callback(AdaptedModel, e.message || 'an error ocurred running seeders'))
+    .then(() => onSeedersDone(AdaptedModel, 'seeders executed'))
+    .catch((e) => onSeedersDone(AdaptedModel, e.message || 'an error ocurred running seeders'))
 
   return AdaptedModel
 }

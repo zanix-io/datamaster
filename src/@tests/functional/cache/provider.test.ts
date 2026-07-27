@@ -1,8 +1,10 @@
+// deno-lint-ignore-file no-explicit-any
 import { assertEquals } from '@std/assert/assert-equals'
 import { assertRejects, assertThrows } from '@std/assert'
 import { ZanixCacheCoreProvider } from 'modules/cache/providers/mod.ts'
 import { ZanixRedisConnector } from 'modules/cache/providers/redis/connector/mod.ts'
 import { Connector } from '@zanix/server'
+import logger from '@zanix/logger'
 
 // mocks
 console.info = () => {}
@@ -191,4 +193,234 @@ Deno.test('QLRU cache should not reinitializate', async () => {
   provider.local.set('1', 1, { exp: 10 })
   await new Promise((resolve) => setTimeout(resolve, 0))
   assertEquals(provider.local.get('1'), 1)
+})
+
+Deno.test('getCachedOrFetch returns an external-cache hit directly, no fetcher', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const key = 'external-hit-no-fetcher-key'
+  // Only the external cache has it — local is empty, so this exercises the "cached !== undefined"
+  // early-return path (not the local-cache short-circuit at the top of the method).
+  await provider.redis.set(key, 'from-redis', {})
+
+  const result = await provider.getCachedOrFetch('redis', key)
+
+  assertEquals(result, 'from-redis')
+
+  provider.redis['close']()
+})
+
+Deno.test('getCachedOrFetch returns undefined with nothing cached and no fetcher', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const result = await provider.getCachedOrFetch('redis', 'totally-missing-key')
+
+  assertEquals(result, undefined)
+
+  provider.redis['close']()
+})
+
+Deno.test('getCachedOrFetch rethrows when the cache read fails with no fetcher', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const redisProto = Object.getPrototypeOf(provider.redis)
+  const originalGet = redisProto.get
+  redisProto.get = () => Promise.reject(new Error('redis get failed'))
+
+  try {
+    await assertRejects(
+      () => provider.getCachedOrFetch('redis', 'any-key'),
+      Error,
+      'redis get failed',
+    )
+  } finally {
+    redisProto.get = originalGet
+    provider.redis['close']()
+  }
+})
+
+Deno.test('getCachedOrFetch falls through to the fetcher when the cache read fails', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const redisProto = Object.getPrototypeOf(provider.redis)
+  const originalGet = redisProto.get
+  redisProto.get = () => Promise.reject(new Error('redis get failed'))
+
+  const errors: unknown[] = []
+  const originalError = logger.error.bind(logger)
+  logger.error = ((...args: unknown[]) => errors.push(args)) as any
+
+  try {
+    const result = await provider.getCachedOrFetch('redis', 'fallback-key', {
+      fetcher: () => 'fetched-despite-error',
+    })
+
+    assertEquals(result, 'fetched-despite-error')
+    assertEquals(errors.length, 1)
+    assertEquals((errors[0] as unknown[])[0], 'Cache save operation failed.')
+  } finally {
+    redisProto.get = originalGet
+    logger.error = originalError
+    provider.redis['close']()
+  }
+})
+
+Deno.test('getCachedOrRevalidate returns an external-cache hit within soft TTL', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const key = 'revalidate-external-hit-key'
+  const value = { value: 'fresh-from-redis', timestamp: Date.now() - 1000 }
+  // Only the external cache has it — local is empty, so this exercises the redis-level "within
+  // soft TTL" branch instead of the local-cache short-circuit at the top of the method.
+  await provider.redis.set(key, value, {})
+
+  const result = await provider.getCachedOrRevalidate('redis', key, { softTtl: 5 })
+
+  assertEquals(result, 'fresh-from-redis')
+  assertEquals(provider.local.get(key).value, 'fresh-from-redis')
+
+  provider.redis['close']()
+})
+
+Deno.test('getCachedOrRevalidate returns undefined with no cache/fetcher', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const result = await provider.getCachedOrRevalidate('redis', 'totally-missing-revalidate-key')
+
+  assertEquals(result, undefined)
+
+  provider.redis['close']()
+})
+
+Deno.test('getCachedOrRevalidate rethrows when the cache read fails with no fetcher', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const redisProto = Object.getPrototypeOf(provider.redis)
+  const originalGet = redisProto.get
+  redisProto.get = () => Promise.reject(new Error('redis get failed'))
+
+  try {
+    await assertRejects(
+      () => provider.getCachedOrRevalidate('redis', 'any-key'),
+      Error,
+      'redis get failed',
+    )
+  } finally {
+    redisProto.get = originalGet
+    provider.redis['close']()
+  }
+})
+
+Deno.test('getCachedOrRevalidate falls through to the fetcher when the read fails', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const redisProto = Object.getPrototypeOf(provider.redis)
+  const originalGet = redisProto.get
+  redisProto.get = () => Promise.reject(new Error('redis get failed'))
+
+  const errors: unknown[] = []
+  const originalError = logger.error.bind(logger)
+  logger.error = ((...args: unknown[]) => errors.push(args)) as any
+
+  try {
+    const result = await provider.getCachedOrRevalidate('redis', 'revalidate-fallback-key', {
+      fetcher: () => 'fetched-despite-error',
+    })
+
+    assertEquals(result, 'fetched-despite-error')
+    assertEquals(errors.length, 1)
+    assertEquals((errors[0] as unknown[])[0], 'Cache save operation failed.')
+  } finally {
+    redisProto.get = originalGet
+    logger.error = originalError
+    provider.redis['close']()
+  }
+})
+
+Deno.test('getCachedOrRevalidate logs when a background refresh fetcher fails', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const key = 'revalidate-background-fail-key'
+  const value = { value: 'stale-value', timestamp: Date.now() - 10000 } // 10s old
+  await provider.redis.set(key, value, {})
+
+  const errors: unknown[] = []
+  const originalError = logger.error.bind(logger)
+  logger.error = ((...args: unknown[]) => errors.push(args)) as any
+
+  try {
+    // Stale-but-present triggers a background refresh (queueMicrotask) — this fetcher fails.
+    const result = await provider.getCachedOrRevalidate('redis', key, {
+      softTtl: 5,
+      fetcher: () => {
+        throw new Error('background refresh failed')
+      },
+    })
+
+    // The stale value is still returned immediately; the failure surfaces only in the background.
+    assertEquals(result, 'stale-value')
+
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    assertEquals(errors.length, 1)
+    assertEquals((errors[0] as unknown[])[0], 'Cache refresh operation failed.')
+  } finally {
+    logger.error = originalError
+    provider.redis['close']()
+  }
+})
+
+Deno.test('saveToCaches logs and swallows an error from the external cache write', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+  await provider.redis['initialize']()
+
+  const redisProto = Object.getPrototypeOf(provider.redis)
+  const originalSet = redisProto.set
+  redisProto.set = () => Promise.reject(new Error('redis set failed'))
+
+  const errors: unknown[] = []
+  const originalError = logger.error.bind(logger)
+  logger.error = ((...args: unknown[]) => errors.push(args)) as any
+
+  try {
+    const key = 'save-to-caches-fail-key'
+    // Must not throw, even though the external write fails.
+    await provider.saveToCaches({ provider: 'redis', key, value: 'v' })
+
+    // The local cache still gets written before the (failing) external write is attempted.
+    assertEquals(provider.local.get(key), 'v')
+    assertEquals(errors.length, 1)
+    assertEquals((errors[0] as unknown[])[0], 'Cache save operation failed.')
+  } finally {
+    redisProto.set = originalSet
+    logger.error = originalError
+    provider.redis['close']()
+  }
+})
+
+Deno.test('withLock runs the function under an exclusive lock and returns its result', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+
+  const result = await provider.withLock('lock-key', () => Promise.resolve('locked-result'))
+
+  assertEquals(result, 'locked-result')
 })

@@ -1,4 +1,7 @@
+// deno-coverage-ignore-file
+
 // deno-lint-ignore-file no-explicit-any
+
 import type { ConnectorOptions } from '@zanix/server'
 
 import { ZanixMongoConnector } from 'mongo/connector/mod.ts'

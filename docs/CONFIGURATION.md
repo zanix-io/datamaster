@@ -4,15 +4,20 @@ Environment variables read by the database/cache connectors and by the data prot
 
 ## Connection variables
 
-| Variable                | Description                                                                                                                                                                      | Default when unset       |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| `MONGO_URI`             | Connection URI used by `ZanixMongoConnector` when no `uri` option is passed to its constructor.                                                                                  | `mongodb://localhost`    |
-| `REDIS_URI`             | Connection URI used by `ZanixRedisConnector` when no `redisUrl` option is passed to its constructor.                                                                             | `redis://localhost:6379` |
-| `LOCAL_CACHE_MAX_ITEMS` | Maximum number of items `ZanixQLRUConnector` holds before evicting the least recently used entry.                                                                                | `50000`                  |
-| `DATABASE_SEEDERS`      | Set to `'false'` to globally disable seeder execution for both `registerModel`'s DSL seeders and schema-based seeders (any other value, including unset, keeps seeders enabled). | seeders enabled          |
+| Variable                 | Description                                                                                                                                                                                                                                                          | Default when unset       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `MONGO_URI`              | Connection URI used by `ZanixMongoConnector` when no `uri` option is passed to its constructor.                                                                                                                                                                      | `mongodb://localhost`    |
+| `REDIS_URI`              | Connection URI used by `ZanixRedisConnector` when no `redisUrl` option is passed to its constructor.                                                                                                                                                                 | `redis://localhost:6379` |
+| `LOCAL_CACHE_MAX_ITEMS`  | Maximum number of items `ZanixQLRUConnector` holds before evicting the least recently used entry.                                                                                                                                                                    | `50000`                  |
+| `DATABASE_SEEDERS`       | Set to `'false'` to globally disable seeder execution for both `registerModel`'s DSL seeders and schema-based seeders (any other value, including unset, keeps seeders enabled).                                                                                     | seeders enabled          |
+| `SEED_MODEL_NAME`        | Names `ZanixMongoConnector`'s seed-tracking model when no `seedModel` option is passed. `'false'` disables it, same as `seedModel: false`.                                                                                                                           | `zanix-seeders`          |
+| `TRIGGERS_MODEL_NAME`    | Names `ZanixMongoConnector`'s persisted triggers model when no `triggersModel` option is passed. `'false'` disables it, same as `triggersModel: false`.                                                                                                              | `zanix-triggers`         |
+| `TRIGGERS_POLL_INTERVAL` | Milliseconds between persisted-trigger polls when no `triggersPollInterval` option is passed — see [Triggers: keeping the registry fresh](./TRIGGERS.md#keeping-the-registry-fresh-without-a-restart). Unset, `'false'`, or non-positive/non-numeric all disable it. | polling disabled         |
+| `TRIGGERS_CHANGE_STREAM` | Set to `'true'` to watch persisted triggers via a Change Stream when no `triggersChangeStream` option is passed — see the same section above.                                                                                                                        | disabled                 |
 
 An explicit constructor option always takes precedence over its matching environment variable (e.g.
-`new ZanixMongoConnector({ uri: '...' })` wins over `MONGO_URI`).
+`new ZanixMongoConnector({ uri: '...' })` wins over `MONGO_URI`) — the env var only applies when the
+option is omitted entirely, not merely falsy.
 
 ## Data protection variables
 

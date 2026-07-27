@@ -45,9 +45,13 @@ export type SchemaModelInitOptions<S extends Schema> = {
    */
   relatedModels?: { [modelName: string]: { schema: S; options?: SchemaModelInitOptions<S> } }
   /**
-   * Callback to ensure asynchronous operations, such as running seeders, complete before proceeding
+   * Notified once this model's seeders (from `extensions.seeders`) have settled — either after
+   * they all resolve (`msg` is `'seeders executed'`) or as soon as one rejects (`msg` is that
+   * error's message). Not the same as `MongoModelDefinition`'s `callback` (which transforms the
+   * schema itself, before the model is even bound) — this one fires later, once binding and
+   * seeding are done.
    */
-  callback?: (Model: AdaptedModelBySchema<S>, msg: string) => void
+  onSeedersDone?: (Model: AdaptedModelBySchema<S>, msg: string) => void
 }
 
 /**

@@ -363,20 +363,16 @@ its `active` field toggled would NOT (that one fully replaces, per point 1 above
 is the `isDefault` field: `true` (auto-seeded, replaces static) vs. `false`/absent (created from
 scratch, adds on top of static).
 
-Every `active` entry is read once at connector startup — a previously-active entry that's now
-`false` (or was deleted, for a non-default one) stops taking effect on the next boot, not just
-newly-added ones.
+Every `active` entry is read once at connector startup, and kept up to date after that without a
+restart — see [Keeping the registry fresh](#keeping-the-registry-fresh-without-a-restart) below. A
+previously-active entry that's now `false` (or was deleted, for a non-default one) stops taking
+effect once that refresh happens, not just for newly-added ones.
 
 **`mail` and `request` work fully from the database alone** — no code changes needed, since both
 dispatch to a well-known, always-registered job name. **`custom` does not**: it only references a
 job name, so unless that name was already registered via `@zanix/asyncmq`'s `registerJob` somewhere
 in your code, adding a `custom` entry purely through this collection has nothing to run.
 
-> ⚠️ **Not live-reloading**: entries are read (and, for default ones, seeded) once, right after the
-> database connection is established. A trigger added, edited, or toggled in this collection while
-> the app is already running and connected only takes effect on the **next restart**, not
-> immediately.
->
 > ⚠️ **Auto-seeding only sees models registered before `connect()`** — the standard `registerModel`
 > DSL usage, executed at module-load time. A model bound dynamically via
 > `getModel(name, schema,
@@ -389,6 +385,55 @@ in your code, adding a `custom` entry purely through this collection has nothing
 > in the same process (e.g. a reconnect, or a test suite creating several) — every connector resets
 > the in-memory persisted-triggers state on startup, regardless of its own `triggersModel` setting,
 > so it never inherits a previous connector's loaded entries.
+
+### Keeping the registry fresh without a restart
+
+A trigger added, edited, or toggled in this collection doesn't require restarting the app — three
+complementary mechanisms keep the in-memory registry current, layered so each covers what the others
+can't:
+
+| Mechanism        | Enabled by                                                              | Speed                      | Covers writes from                                           |
+| ---------------- | ----------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------ |
+| On-write refresh | Always on, no configuration                                             | Instant                    | This connector's own model only                              |
+| Polling          | `triggersPollInterval` (ms) or `TRIGGERS_POLL_INTERVAL` env var         | Up to one interval's delay | Any process/replica, or a direct DB edit                     |
+| Change Stream    | `triggersChangeStream: true` or `TRIGGERS_CHANGE_STREAM='true'` env var | Near-instant               | Any process/replica — requires a replica set/sharded cluster |
+
+- **On-write refresh** — the persisted triggers model's own schema gets `post('save')`/
+  `post(['updateOne', 'findOneAndUpdate'])`/`post(['deleteOne', 'findOneAndDelete'])` hooks that
+  re-read the collection the moment a write commits _through this connector's own model_ (e.g. an
+  admin endpoint in the same app calling `TriggersModel.updateOne(...)`). Always on, no
+  configuration needed — but it can't see a write made by a different process, a separate replica's
+  own model instance, or a raw edit made directly in the database (Mongoose middleware is
+  client-side; it only fires for operations issued through that same JS model object).
+- **Polling** (`triggersPollInterval`, milliseconds, `false`/omitted by default — or the
+  `TRIGGERS_POLL_INTERVAL` env var when the option is left unset, same disabling rules) — a safety
+  net that re-reads the collection on a timer, catching everything on-write refresh can't: a write
+  from a separate service, another horizontally-scaled replica of this same app, or a direct
+  database edit (e.g. via `mongosh`/Compass). Works regardless of deployment topology, at the cost
+  of up to one interval's delay:
+
+  ```ts
+  const connector = new ZanixMongoConnector({ triggersPollInterval: 5000 }) // re-read every 5s
+  ```
+
+- **Change Stream** (`triggersChangeStream: true`, `false` by default — or the
+  `TRIGGERS_CHANGE_STREAM='true'` env var when the option is left unset) — watches the collection
+  via MongoDB's Change Streams API, refreshing the moment any write commits, from any process or
+  replica, without waiting for `triggersPollInterval`. **Requires a replica set or sharded cluster**
+  — against a standalone instance, starting the watch fails; that failure is logged and the
+  connector keeps running normally on the other two mechanisms instead of crashing:
+
+  ```ts
+  const connector = new ZanixMongoConnector({ triggersChangeStream: true })
+  ```
+
+  An explicit option always wins over its env var, the same rule every option/env-var pair in this
+  package follows — see [Configuration](./CONFIGURATION.md#connection-variables).
+
+For a horizontally-scaled deployment (several replicas of the same app), on-write refresh only
+updates the replica that made the write — polling or Change Streams are what propagate the change to
+every other replica. If you're on a replica set, Change Streams alone (no polling) gives
+near-instant sync everywhere; if you aren't, polling is the only cross-replica option.
 
 ## See also
 

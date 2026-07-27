@@ -7,6 +7,42 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-26
+
+### Added
+
+- Persisted triggers now stay current without a restart, via three complementary mechanisms — see
+  [docs/TRIGGERS.md](docs/TRIGGERS.md#keeping-the-registry-fresh-without-a-restart):
+  - **On-write refresh** (always on, no configuration): the persisted triggers model's own schema
+    gets `post('save')`/`post(['updateOne', 'findOneAndUpdate'])`/
+    `post(['deleteOne', 'findOneAndDelete'])` hooks that refresh the in-memory registry instantly
+    for any write made through this connector's own model.
+  - **Polling** (`triggersPollInterval`, milliseconds; `false`/omitted by default) — a safety net
+    that re-reads the collection on a timer, catching writes on-write refresh can't see (a separate
+    service, another replica, a direct database edit).
+  - **Change Stream** (`triggersChangeStream: true`; `false` by default) — watches the collection
+    via MongoDB's Change Streams API for near-instant, cross-replica sync. Requires a replica
+    set/sharded cluster; gracefully logs and falls back to the other two mechanisms otherwise,
+    instead of failing connector startup.
+- Four new environment variable counterparts for `ZanixMongoConnector`'s constructor options —
+  `SEED_MODEL_NAME`, `TRIGGERS_MODEL_NAME`, `TRIGGERS_POLL_INTERVAL`, `TRIGGERS_CHANGE_STREAM` — see
+  [Configuration](docs/CONFIGURATION.md#connection-variables). Same precedence rule as `MONGO_URI`:
+  an explicit constructor option always wins over its env var, which only applies when the option is
+  omitted entirely. The literal string `'false'` disables the two model-name variables, the same
+  convention `DATABASE_SEEDERS` already uses.
+- Expanded test coverage for the new live-sync mechanisms (the concurrent-close race in the poll
+  loop, document- vs query-level refresh hooks, Change Stream degradation against a standalone Mongo
+  instance) and closed pre-existing coverage gaps found in the same pass: `RedisPipelineScheduler`
+  (flush guards, error handling, `shutdown`) and `ZanixCacheCoreProvider` (cache-read/write error
+  paths, background-refresh failures, `withLock`).
+
+### Fixed
+
+- A race in the persisted-triggers poll loop: a tick already in flight when the connector's
+  `close()` ran could still schedule one more timer via its `.finally()` callback _after_
+  `close()`'s own `clearTimeout` had already fired, leaking a poll against an already-closed
+  connection. Guarded with a `triggersPollStopped` flag checked right before each reschedule.
+
 ## [0.6.0] - 2026-07-26
 
 ### Added

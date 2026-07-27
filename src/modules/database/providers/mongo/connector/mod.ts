@@ -18,6 +18,37 @@ import { runSeedersOnStart } from './seeders.ts'
 import { HttpError } from '@zanix/errors'
 import logger from '@zanix/logger'
 
+/** Env var names for the constructor options that also accept one — see the class-level doc. */
+const SEED_MODEL_ENV = 'SEED_MODEL_NAME'
+const TRIGGERS_MODEL_ENV = 'TRIGGERS_MODEL_NAME'
+const TRIGGERS_POLL_INTERVAL_ENV = 'TRIGGERS_POLL_INTERVAL'
+const TRIGGERS_CHANGE_STREAM_ENV = 'TRIGGERS_CHANGE_STREAM'
+
+/**
+ * Resolves a `string | false` model-name option from its env var, for whichever of `seedModel`/
+ * `triggersModel` was left unset. Unset env var keeps the feature on with `defaultName`; the
+ * literal string `'false'` disables it — the same convention `DATABASE_SEEDERS` already uses
+ * elsewhere in this package for an on-by-default feature. Any other string is used as the name.
+ */
+const modelNameFromEnv = (envName: string, defaultName: string): string | false => {
+  const value = Deno.env.get(envName)
+  if (value === undefined) return defaultName
+  return value === 'false' ? false : value
+}
+
+/**
+ * Resolves `triggersPollInterval` from `TRIGGERS_POLL_INTERVAL` when the constructor option was
+ * left unset. Unset, `'false'`, or a non-positive/non-numeric value all disable polling; anything
+ * else is parsed as a positive number of milliseconds.
+ */
+const pollIntervalFromEnv = (): number | false => {
+  const value = Deno.env.get(TRIGGERS_POLL_INTERVAL_ENV)
+  if (value === undefined || value === 'false') return false
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : false
+}
+
 /**
  * Manages the connection lifecycle with a MongoDB database using Mongoose,
  * providing utilities for model retrieval, schema processing, and connector customization.
@@ -26,9 +57,18 @@ import logger from '@zanix/logger'
  * handling configuration, replica set awareness, and AsyncLocalStorage (ALS) context support
  * when required.
  *
- * Environment Variables:
+ * Environment Variables — for each, an explicit constructor option always takes precedence (same
+ * rule `MONGO_URI` already follows for `uri`):
  * - **MONGO_URI**: Optional. If set, this URI will be used as the default MongoDB connection string.
  *   Example: `MONGO_URI="mongodb://localhost:27017/my_database"`
+ * - **SEED_MODEL_NAME**: Names the internal seed-tracking model in place of `seedModel`. The
+ *   literal string `'false'` disables it, same as passing `seedModel: false`.
+ * - **TRIGGERS_MODEL_NAME**: Names the internal persisted triggers model in place of
+ *   `triggersModel`. The literal string `'false'` disables it, same as `triggersModel: false`.
+ * - **TRIGGERS_POLL_INTERVAL**: Milliseconds, in place of `triggersPollInterval` (see
+ *   `docs/TRIGGERS.md`'s "Keeping the registry fresh" section). Unset, `'false'`, or a
+ *   non-positive/non-numeric value all disable polling.
+ * - **TRIGGERS_CHANGE_STREAM**: Set to `'true'` to enable, in place of `triggersChangeStream`.
  *
  * @class ZanixMongoConnector
  * @template T
@@ -52,10 +92,45 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   private isReplicaSet?: boolean
   /** The connector's display name, used in logs. */
   protected name: string
-  /** Name of the internal seed-tracking model, or `false` if seed tracking is disabled. */
+  /**
+   * Name of the internal seed-tracking model, or `false` if seed tracking is disabled. Falls
+   * back to `SEED_MODEL_NAME` (env var) when `seedModel` wasn't passed to the constructor.
+   */
   protected seederModel: string | false
-  /** Name of the internal persisted triggers model, or `false` if it's disabled. */
+  /**
+   * Name of the internal persisted triggers model, or `false` if it's disabled. Falls back to
+   * `TRIGGERS_MODEL_NAME` (env var) when `triggersModel` wasn't passed to the constructor.
+   */
   protected triggersModel: string | false
+  /**
+   * Poll interval (ms) for refreshing the persisted triggers registry, or `false` if disabled.
+   * Falls back to `TRIGGERS_POLL_INTERVAL` (env var) when `triggersPollInterval` wasn't passed to
+   * the constructor.
+   */
+  protected triggersPollInterval: number | false
+  /**
+   * Whether to watch the persisted triggers collection via a MongoDB Change Stream. Falls back to
+   * `TRIGGERS_CHANGE_STREAM` (env var) when `triggersChangeStream` wasn't passed to the
+   * constructor.
+   */
+  protected triggersChangeStream: boolean
+  /**
+   * Handle of the currently scheduled triggers-poll timer, if polling is active — set by
+   * `loadPersistedTriggersOnStart`, cleared by `close()`.
+   */
+  protected triggersPollTimer: ReturnType<typeof setTimeout> | undefined
+  /**
+   * Set by `close()` before clearing `triggersPollTimer`, and checked by the poll loop right
+   * before it would reschedule itself — closes the race where a tick already in flight when
+   * `close()` runs would otherwise schedule one more timer *after* `clearTimeout` already ran,
+   * leaking a poll that fires against an already-closed connection.
+   */
+  protected triggersPollStopped = false
+  /**
+   * The active triggers Change Stream watcher, if one was successfully started — set by
+   * `loadPersistedTriggersOnStart`, closed by `close()`.
+   */
+  protected triggersChangeStreamHandle: { close: () => Promise<void> } | undefined
   /** Defines and binds a model initialized directly by a schema, bound as an instance method. */
   private defineModelBySchema = defineModelBySchema
 
@@ -73,8 +148,12 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     this.name = targetName.startsWith('_Zanix') ? 'database core' : targetName
     this.isReplicaSet = this.#uri?.includes('replicaSet=') || this.#uri?.includes('mongodb+srv://')
     this.#config = options.config
-    this.seederModel = options.seedModel ?? 'zanix-seeders'
-    this.triggersModel = options.triggersModel ?? 'zanix-triggers'
+    this.seederModel = options.seedModel ?? modelNameFromEnv(SEED_MODEL_ENV, 'zanix-seeders')
+    this.triggersModel = options.triggersModel ??
+      modelNameFromEnv(TRIGGERS_MODEL_ENV, 'zanix-triggers')
+    this.triggersPollInterval = options.triggersPollInterval ?? pollIntervalFromEnv()
+    this.triggersChangeStream = options.triggersChangeStream ??
+      Deno.env.get(TRIGGERS_CHANGE_STREAM_ENV) === 'true'
 
     this.#database = createDatabase()
   }
@@ -288,6 +367,10 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    */
   protected async close(): Promise<void> {
     try {
+      this.triggersPollStopped = true
+      if (this.triggersPollTimer) clearTimeout(this.triggersPollTimer)
+      await this.triggersChangeStreamHandle?.close()
+
       // Disconnect from mongo
       logger.info('Closing the MongoDB connection...', 'noSave')
       await this.#database.disconnect()
