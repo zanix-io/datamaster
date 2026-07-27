@@ -12,7 +12,7 @@ import { ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]'
 // initialize() call needed. `initialize`/`close` are protected: the framework or
 // this connector itself manages the connection lifecycle.
 const connector = new ZanixMongoConnector({
-  uri: process.env.MONGO_URI, // falls back to MONGO_URI env var, then 'mongodb://localhost'
+  uri: Deno.env.get('MONGO_URI'), // falls back to MONGO_URI env var, then 'mongodb://localhost'
   seedModel: 'my-seed-register-model', // default: 'zanix-seeders'; false disables seed tracking
   triggersModel: 'my-triggers', // default: 'zanix-triggers'; false disables persisted triggers
   triggersPollInterval: 5000, // default: false (disabled); re-reads persisted triggers every 5s

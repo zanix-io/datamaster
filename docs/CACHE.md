@@ -8,7 +8,7 @@ Local (in-memory) and Redis-backed caching, plus the multi-layer cache provider 
 import { ZanixRedisConnector } from 'jsr:@zanix/datamaster@[version]'
 
 const redis = new ZanixRedisConnector({
-  redisUrl: process.env.REDIS_URI, // falls back to REDIS_URI env var, then 'redis://localhost:6379'
+  redisUrl: Deno.env.get('REDIS_URI'), // falls back to REDIS_URI env var, then 'redis://localhost:6379'
   ttl: 60, // seconds; 0 (default) = never expires
   maxCommandRetries: 3,
   commandTimeout: 2000,

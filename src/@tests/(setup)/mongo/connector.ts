@@ -5,6 +5,7 @@
 import type { ConnectorOptions } from '@zanix/server'
 
 import { ZanixMongoConnector } from 'mongo/connector/mod.ts'
+import '../../(setup)/envars.ts'
 
 // mocks
 console.info = () => {}

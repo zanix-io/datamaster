@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -64,12 +64,14 @@
     "qlru/": "./src/modules/cache/qlru/",
     "database/": "./src/modules/database/",
     "mongo/": "./src/modules/database/providers/mongo/",
-    "sqlite/": "./src/modules/database/providers/sqlite/"
+    "sqlite/": "./src/modules/database/providers/sqlite/",
+    "observability/": "./src/modules/observability/"
   },
   "exports": {
     ".": "./mod.ts",
     "./database": "./src/modules/database/mod.ts",
     "./cache": "./src/modules/cache/mod.ts",
+    "./observability": "./src/modules/observability/mod.ts",
     "./core": "./src/modules/core.ts"
   },
   "nodeModulesDir": "auto",

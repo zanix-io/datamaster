@@ -7,6 +7,71 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-27
+
+### Added
+
+- **New `./observability` subpath**: Elasticsearch/OpenSearch persistence for `@zanix/logger` — see
+  [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md). Never re-exported from the package root, so a
+  consumer who doesn't import it pays zero cost and `@zanix/logger` stays fully independent of
+  DataMaster.
+  - **`ZanixElasticsearchConnector`**: a plain `fetch`-based connector for Elasticsearch OSS,
+    Elasticsearch (Free tier), and OpenSearch — no vendor SDK, to sidestep both
+    `@elastic/elasticsearch`'s product-check friction against non-Elastic servers and
+    `@opensearch-project/opensearch`'s lack of official support against real Elasticsearch. Extends
+    `@zanix/server`'s new `ZanixSearchConnector` abstract base (see below), registering under the
+    `'search'` core connector type.
+    - `index(doc, opts?)` / `bulkIndex(docs, opts?)` — write one or many plain
+      `Record<string, unknown>` documents via `POST /{index}/_doc` / `POST /_bulk` (NDJSON).
+      `bulkIndex` inspects `items[].error` for per-document partial failures rather than relying on
+      the request not having thrown (a bulk request responds `200` even when individual documents
+      fail).
+    - `search(query, opts?)` — runs a raw Query DSL body via `POST /{index}/_search`, or
+      cluster-wide `POST /_search` if no index can be resolved. Deliberately untyped on `query`'s
+      shape — the DSL itself is the reason to reach for `search()` over `index`/`bulkIndex`.
+    - `refresh(opts?)` — forces an index refresh (`POST /{index}/_refresh`) so just-written
+      documents become immediately searchable, instead of waiting for the next automatic refresh
+      cycle. Mainly for tests/read-your-own-write scenarios — calling it on every write in a
+      production hot path hurts indexing throughput.
+    - `checkClusterHealth()` — an explicit, asynchronous cluster reachability check via
+      `GET /_cluster/health`, separate from the inherited, always-`true`, synchronous `isHealthy()`.
+    - `node`/`auth` resolve with the same explicit-option-over-env-var precedence
+      `MONGO_URI`/`REDIS_URI` already follow: `node` falls back to `ELASTICSEARCH_URL`, then
+      `OPENSEARCH_URL`; `auth`'s API-key shape falls back to `ELASTICSEARCH_API_KEY`, then
+      `OPENSEARCH_API_KEY`. Basic auth has no env var counterpart — it can be embedded directly in
+      the URL instead (`https://user:pass@host:9200`), verified directly against this connector:
+      `fetch` honors userinfo in a URL and sends it as a real `Authorization: Basic` header.
+  - **`elasticsearchLogSave(options?)`**: a `@zanix/logger` `storage.save` **factory function** —
+    call it with plain configuration and it returns a `SaveDataFunction`, indistinguishable from a
+    handwritten `storage: { save: (context) => {...} }` from Logger's perspective. Buffers formatted
+    logs in memory (`BulkBuffer`, internal) and flushes them via `bulkIndex` on a size-or-time
+    threshold (`bulk: { maxSize, flushIntervalMs }`), instead of one HTTP round trip per log call.
+    Aliases the formatted log's own `timestamp` field to `@timestamp` (the field Kibana/OpenSearch
+    Dashboards look for by default) without ever overwriting an already-present `@timestamp` or
+    removing the original field; only synthesizes a fresh timestamp when no time-like field is
+    present at all (`addTimestampField`, default `true`). `useWorker: true` offloads the periodic
+    flush (never an individual log call) to a real `WorkerManager` worker thread. A flush failure is
+    reported via `logger.error(..., 'noSave')`, never thrown back to the caller. The returned
+    function has a `flush()` escape hatch for graceful-shutdown hooks to send whatever's currently
+    buffered ahead of schedule.
+  - Auto-registers a default `ZanixElasticsearchConnector` with the Zanix DI container when
+    importing `./core`, gated on either `ELASTICSEARCH_URL` or `OPENSEARCH_URL` being set —
+    mirroring the Mongo/Redis/SQLite core connectors.
+- Bumped the `@zanix/server` dependency to `2.0.4`, which adds `ZanixSearchConnector` (the new
+  `'search'` core connector type's abstract base, extending `RestClient`) and the `BulkIndexResult`
+  type — both consumed by `ZanixElasticsearchConnector` above.
+- Real-cluster functional tests for the observability module
+  (`src/@tests/functional/observability/connector-real.test.ts`), opt-in via
+  `RUN_OPENSEARCH_TESTS=true` (see `.env.test.example`) so a plain `deno test --allow-all` never
+  requires Docker/OpenSearch to be running. CI sets the env var directly and starts an `opensearch`
+  service container, same as it already does for `mongo`/`redis`.
+
+### Fixed
+
+- Several docs examples (`README.md`, `docs/DATABASE.md`, `docs/CACHE.md`) used Node's
+  `process.env.X` to read an environment variable — this is a Deno library; corrected to
+  `Deno.env.get('X')`.
+
 ## [0.7.0] - 2026-07-26
 
 ### Added

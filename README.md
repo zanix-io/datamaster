@@ -97,17 +97,28 @@ local caching utilities, such as in-memory Map for fast, etc.
   - Allows callbacks to extend schemas with custom methods.
   - Simplifies querying and CRUD operations with the connector instance.
 
+- **Observability**
+
+  - Native `ZanixElasticsearchConnector` class for Elasticsearch OSS, Elasticsearch (Free tier), and
+    OpenSearch — a plain `fetch`-based client, no vendor SDK.
+  - `elasticsearchLogSave`: a `@zanix/logger` `storage.save` factory that persists formatted logs
+    via buffered `_bulk` requests, with `@timestamp` aliasing and optional worker-thread offload for
+    the periodic flush.
+  - Only available via the dedicated `./observability` subpath (see below) — importing it is always
+    an explicit, opt-in choice, keeping `@zanix/logger` fully independent of DataMaster.
+
 - **Extensible architecture**
 
   - Ready for future connectors (Memcached, PostgreSQL).
-  - Everything is available from the root package; two narrower entrypoints exist for consumers who
-    prefer to scope their imports:
+  - Everything is available from the root package (except `./observability`, see above); two
+    narrower entrypoints exist for consumers who prefer to scope their imports:
 
     - `./cache` → cache systems only.
     - `./database` → database connectors only.
+    - `./observability` → `ZanixElasticsearchConnector`/`elasticsearchLogSave` only.
     - `./core` → side-effect-only import that auto-registers the default Mongo, Redis, local-cache,
-      and SQLite connectors/providers with the Zanix DI container, for apps that don't need to
-      customize their configuration.
+      SQLite, and Elasticsearch/OpenSearch connectors/providers with the Zanix DI container, for
+      apps that don't need to customize their configuration.
 
 - **Seamless Zanix integration**
 
@@ -135,6 +146,7 @@ groups the main exports by category — each links to a guide with full usage ex
 | Transforms & schema utilities | `transformRecursively`, `transformDeepByPaths`, `transformShallowByPaths`, `transformByDataAccess`, `transformByDataProtection`, `getAllSubschemas`, `findPathsWithAccessorsDeep`                     | [Transforms](./docs/TRANSFORMS.md)                                      |
 | Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject` | [Data Protection](./docs/DATA-PROTECTION.md)                            |
 | Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                                     | [Cache](./docs/CACHE.md)                                                |
+| Observability                 | `ZanixElasticsearchConnector`, `elasticsearchLogSave`                                                                                                                                                 | [Observability](./docs/OBSERVABILITY.md)                                |
 | Configuration                 | Environment variables for connections and data protection                                                                                                                                             | [Configuration](./docs/CONFIGURATION.md)                                |
 
 ```ts
@@ -216,7 +228,7 @@ registerModel<Attrs>({
 // Mongo connector with seed registration
 // (auto-initializes on construction; no manual `initialize()` call needed)
 const connector = new ZanixMongoConnector({
-  uri: process.env.MONGO_URI!,
+  uri: Deno.env.get('MONGO_URI')!,
   seedModel: 'my-seed-register-model',
   config: { dbName: 'my_database' },
 })
@@ -250,6 +262,8 @@ await connector['close']()
   utilities.
 - [Cache](./docs/CACHE.md) — the Redis connector, the local LRU connector, and the multi-layer cache
   provider (`getCachedOrFetch`/`getCachedOrRevalidate`/`withLock`).
+- [Observability](./docs/OBSERVABILITY.md) — `ZanixElasticsearchConnector` and
+  `elasticsearchLogSave`, the `@zanix/logger` persistence bridge to Elasticsearch/OpenSearch.
 - [Configuration](./docs/CONFIGURATION.md) — environment variables, defaults, and versioned-key
   naming.
 
