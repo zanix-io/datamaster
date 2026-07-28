@@ -2,6 +2,7 @@ import type { ModelDef } from 'database/typings/models.ts'
 
 import ProgramModule from 'modules/program/mod.ts'
 import { seederAdaptation } from '../utils/seeders/adaptation.ts'
+import { DATABASE_SEEDERS_ENV } from '../utils/constants.ts'
 
 /**
  * A DSL definition that adds a model to the `ProgramModule`'s model registry.
@@ -49,7 +50,7 @@ export const registerModel: ModelDef = ({ extensions = {}, ...model }, type): vo
 
   ProgramModule.models.addModel({ ...model, extensions: exts }, type)
 
-  if (!seeders.length || Deno.env.get('DATABASE_SEEDERS') === 'false') return
+  if (!seeders.length || Deno.env.get(DATABASE_SEEDERS_ENV) === 'false') return
 
   ProgramModule.seeders.addSeeder({
     model: type === 'mongo' ? model.name : model,

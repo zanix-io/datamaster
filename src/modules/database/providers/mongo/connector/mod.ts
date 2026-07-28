@@ -18,11 +18,15 @@ import { runSeedersOnStart } from './seeders.ts'
 import { HttpError } from '@zanix/errors'
 import logger from '@zanix/logger'
 
-/** Env var names for the constructor options that also accept one — see the class-level doc. */
-const SEED_MODEL_ENV = 'SEED_MODEL_NAME'
-const TRIGGERS_MODEL_ENV = 'TRIGGERS_MODEL_NAME'
-const TRIGGERS_POLL_INTERVAL_ENV = 'TRIGGERS_POLL_INTERVAL'
-const TRIGGERS_CHANGE_STREAM_ENV = 'TRIGGERS_CHANGE_STREAM'
+/** Env var names for the constructor options that also accept one — see the class-level doc.
+ * Exported so other packages (e.g. a general config bootstrap) can set/read them without
+ * redefining the literal strings. */
+export const SEED_MODEL_ENV = 'SEED_MODEL_NAME'
+export const TRIGGERS_MODEL_ENV = 'TRIGGERS_MODEL_NAME'
+export const TRIGGERS_POLL_INTERVAL_ENV = 'TRIGGERS_POLL_INTERVAL'
+export const TRIGGERS_CHANGE_STREAM_ENV = 'TRIGGERS_CHANGE_STREAM'
+/** Default persisted-triggers collection name when `TRIGGERS_MODEL_NAME` isn't set. */
+export const DEFAULT_TRIGGERS_MODEL = 'zanix-triggers'
 
 /**
  * Resolves a `string | false` model-name option from its env var, for whichever of `seedModel`/
@@ -35,6 +39,20 @@ const modelNameFromEnv = (envName: string, defaultName: string): string | false 
   if (value === undefined) return defaultName
   return value === 'false' ? false : value
 }
+
+/**
+ * Whether the persisted triggers module was explicitly disabled via `TRIGGERS_MODEL_NAME=false`
+ * (the same convention `DATABASE_SEEDERS` uses) — on by default, this only returns `true` when a
+ * consuming app opted out.
+ */
+export const isTriggersModelDisabled = (): boolean => Deno.env.get(TRIGGERS_MODEL_ENV) === 'false'
+
+/**
+ * Resolves the effective persisted-triggers collection name (only meaningful when
+ * {@link isTriggersModelDisabled} is `false`), mirroring `ZanixMongoConnector`'s own resolution.
+ */
+export const triggersModelName = (): string =>
+  Deno.env.get(TRIGGERS_MODEL_ENV) || DEFAULT_TRIGGERS_MODEL
 
 /**
  * Resolves `triggersPollInterval` from `TRIGGERS_POLL_INTERVAL` when the constructor option was
@@ -150,7 +168,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     this.#config = options.config
     this.seederModel = options.seedModel ?? modelNameFromEnv(SEED_MODEL_ENV, 'zanix-seeders')
     this.triggersModel = options.triggersModel ??
-      modelNameFromEnv(TRIGGERS_MODEL_ENV, 'zanix-triggers')
+      modelNameFromEnv(TRIGGERS_MODEL_ENV, DEFAULT_TRIGGERS_MODEL)
     this.triggersPollInterval = options.triggersPollInterval ?? pollIntervalFromEnv()
     this.triggersChangeStream = options.triggersChangeStream ??
       Deno.env.get(TRIGGERS_CHANGE_STREAM_ENV) === 'true'

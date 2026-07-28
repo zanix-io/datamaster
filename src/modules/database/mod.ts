@@ -275,9 +275,27 @@ export {
 
 // main
 export {
+  /** Default persisted-triggers collection name when `TRIGGERS_MODEL_NAME` isn't set. */
+  DEFAULT_TRIGGERS_MODEL,
+  /** Whether the persisted triggers module was explicitly disabled (`TRIGGERS_MODEL_NAME=false`). */
+  isTriggersModelDisabled,
+  /** Env var name for `SEED_MODEL_NAME`. */
+  SEED_MODEL_ENV,
+  /** Env var name for `TRIGGERS_CHANGE_STREAM`. */
+  TRIGGERS_CHANGE_STREAM_ENV,
+  /** Env var name for `TRIGGERS_MODEL_NAME`. */
+  TRIGGERS_MODEL_ENV,
+  /** Env var name for `TRIGGERS_POLL_INTERVAL`. */
+  TRIGGERS_POLL_INTERVAL_ENV,
+  /** Resolves the effective persisted-triggers collection name. */
+  triggersModelName,
   /** Manages the connection lifecycle with a MongoDB database using Mongoose. */
   ZanixMongoConnector,
 } from 'mongo/connector/mod.ts'
+export {
+  /** Env var name for `DATABASE_SEEDERS`. */
+  DATABASE_SEEDERS_ENV,
+} from 'database/utils/constants.ts'
 export { Schema } from 'mongoose'
 
 /**

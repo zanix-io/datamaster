@@ -7,12 +7,16 @@
  * \_____/ \__,_||_| |_||_|/_/\_\
  */
 
-import { ZanixElasticsearchConnector } from './connector.ts'
+import {
+  ELASTICSEARCH_URL_ENV,
+  OPENSEARCH_URL_ENV,
+  ZanixElasticsearchConnector,
+} from './connector.ts'
 import { Connector } from '@zanix/server'
 
 /** Connector DSL definition */
 const registerConnector = () => {
-  if (!Deno.env.has('ELASTICSEARCH_URL') && !Deno.env.has('OPENSEARCH_URL')) return
+  if (!Deno.env.has(ELASTICSEARCH_URL_ENV) && !Deno.env.has(OPENSEARCH_URL_ENV)) return
 
   @Connector('search')
   class _ZanixElasticsearchCoreConnector extends ZanixElasticsearchConnector {}

@@ -10,6 +10,11 @@ const DEFAULT_NODE = 'http://localhost:9200'
 const DEFAULT_INDEX = 'zanix-logs'
 const NDJSON_CONTENT_HEADER = { 'Content-Type': 'application/x-ndjson' }
 
+/** Env var names for the cluster URL — exported so other packages (e.g. a general config
+ * bootstrap) can read/gate on them without redefining the literal strings. */
+export const ELASTICSEARCH_URL_ENV = 'ELASTICSEARCH_URL'
+export const OPENSEARCH_URL_ENV = 'OPENSEARCH_URL'
+
 /** Builds the `Authorization`/`ApiKey` header pair for a given set of Elasticsearch credentials. */
 const authHeaders = (auth?: ElasticsearchAuth): Record<string, string> => {
   if (!auth) return {}
@@ -29,7 +34,7 @@ const authHeaders = (auth?: ElasticsearchAuth): Record<string, string> => {
  * API-key case, which a URL has no syntax for.
  */
 const resolveNode = (node?: string): string =>
-  node || Deno.env.get('ELASTICSEARCH_URL') || Deno.env.get('OPENSEARCH_URL') || DEFAULT_NODE
+  node || Deno.env.get(ELASTICSEARCH_URL_ENV) || Deno.env.get(OPENSEARCH_URL_ENV) || DEFAULT_NODE
 
 /**
  * Resolves auth credentials: the explicit `auth` option always wins; otherwise falls back to an

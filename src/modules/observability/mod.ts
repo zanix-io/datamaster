@@ -17,6 +17,10 @@
  */
 
 export {
+  /** Env var name for the Elasticsearch cluster URL. */
+  ELASTICSEARCH_URL_ENV,
+  /** Env var name for the OpenSearch cluster URL. */
+  OPENSEARCH_URL_ENV,
   /** Connector for Elasticsearch OSS, Elasticsearch (Free tier), and OpenSearch. */
   ZanixElasticsearchConnector,
 } from './connector.ts'

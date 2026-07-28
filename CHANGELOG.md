@@ -7,6 +7,50 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-27
+
+## Added
+
+- Added unit tests for `createDatabase` covering:
+  - Database routing using the `db:model` syntax.
+  - Default model registration without a database prefix.
+- Added unit tests for persisted trigger helpers:
+  - `isTriggersModelDisabled()`
+  - `triggersModelName()`
+  - Default and environment-based resolution behavior.
+- Introduced the `DATABASE_SEEDERS_ENV` constant to centralize the `DATABASE_SEEDERS` environment
+  variable.
+- Added exported helpers for persisted triggers:
+  - `DEFAULT_TRIGGERS_MODEL`
+  - `isTriggersModelDisabled()`
+  - `triggersModelName()`
+- Exported Mongo connector environment variable constants:
+  - `SEED_MODEL_ENV`
+  - `TRIGGERS_MODEL_ENV`
+  - `TRIGGERS_POLL_INTERVAL_ENV`
+  - `TRIGGERS_CHANGE_STREAM_ENV`
+- Exported Observability connector environment variable constants:
+  - `ELASTICSEARCH_URL_ENV`
+  - `OPENSEARCH_URL_ENV`
+
+## Changed
+
+- Replaced hardcoded `DATABASE_SEEDERS` references with the shared `DATABASE_SEEDERS_ENV` constant
+  across model registration and seeder execution.
+- Centralized the default persisted triggers collection name through `DEFAULT_TRIGGERS_MODEL`.
+- Updated the Mongo connector to reuse the shared default triggers model constant.
+- Updated the Observability connector to use exported environment variable constants instead of
+  string literals.
+- Re-exported the new constants and helper utilities through the public module API.
+
+## Improved
+
+- Reduced duplicated environment variable literals across the Database and Observability modules.
+- Improved API discoverability by exposing reusable environment variable constants and helper
+  functions.
+- Increased test coverage for environment-driven configuration and multi-database model
+  registration.
+
 ## [0.8.0] - 2026-07-27
 
 ### Added

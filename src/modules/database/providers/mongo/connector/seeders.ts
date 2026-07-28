@@ -3,6 +3,7 @@ import type { ZanixMongoConnector } from './mod.ts'
 import type { Seeders } from '@zanix/server'
 
 import { seederAdaptation } from 'database/utils/seeders/adaptation.ts'
+import { DATABASE_SEEDERS_ENV } from 'database/utils/constants.ts'
 import ProgramModule from 'modules/program/mod.ts'
 import { defineSeedModelOnce } from './models.ts'
 import logger from '@zanix/logger'
@@ -66,7 +67,7 @@ export async function runSeedersBySchema(
   seeders: SeederHandler[],
   modelName: string,
 ) {
-  if (!seeders.length || Deno.env.get('DATABASE_SEEDERS') === 'false') return
+  if (!seeders.length || Deno.env.get(DATABASE_SEEDERS_ENV) === 'false') return
 
   // Normalize seeders
   const adaptedSeeders: Seeders = [{
