@@ -53,7 +53,7 @@ const dispatchAction = async <T extends TriggerActionType>(
   action: TriggerActionConfig<T>,
   data: any,
 ): Promise<void> => {
-  const { conditions, priority, delay, data: extraData, ...actionFields } = action
+  const { conditions, priority, delay, ...actionFields } = action
 
   if (conditions && !validateConditions(data, conditions)) return
 
@@ -64,12 +64,15 @@ const dispatchAction = async <T extends TriggerActionType>(
   const contextId = ServerProgram.asyncContext.getStore()?.id
   const jobName = jobNameFor(type, action)
 
-  // Every string field on the action (`to`, `subject`, `url`, `headers`, `body`, ...) supports
-  // `{{field}}`/`{{nested.path}}` placeholders, resolved against the record the trigger fired
-  // for — this is the ONLY way action fields see per-record data; nothing is merged in
-  // automatically beyond what a field's own placeholders resolve to. `url` gets its own
-  // query-string-aware interpolation (see `interpolateUrl`) instead of the generic pass, so an
-  // array/object whole-value placeholder in a query param expands correctly.
+  // Every field on the action (`to`, `subject`, `url`, `headers`, `body`, `data`, and any field
+  // added later) supports `{{field}}`/`{{nested.path}}` placeholders, resolved recursively against
+  // the record the trigger fired for — this is the ONLY way action fields see per-record data;
+  // nothing is merged in automatically beyond what a field's own placeholders resolve to. `data` is
+  // deliberately kept inside this generic pass (not pulled out early) so a field added to
+  // `TriggerActionCommons` in the future is covered without touching this function. `url` is the
+  // one deliberate exception — it gets its own query-string-aware interpolation (see
+  // `interpolateUrl`) instead of the generic pass, so an array/object whole-value placeholder in a
+  // query param expands correctly.
   const { url: rawUrl, ...restFields } = actionFields as { url?: string } & Record<string, any>
   const modelInterpolatedFields: any = interpolate(restFields, currentData)
   if (rawUrl !== undefined) {
@@ -79,7 +82,8 @@ const dispatchAction = async <T extends TriggerActionType>(
   // `${{ENV_VAR}}` placeholders (see `interpolateEnv`) are resolved next, against `Deno.env` — a
   // separate pass from the `{{field}}` one above, so secrets never need to be written into the
   // trigger definition itself (see the security note on `TriggerActions`). Runs over every field
-  // (including the already-resolved `url`), so both conventions can coexist in the same string.
+  // (including the already-resolved `url` and `data`), so both conventions can coexist in the same
+  // string.
   const interpolatedFields: any = interpolateEnv(modelInterpolatedFields)
 
   // For methods that conventionally carry no body, send `body`'s fields as query parameters
@@ -95,15 +99,20 @@ const dispatchAction = async <T extends TriggerActionType>(
     delete interpolatedFields.body
   }
 
+  // `data` merges into the job's own `data` payload (alongside `_data`/`_oldData`) instead of
+  // top-level `args` — it's split off only now, after already going through both interpolation
+  // passes above like any other field.
+  const { data: interpolatedExtraData, ...topLevelFields } = interpolatedFields
+
   const args = {
     type,
-    ...interpolatedFields,
+    ...topLevelFields,
     priority: priority || 'low',
     delay,
     data: {
       _data: currentData,
       ...(oldData ? { _oldData: oldData } : {}),
-      ...extraData,
+      ...interpolatedExtraData,
     },
   }
 
@@ -126,13 +135,13 @@ const dispatchAction = async <T extends TriggerActionType>(
  * actions whose conditions don't pass are skipped. Passing actions go through two interpolation
  * passes, in order:
  *
- * 1. **Model interpolation** — every string field (`to`, `subject`, `headers`, `body`, ...) is
- *    interpolated against `data` (see {@link interpolate}); `url` gets its own query-string-aware
- *    interpolation instead (see {@link interpolateUrl}). This is the only way a field sees
- *    per-record data — nothing is merged in beyond what its own `{{field}}` placeholders resolve
- *    to.
- * 2. **Environment interpolation** — every field (including the already-resolved `url`) is then
- *    interpolated again for `${{ENV_VAR}}` placeholders against `Deno.env` (see
+ * 1. **Model interpolation** — every string field (`to`, `subject`, `headers`, `body`, `data`,
+ *    ...) is interpolated against `data` (see {@link interpolate}), recursively through nested
+ *    objects/arrays; `url` gets its own query-string-aware interpolation instead (see
+ *    {@link interpolateUrl}). This is the only way a field sees per-record data — nothing is
+ *    merged in beyond what its own `{{field}}` placeholders resolve to.
+ * 2. **Environment interpolation** — every field (including the already-resolved `url` and `data`)
+ *    is then interpolated again for `${{ENV_VAR}}` placeholders against `Deno.env` (see
  *    {@link interpolateEnv}). This is how a trigger reaches a secret (an API key, a bearer token,
  *    a webhook URL) **without writing it into the trigger definition itself** — see the security
  *    note on {@link TriggerActions}. The two placeholder conventions coexist in the same string

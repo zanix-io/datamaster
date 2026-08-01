@@ -53,7 +53,12 @@ export type TriggerActionCommons = {
   priority: 'high' | 'medium' | 'low'
   /** Delay in milliseconds before the action executes. */
   delay: number
-  /** Additional data to pass along with the action. */
+  /**
+   * Additional data to pass along with the action, merged into the dispatched job's own `data`
+   * payload (alongside `_data`/`_oldData`). Supports the same `{{field}}`/`{{nested.path}}` and
+   * `${{ENV_VAR}}` interpolation as every other action field (see the security note on
+   * {@link TriggerActions}), recursively through nested objects/arrays.
+   */
   data: Record<string, unknown>
   /** Conditions that must be met for the action to trigger. */
   conditions: Condition[]

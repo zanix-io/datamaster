@@ -57,6 +57,37 @@ Deno.test({
   },
 })
 
+Deno.test(
+  'handleTrigger interpolates placeholders inside a nested "data" object',
+  async () => {
+    reset()
+
+    Deno.env.set('ADMIN_SERVER_ID', 'srv-42')
+
+    try {
+      await handleTrigger({ firstName: 'pepe', click: 'click here' }, {
+        mail: {
+          to: 'email@email.io',
+          subject: 'Hola {{firstName}}',
+          zanixTemplate: 'welcome',
+          data: {
+            buttonText: '{{click}} ${{ADMIN_SERVER_ID}}',
+            other: [{ text: '{{click}}' }],
+          },
+          other: [{ text: '{{click}}' }],
+        },
+      })
+
+      assertEquals(calls[0].options.args.subject, 'Hola pepe')
+      assertEquals(calls[0].options.args.data.buttonText, 'click here srv-42')
+      assertEquals(calls[0].options.args.data.other[0].text, 'click here')
+      assertEquals(calls[0].options.args.other[0].text, 'click here')
+    } finally {
+      Deno.env.delete('ADMIN_SERVER_ID')
+    }
+  },
+)
+
 Deno.test('handleTrigger dispatches "request" to the well-known request job name', async () => {
   reset()
 
