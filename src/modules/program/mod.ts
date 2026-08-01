@@ -1,6 +1,7 @@
 import { AccessorsContainer } from './metadata/accessors.ts'
 import { ModelsContainer } from './metadata/models.ts'
 import { SeedersContainer } from './metadata/seeders.ts'
+import { TriggerActionJobsContainer } from './metadata/trigger-action-jobs.ts'
 
 /**
  * Class that manages internal containers for caching, and databases.
@@ -21,6 +22,11 @@ export class InternalProgram {
    * Target container that stores accessor information
    */
   public accessors: AccessorsContainer = new AccessorsContainer()
+  /**
+   * Target container that stores the built-in trigger action → job name registry.
+   * @type {TriggerActionJobsContainer}
+   */
+  public triggerActionJobs: TriggerActionJobsContainer = new TriggerActionJobsContainer()
 }
 
 /**

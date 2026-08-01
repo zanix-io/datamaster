@@ -49,6 +49,8 @@ export type {
   BaseModel,
   /** Base shape shared by every model definition, regardless of database type. */
   BaseModelDefinition,
+  /** Fields accepted to create a new triggers-model entry — derived from `TriggersModelAttrs`. */
+  CreateTriggerInput,
   /** Basic data object to save in a model. */
   DataObject,
   /** DSL definition that enhances a base model with specific model definitions and optional configuration. */
@@ -61,6 +63,8 @@ export type {
   SeedModelAttrs,
   /** Attributes for a persisted entry in the internal triggers model. */
   TriggersModelAttrs,
+  /** Fields accepted to update an existing triggers-model entry — derived from `TriggersModelAttrs`. */
+  UpdateTriggerInput,
 } from './typings/models.ts'
 export type {
   /** Base attributes for a database entity or model. */
@@ -82,6 +86,20 @@ export {
   /** The well-known job names datamaster dispatches built-in trigger actions to. */
   DEFAULT_TRIGGER_JOBS,
 } from './typings/triggers.ts'
+export {
+  /** Every trigger-action job descriptor registered so far via `registerTriggerActionJob`. */
+  getRegisteredTriggerActionJobs,
+  /** Registers the job a built-in trigger action kind (`mail`, `request`, ...) dispatches to. */
+  registerTriggerActionJob,
+} from './defs/trigger-actions.ts'
+export type {
+  /** Built-in trigger action kinds whose job resolution goes through `registerTriggerActionJob`. */
+  BuiltInTriggerActionType,
+  /** Everything needed to register a real job for a built-in trigger action kind. */
+  TriggerActionJobDescriptor,
+  /** A trigger-action job's execution logic — a minimal structural context, not `@zanix/asyncmq`'s own `Job` type. */
+  TriggerActionJobHandler,
+} from './defs/trigger-actions.ts'
 export type {
   /** Represents a logical AND condition combining multiple conditions. */
   AndCondition,
@@ -247,6 +265,8 @@ export {
 
 // seeders
 export {
+  /** Reports, per protected path, how many documents are still on an older protection version than the one currently active. */
+  checkProtectionRotationStatus,
   /** Seeder handler that ensures a single document exists in the collection, identified by its `id`. */
   seedByIdIfMissing,
   /** Seeder handler that ensures multiple documents exist in the collection, each identified by its `id`. */
@@ -254,6 +274,8 @@ export {
   /** Rotates data protection keys across the database by re-encrypting or re-masking all protected fields. */
   seedRotateProtectionKeys,
 } from 'mongo/utils/seeders.ts'
+
+export type { ProtectionRotationStatus } from 'mongo/utils/seeders.ts'
 
 //transforms
 export {

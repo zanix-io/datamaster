@@ -159,6 +159,10 @@ To rotate protection keys across every document in a model, see
 `extensions` also accepts `triggers` — reactive `mail`/`request`/`custom` actions tied to a model's
 create/update/delete lifecycle — see [Triggers](./TRIGGERS.md).
 
+`extensions.autoProtectOnUpdate: true` extends automatic data protection to document-level updates
+(`.save()` on an existing document), not just a document's first save — see
+[Data Protection: automatic update-time protection](./DATA-PROTECTION.md#automatic-update-time-protection-autoprotectonupdate).
+
 ## Multi-database support
 
 A model name (or a schema `ref`) can be prefixed with a database name using `'database:model'`:

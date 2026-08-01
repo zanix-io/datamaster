@@ -111,6 +111,25 @@ That automatic path does **not** cover every write, though:
   `bulkWrite`, etc. — bypass Mongoose's document middleware entirely, so the pre-save hook never
   fires for them.
 
+This is **deliberate, not an oversight**: on an update, the field's current in-memory value could
+either be a genuine new plaintext value (needs protecting) or the same already-protected value being
+carried through unchanged (e.g. a partial update that round-trips other fields) — and there's no
+fully reliable way to tell those apart generically:
+
+- **`hash` is one-way by design** — there's no reverse operation to check "is this already a hash,"
+  and no reserved format a hash's output is guaranteed not to collide with. Re-hashing an
+  already-hashed value silently and permanently breaks `validateHash`/`.verify()` for that record,
+  with no error raised anywhere.
+- **`mask`/`encrypt` do carry a recognizable version prefix** (`"v0:..."`, see
+  [Versioned keys](#versioned-keys)), so a prefix-based heuristic could flag "this looks already
+  protected." But it's still a heuristic: a legitimate plaintext value that happens to start with
+  that exact pattern (a version tag, a changelog note, ...) would be silently left unprotected in
+  the database — a much worse failure mode than doing nothing.
+
+Given that, this library doesn't guess. Instead, updates that need protection go through the
+**explicit** path below, where the caller's contract removes the ambiguity entirely (the input is
+always treated as plaintext to protect — never a value read back from a hydrated document).
+
 For those cases, every bound model also exposes the same protection primitives as **static
 methods**, sourced from the model's `SchemaStatics`, so you can protect a value yourself before
 building the update payload:
@@ -130,6 +149,55 @@ building the query, then match against the stored (masked) value —
 ```ts
 const filter = { email: { $regex: Model.mask(searchTerm), $options: 'i' } }
 ```
+
+**Reconstructing a new document from an already-protected one** (cloning/duplicating a record,
+exporting and re-importing between environments) needs the reverse first — decrypt/unmask it back to
+plaintext, then let the normal `isNew` path (or `upsertById`) protect it fresh:
+
+```ts
+import { transformByDataProtection } from 'jsr:@zanix/datamaster@[version]/database'
+
+const original = await Model.findById(id)
+await transformByDataProtection({ excludeHashedFields: true })(original, original)
+const plain = original.toJSON({ getters: false, transform: false })
+
+await new Model({ ...plain, _id: undefined }).save() // protected fresh, not a copy of the old ciphertext
+```
+
+This is the exact mechanism `seedRotateProtectionKeys` already uses in production to re-encrypt
+every document under a new key version — see [Key rotation](#key-rotation) below.
+
+### Automatic update-time protection (`autoProtectOnUpdate`)
+
+`extensions.autoProtectOnUpdate: true` extends the automatic path to document-level updates too
+(`.save()` on an existing, non-`isNew` document) — **without** the heuristics ruled out above. A
+protected path's current value is compared against a snapshot taken the moment the document was last
+hydrated from the database (not its shape/format): reassigning the exact same already-protected
+value back (a no-op edit, or a partial update that round-trips other fields) is never re-protected —
+only a value that's genuinely different from what was loaded gets protected. This works even for
+`hash`, since the comparison never needs to reverse anything to make the call.
+
+```ts
+registerModel({
+  name: 'users',
+  definition: { ssn: { type: String, get: dataProtectionGetter('encrypt') } },
+  extensions: { autoProtectOnUpdate: true },
+})
+
+const user = await User.findById(id)
+user.ssn = 'a-genuinely-new-value'
+await user.save() // now protected automatically, no `upsertById` needed
+```
+
+`false` by default — falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var (`'true'` to enable
+everywhere an explicit per-model value isn't set) when the option itself is omitted, same
+explicit-wins-over-env-var rule every option/env-var pair in this package follows.
+
+**Not yet supported for wildcard (`*`) protected paths** — a per-element protected path inside an
+array of subdocuments (see [Combining both](#combining-both-datapoliciesgetter) for an example
+shape). Those keep today's behavior: only the explicit `upsertById`/`upsertManyById` path protects
+them on update. Query-level operations (`updateOne`, `findOneAndUpdate`, `bulkWrite`) are also
+unaffected either way — this option only extends the document-level `.save()` path.
 
 ## Versioned keys
 
@@ -181,7 +249,40 @@ Skips with a warning if the model has no data protection configured at all
 protected field in memory (hashed fields are dropped — hashing is one-way), and re-upserts the plain
 values through `upsertManyById(..., { useDataPolicies: true, type: 'update' })`, which re-runs the
 setter under the model's **current** `activeVersion` — re-encrypting/re-masking with the new key.
-Existing values that already match the new version are left untouched.
+
+**Every document is re-protected on every run, unconditionally** — there's no check for "already on
+the target version," so running this seeder twice re-processes the whole collection both times. For
+`mask` this is invisible (deterministic: the same input/key always produces the same output, so the
+stored value doesn't actually change), but for `encrypt` it isn't — AES-GCM uses a random IV per
+call, so the ciphertext changes on every single run even with the exact same key and version. This
+is harmless (the value still decrypts to the same original), just something to know if you're
+diffing raw stored values across runs and expect them to stabilize once rotation is "done."
+
+`upsertManyById`'s underlying `bulkWrite` (`ordered: false`) retries only the specific operations
+MongoDB reports as failed, up to 3 times with backoff, before giving up and re-throwing — so a
+transient failure for a handful of documents doesn't require re-running the whole seeder, and a
+non-transient failure surfaces with the exact failed document count logged, not a generic driver
+error.
+
+That retry only covers transient failures, though — it can't detect a document a concurrent,
+not-yet-redeployed replica is still writing under the old key mid-rollout. Call
+`checkProtectionRotationStatus(Model)` (same package) after rotating, and again before removing an
+old key from the environment, to confirm nothing was left behind:
+
+```ts
+import { checkProtectionRotationStatus } from 'jsr:@zanix/datamaster@[version]/database'
+
+const status = await checkProtectionRotationStatus(UsersModel)
+// { ssn: { total: 500, current: 500, outdated: 0 }, email: { total: 500, current: 480, outdated: 20 } }
+```
+
+Reports `{ total, current, outdated }` per protected path — `outdated` is how many documents are
+still on an older protection version than the one currently active; `0` for every path is what "safe
+to remove the old key" actually means. `hash` paths are always skipped (no version to check — same
+reason `seedRotateProtectionKeys` excludes them), and so are wildcard (`*`) protected paths inside
+an array of subdocuments (not yet supported, same limitation as `autoProtectOnUpdate`). Streams the
+collection via the same `readDocuments` options as `seedRotateProtectionKeys` (`filter`, `limit`,
+`batchSize`, `mode`) rather than loading it all into memory.
 
 ## Standalone utilities
 

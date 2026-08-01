@@ -50,6 +50,26 @@ export type Extensions = {
    * Optional triggers that define reactive behaviors or side effects tied to model events.
    */
   triggers?: Triggers
+  /**
+   * Whether a document-level update (`doc.save()` on an existing, non-`isNew` document) should
+   * automatically (re-)apply data protection to a protected path that was reassigned a genuinely
+   * new value — as opposed to the current default, where only a document's first save (`isNew`)
+   * and the explicit `upsertById`/`upsertManyById({ useDataPolicies: true })` path protect data.
+   *
+   * Detection compares each protected path's current value against a snapshot taken when the
+   * document was hydrated from the database (not a content heuristic), so reassigning the exact
+   * same already-protected value back (a no-op edit, or a partial update that round-trips other
+   * fields) is never re-protected — safe even for `hash`, which can't otherwise be reversed to
+   * check. See [Data Protection](../../docs/DATA-PROTECTION.md) for the full rationale.
+   *
+   * Falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var (`'true'` to enable) when omitted here —
+   * an explicit value on this option always wins over that default. `false` when neither is set.
+   *
+   * Not yet supported for wildcard (`*`) protected paths (e.g. a per-element protected path inside
+   * an array of subdocuments) — those keep today's behavior (no automatic update protection)
+   * regardless of this option.
+   */
+  autoProtectOnUpdate?: boolean
 }
 
 /**

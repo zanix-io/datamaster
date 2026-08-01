@@ -939,3 +939,40 @@ Deno.test({
     await cleanup['close']()
   },
 })
+
+Deno.test({
+  ...sanitize,
+  name:
+    'close() actually disconnects once the instance is frozen, instead of silently failing (mirrors TargetContainer.instanceFreeze)',
+  fn: async () => {
+    // `@zanix/server`'s `TargetContainer` calls `Object.freeze()` on a connector instance the
+    // moment `isReady` resolves (see `instanceFreeze`/`getInstance`) — every connector built
+    // through the DI container (i.e. every real deployment) hits this. A direct `new
+    // ZanixMongoConnector(...)`, as every other test in this file uses, never goes through that
+    // path, so it wouldn't have caught `close()` trying to mutate a now-frozen instance property
+    // directly — reproduce the freeze explicitly instead of relying on the DI container.
+    //
+    // `close()`'s own top-level try/catch means a broken close never throws to the caller — it
+    // only logs via `logger.error` and returns normally (this is exactly what surfaced as
+    // "Failed to disconnect MongoDB in '...' class" in a real deployment). So `await
+    // db['close']()` not throwing proves nothing on its own; assert `logger.error` was never
+    // called, and that the connection actually closed — via the public `isHealthy()`, since
+    // `#database` is a true private field this test can't reach into — instead.
+    const db = new ZanixMongoConnector({ seedModel: false, triggersModel: false })
+    await db.isReady
+    Object.freeze(db)
+
+    const errors: unknown[] = []
+    const originalError = logger.error.bind(logger)
+    logger.error = ((...args: unknown[]) => errors.push(args)) as any
+
+    try {
+      await db['close']()
+      assertEquals(errors.length, 0)
+    } finally {
+      logger.error = originalError
+    }
+
+    assertEquals(await db.isHealthy(), false)
+  },
+})

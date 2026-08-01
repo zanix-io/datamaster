@@ -3,6 +3,8 @@ import { assertEquals, assertExists } from '@std/assert'
 import { ProgramModule, Provider, ZanixWorkerProvider } from '@zanix/server'
 import { handleTrigger } from 'mongo/processor/triggers/dispatch.ts'
 import { DEFAULT_TRIGGER_JOBS } from 'database/typings/triggers.ts'
+import { registerTriggerActionJob } from 'database/defs/trigger-actions.ts'
+import DatabaseProgramModule from 'modules/program/mod.ts'
 
 const calls: { name: string; options: any; via: 'runJob' | 'runTask' }[] = []
 
@@ -33,6 +35,26 @@ Deno.test('handleTrigger dispatches "mail" to the well-known mail job name', asy
   assertEquals(calls[0].name, DEFAULT_TRIGGER_JOBS.mail)
   assertEquals(calls[0].options.args.body.template, 'welcome')
   assertEquals(calls[0].options.args.to, 'a@b.com')
+})
+
+Deno.test({
+  name: 'handleTrigger dispatches "mail" to a registered override job name, not the default',
+  fn: async () => {
+    reset()
+
+    registerTriggerActionJob('mail', { name: 'custom-mail-job', handler: () => {} })
+
+    try {
+      await handleTrigger({ id: '1' }, {
+        mail: { to: 'a@b.com', subject: 'Hi', body: { template: 'welcome' } },
+      })
+
+      assertEquals(calls.length, 1)
+      assertEquals(calls[0].name, 'custom-mail-job')
+    } finally {
+      DatabaseProgramModule.triggerActionJobs.resetContainer()
+    }
+  },
 })
 
 Deno.test('handleTrigger dispatches "request" to the well-known request job name', async () => {

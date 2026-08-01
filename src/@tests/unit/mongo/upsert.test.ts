@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
-import { assertEquals } from '@std/assert'
+import { assert, assertEquals, assertRejects } from '@std/assert'
 import { upsertById, upsertManyById } from 'mongo/processor/schema/statics/upsert.ts'
+import logger from '@zanix/logger'
 
 const buildFakeModel = (hasDataProtection = false) => {
   const calls: any[] = []
@@ -104,4 +105,85 @@ Deno.test({
     assertEquals(model.calls[0].op, 'bulkWrite')
     assertEquals(model.calls[0].ops[0].updateOne.update, { $set: { name: 'A' } })
   },
+})
+
+// --- bulkWrite retry ------------------------------------------------------------------------
+
+const buildFakeModelWithBulkWrite = (bulkWrite: (ops: any, options: any) => Promise<void>) => ({
+  _hasDataProtection: () => false,
+  bulkWrite,
+})
+
+Deno.test('upsertManyById: a transient partial failure is retried and succeeds', async () => {
+  let calls = 0
+  const bulkWriteCalls: any[][] = []
+
+  const model = buildFakeModelWithBulkWrite((ops: any) => {
+    bulkWriteCalls.push(ops)
+    calls++
+    if (calls === 1) {
+      const error: any = new Error('bulk write partial failure')
+      error.writeErrors = [{ index: 1 }] // only the second op failed
+      return Promise.reject(error)
+    }
+    return Promise.resolve()
+  })
+
+  await upsertManyById.call(model as any, [
+    { id: '1', name: 'A' },
+    { id: '2', name: 'B' },
+    { id: '3', name: 'C' },
+  ], { type: 'update' })
+
+  assertEquals(calls, 2)
+  assertEquals(bulkWriteCalls[0].length, 3) // first attempt: the full batch
+  assertEquals(bulkWriteCalls[1].length, 1) // retry: only the one that failed (index 1 -> "B")
+  assertEquals(bulkWriteCalls[1][0].updateOne.update, { $set: { name: 'B' } })
+})
+
+Deno.test('upsertManyById: gives up and rethrows after exhausting all retries', async () => {
+  let calls = 0
+  const model = buildFakeModelWithBulkWrite(() => {
+    calls++
+    const error: any = new Error('persistent failure')
+    error.writeErrors = [{ index: 0 }]
+    return Promise.reject(error)
+  })
+
+  const errors: unknown[] = []
+  const originalError = logger.error.bind(logger)
+  logger.error = ((...args: unknown[]) => errors.push(args)) as any
+
+  try {
+    await assertRejects(
+      () =>
+        upsertManyById.call(model as any, [{ id: '1', name: 'A' }, { id: '2', name: 'B' }], {
+          type: 'update',
+        }),
+      Error,
+      'persistent failure',
+    )
+    assertEquals(calls, 4) // 1 initial attempt + 3 retries
+    assert(errors.length > 0) // failure is surfaced via the logger too, not just the rejection
+  } finally {
+    logger.error = originalError
+  }
+})
+
+Deno.test('upsertManyById: an error with no per-op writeErrors is never retried', async () => {
+  let calls = 0
+  const model = buildFakeModelWithBulkWrite(() => {
+    calls++
+    return Promise.reject(new Error('connection lost'))
+  })
+
+  await assertRejects(
+    () =>
+      upsertManyById.call(model as any, [{ id: '1', name: 'A' }, { id: '2', name: 'B' }], {
+        type: 'update',
+      }),
+    Error,
+    'connection lost',
+  )
+  assertEquals(calls, 1) // no retry attempted — this error would fail identically every time
 })

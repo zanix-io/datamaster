@@ -110,6 +110,11 @@ export const transformByDataProtection = (
         // deno-lint-ignore ban-types
         const decodedValue = dataProtectionGetterDefinition(dataProtection[path], value) as String
 
+        // `dataProtectionGetterDefinition` returns nothing when there's no value to reverse (e.g.
+        // an empty array a Mongoose `[String]` path defaults to) — pass the original value through
+        // unchanged rather than probing a nullish result for `unmask`/`decrypt`/`verify`.
+        if (decodedValue === undefined || decodedValue === null) return value
+
         if (Object.hasOwn(decodedValue, 'unmask')) {
           const unmaskableString: UnmaskableObject = decodedValue
           // deno-lint-ignore no-non-null-assertion

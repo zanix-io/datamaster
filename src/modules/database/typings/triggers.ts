@@ -80,41 +80,28 @@ export type TriggerActions = {
   /**
    * Email action.
    *
-   * Dispatched to the well-known {@link DEFAULT_TRIGGER_JOBS.mail} job — an app bootstrapped via
-   * `@zanix/core`'s `Zanix.start()`/`Zanix.startWorker()` gets this registered automatically
-   * (`@zanix/core` is the layer that depends on datamaster, asyncmq, and notifications
-   * simultaneously, so it — not asyncmq itself — owns this handler), mapping `body` directly onto
-   * `NotifyMessageWithTemplate`'s `{ template, data }` shape.
+   * Dispatched to the job registered for it (see `registerTriggerActionJob`) — falls back to
+   * {@link DEFAULT_TRIGGER_JOBS.mail} if nothing overrode it. This package only knows a `mail`
+   * action needs a recipient and a subject; the rest of the payload (which template to render,
+   * and its data) is interpreted entirely by whichever job handles it — see
+   * `@zanix/notifications`'s `MailTriggerActionData`/`sendMailTriggerNotification` for the
+   * concrete contract that package's own self-registered handler uses.
    *
-   * Every string field (`to`, `subject`, `body.data`'s own values, ...) supports `{{field}}`/
-   * `{{nested.path}}` placeholders, resolved against the record the trigger fired for — e.g.
-   * `to: '{{email}}'`, `subject: 'Welcome {{name}}'` — and, separately, `${{ENV_VAR}}`
-   * placeholders resolved from `Deno.env` (see the security note on {@link TriggerActions}). Both
-   * conventions can coexist in the same field.
+   * Every string field supports `{{field}}`/`{{nested.path}}` placeholders, resolved against the
+   * record the trigger fired for — e.g. `to: '{{email}}'`, `subject: 'Welcome {{name}}'` — and,
+   * separately, `${{ENV_VAR}}` placeholders resolved from `Deno.env` (see the security note on
+   * {@link TriggerActions}). Both conventions can coexist in the same field.
    */
-  mail: Partial<TriggerActionCommons> & {
-    /** The recipient email address. Supports `{{field}}` interpolation. */
-    to: string
-    /** The email subject line. Supports `{{field}}` interpolation. */
-    subject: string
-    /** The sender email address. Defaults to whatever the notifier provider configures. */
-    from?: string
-    /** The message date. Defaults to whatever the notifier provider sets it to. */
-    date?: string
-    /**
-     * The email body: a template reference. `data` is the template's render data — an object of
-     * fields the template expects (for templates that support custom styling, a `styles.css` key
-     * appends additional CSS to the template's own base stylesheet, concatenated, not replaced),
-     * or a literal string for templates that accept plain content directly. String values within
-     * `data` support `{{field}}` interpolation, same as any other field.
-     */
-    body: {
-      /** The name of the notification template to render. */
-      template: string
-      /** The template's render data, or a literal string for plain-content templates. */
-      data?: Record<string, unknown> | string
+  mail:
+    & Partial<TriggerActionCommons>
+    & {
+      /** The recipient email address. Supports `{{field}}` interpolation. */
+      to: string
+      /** The email subject line. Supports `{{field}}` interpolation. */
+      subject: string
     }
-  }
+    // deno-lint-ignore no-explicit-any
+    & Record<string, any>
   /**
    * HTTP request action.
    *
@@ -174,13 +161,12 @@ export type TriggerTypes = Record<
 export type Triggers = Partial<Record<'pre' | 'post', Partial<TriggerTypes>>>
 
 /**
- * The well-known job names datamaster dispatches built-in trigger actions to via
- * `ProgramModule.providers.get('worker').runJob(...)`.
- *
- * These names are the contract that must have a job handler registered for them (via
- * `registerJob`) in order for `mail`/`request` trigger actions to actually run — apps bootstrapped
- * via `@zanix/core` get this automatically; standalone `@zanix/asyncmq` usage must register them
- * itself. `custom` actions reference their own job name directly instead of one of these.
+ * The default job names `mail`/`request` trigger actions dispatch to when nothing registered an
+ * override via `registerTriggerActionJob` — see `database/defs/trigger-actions.ts`. Apps
+ * bootstrapped via `@zanix/core` get both registered automatically (`request` directly by
+ * `@zanix/core` itself; `mail` self-registered by `@zanix/notifications`'s own `/core`
+ * entrypoint); standalone `@zanix/asyncmq` usage must register a job for these names itself.
+ * `custom` actions reference their own job name directly instead of one of these.
  */
 export const DEFAULT_TRIGGER_JOBS = {
   /** Job name for the built-in `mail` trigger action. */

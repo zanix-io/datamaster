@@ -31,3 +31,30 @@ Deno.test('readBatch should iterate until batch size and exec it onDocument', as
   assertEquals(calledDocs[1].doc.name, 'Bob')
   assertEquals(calledDocs[1].index, 2)
 })
+
+Deno.test('readBatch should stop once batchSize is reached without a limit or lean', async () => {
+  const mockDocs: Document[] = [
+    { id: 1, name: 'Alice' },
+    { id: 2, name: 'Bob' },
+    { id: 3, name: 'Charlie' },
+  ]
+
+  // deno-lint-ignore no-explicit-any
+  const model = new MockModel(mockDocs) as any
+
+  const calledDocs: { doc: Document; index: number }[] = []
+
+  await readBatch.call(model, {
+    filter: {},
+    limit: 0,
+    batchSize: 2,
+    useLean: false,
+    onDocument: (doc, i) => {
+      calledDocs.push({ doc, index: i })
+    },
+  })
+
+  assertEquals(calledDocs.length, 2)
+  assertEquals(calledDocs[0].doc.name, 'Alice')
+  assertEquals(calledDocs[1].doc.name, 'Bob')
+})

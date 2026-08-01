@@ -54,7 +54,9 @@ export const dataProtectionGetterDefinition = (
   config: DataProtection,
   value?: string | string[],
 ): VerifiableObject | DecryptableObject => {
-  if (!value) return
+  // An empty array (e.g. an `[String]` path Mongoose defaults to `[]` when never set) has nothing
+  // to reverse — `extractVersion` indexes into the array's first element and would throw on one.
+  if (!value || (Array.isArray(value) && value.length === 0)) return
   const { message, version } = extractVersion(value)
 
   const variants = config.versionConfigs[version] || config.versionConfigs['default']

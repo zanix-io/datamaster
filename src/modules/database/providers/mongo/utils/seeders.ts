@@ -1,8 +1,11 @@
+// deno-lint-ignore-file no-explicit-any
 import type { MongoSeeder, ReadDocumentsOptions } from 'mongo/typings/commons.ts'
 import type { DataObject } from 'database/typings/models.ts'
+import type { AdaptedModel } from 'mongo/typings/models.ts'
 import type { Document } from 'mongoose'
 
 import { transformByDataProtection } from 'mongo/processor/schema/transforms/data-policies.ts'
+import { extractVersion } from 'utils/protection.ts'
 import logger from '@zanix/logger'
 
 /**
@@ -105,4 +108,86 @@ export function seedRotateProtectionKeys(
 
     await Model.upsertManyById(documents, { useDataPolicies: true, type: 'update' })
   }
+}
+
+/** Per-path rotation status returned by {@link checkProtectionRotationStatus}. */
+export type ProtectionRotationStatus = Record<string, {
+  /** Documents with a defined value at this path. */
+  total: number
+  /** Of those, how many are already on the currently active protection version. */
+  current: number
+  /** Of those, how many are still on an older version — not yet safe to drop that old key. */
+  outdated: number
+}>
+
+/**
+ * Reports, per protected path, how many documents in the collection are still on an older
+ * protection version versus the one currently active — the question
+ * {@link seedRotateProtectionKeys} itself doesn't answer. That seeder processes the whole
+ * collection in one pass, but a `bulkWrite` that exhausts its retries, or a write from a
+ * not-yet-redeployed replica still using the old key mid-rollout, can leave some documents behind
+ * without either failing loudly or telling you which records need attention.
+ *
+ * Call this **after** running {@link seedRotateProtectionKeys} — and again after fixing anything it
+ * reports — before removing an old protection key from the environment. `outdated: 0` for every
+ * path is what "safe to remove the old key" actually means; see
+ * [Data Protection: key rotation](../../../../../docs/DATA-PROTECTION.md#key-rotation).
+ *
+ * Two kinds of paths are always skipped, matching {@link seedRotateProtectionKeys}'s own scope:
+ * - **`hash`** — one-way, with no key/version to compare against (same reason
+ *   `seedRotateProtectionKeys` excludes it via `excludeHashedFields`).
+ * - **Wildcard (`*`) paths** — a per-element path inside an array of subdocuments; not yet
+ *   supported (same limitation as `autoProtectOnUpdate`, see its own JSDoc).
+ *
+ * @param Model - The bound model to check.
+ * @param options - The same read options `readDocuments` accepts (`mode`, `filter`, `limit`,
+ * `batchSize`) except `onDocument`/`useLean`, which this function controls itself.
+ * @returns A status object keyed by protected path, or `{}` if the model has no data protection
+ * configured, or no path qualifies for a check (only `hash`/wildcard paths configured).
+ *
+ * @example
+ * const status = await checkProtectionRotationStatus(UserModel)
+ * // { ssn: { total: 500, current: 500, outdated: 0 }, email: { total: 500, current: 480, outdated: 20 } }
+ * // `email` isn't fully rotated yet — keep the old key around.
+ */
+export async function checkProtectionRotationStatus(
+  Model: AdaptedModel,
+  options?: Omit<ReadDocumentsOptions<Document>, 'onDocument' | 'useLean'>,
+): Promise<ProtectionRotationStatus> {
+  if (!Model._hasDataProtection()) return {}
+
+  const dataProtection = Model._getDataProtection()
+  const checkablePaths = Model._getDataProtectionPaths().filter((path) => {
+    if (path.includes('*')) return false
+
+    const config = dataProtection[path]
+    const strategy = config.versionConfigs[config.activeVersion]?.strategy ??
+      config.versionConfigs['default']?.strategy
+
+    return strategy !== 'hash'
+  })
+
+  if (!checkablePaths.length) return {}
+
+  const status: ProtectionRotationStatus = {}
+  for (const path of checkablePaths) status[path] = { total: 0, current: 0, outdated: 0 }
+
+  await Model.readDocuments({
+    ...options,
+    useLean: true,
+    onDocument: (doc: Record<string, any>) => {
+      for (const path of checkablePaths) {
+        const raw = doc[path]
+        if (raw === undefined || raw === null) continue
+
+        status[path].total++
+        const { version } = extractVersion(raw)
+
+        if (version === dataProtection[path].activeVersion) status[path].current++
+        else status[path].outdated++
+      }
+    },
+  })
+
+  return status
 }

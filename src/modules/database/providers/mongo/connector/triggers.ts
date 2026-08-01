@@ -105,11 +105,11 @@ export async function loadPersistedTriggersOnStart(this: ZanixMongoConnector) {
  * calling {@link refreshPersistedTriggers} on each tick. A no-op unless `triggersPollInterval` was
  * set to a positive number.
  *
- * Self-reschedules with `setTimeout` (stored on `triggersPollTimer`, cleared by `close()`) rather
+ * Self-reschedules with `setTimeout` (stored on `triggersPoll.timer`, cleared by `close()`) rather
  * than `setInterval`, so a slow tick can never overlap with the next one. A tick that fails (e.g. a
  * transient connection error) is logged but never stops future polling.
  *
- * Checks `triggersPollStopped` right before rescheduling, not just at the top of `tick` — a tick
+ * Checks `triggersPoll.stopped` right before rescheduling, not just at the top of `tick` — a tick
  * already past that check when `close()` runs would otherwise still schedule one more timer via
  * `.finally()` *after* `close()`'s own `clearTimeout` already ran, leaking a poll against an
  * already-closed connection.
@@ -127,12 +127,12 @@ function startTriggersPolling(
     refreshPersistedTriggers(Model)
       .catch((e) => logger.error('Failed to poll the persisted triggers collection', e, 'noSave'))
       .finally(() => {
-        if (this.triggersPollStopped) return
-        this.triggersPollTimer = setTimeout(tick, interval)
+        if (this.triggersPoll.stopped) return
+        this.triggersPoll.timer = setTimeout(tick, interval)
       })
   }
 
-  this.triggersPollTimer = setTimeout(tick, interval)
+  this.triggersPoll.timer = setTimeout(tick, interval)
 }
 
 /**

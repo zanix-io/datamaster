@@ -133,17 +133,24 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    */
   protected triggersChangeStream: boolean
   /**
-   * Handle of the currently scheduled triggers-poll timer, if polling is active — set by
-   * `loadPersistedTriggersOnStart`, cleared by `close()`.
+   * Mutable box for the triggers-poll timer handle and stop flag. Both need to keep changing
+   * after the connector is considered "ready" — the timer is re-set on every tick (see
+   * `triggers.ts`'s `startTriggersPolling`), and the stop flag is only ever set by `close()` — but
+   * `TargetContainer` calls `Object.freeze()` on this instance once `isReady` resolves (see
+   * `instanceFreeze`), which would make a plain `this.triggersPollTimer = ...`/
+   * `this.triggersPollStopped = true` throw `TypeError: Cannot assign to read only property`.
+   * `Object.freeze` is shallow, so this nested object's own properties stay mutable regardless.
+   *
+   * - `timer`: handle of the currently scheduled poll timer, if polling is active — set by
+   *   `loadPersistedTriggersOnStart`/the poll loop's own reschedule, cleared by `close()`.
+   * - `stopped`: set by `close()` before clearing `timer`, and checked by the poll loop right
+   *   before it would reschedule itself — closes the race where a tick already in flight when
+   *   `close()` runs would otherwise schedule one more timer *after* `clearTimeout` already ran,
+   *   leaking a poll that fires against an already-closed connection.
    */
-  protected triggersPollTimer: ReturnType<typeof setTimeout> | undefined
-  /**
-   * Set by `close()` before clearing `triggersPollTimer`, and checked by the poll loop right
-   * before it would reschedule itself — closes the race where a tick already in flight when
-   * `close()` runs would otherwise schedule one more timer *after* `clearTimeout` already ran,
-   * leaking a poll that fires against an already-closed connection.
-   */
-  protected triggersPollStopped = false
+  protected triggersPoll: { timer?: ReturnType<typeof setTimeout>; stopped: boolean } = {
+    stopped: false,
+  }
   /**
    * The active triggers Change Stream watcher, if one was successfully started — set by
    * `loadPersistedTriggersOnStart`, closed by `close()`.
@@ -385,8 +392,8 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    */
   protected async close(): Promise<void> {
     try {
-      this.triggersPollStopped = true
-      if (this.triggersPollTimer) clearTimeout(this.triggersPollTimer)
+      this.triggersPoll.stopped = true
+      if (this.triggersPoll.timer) clearTimeout(this.triggersPoll.timer)
       await this.triggersChangeStreamHandle?.close()
 
       // Disconnect from mongo

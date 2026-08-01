@@ -157,3 +157,16 @@ export type TriggersModelAttrs = {
    */
   lastSyncedTriggers?: Triggers
 }
+
+/**
+ * Fields accepted to create a new {@link TriggersModelAttrs} entry — derived from it so a caller
+ * (`TriggersAdminRepository.create`, `@zanix/admin`'s `TriggersAdminClient`/`CreateTriggerRTO`)
+ * never hand-re-declares this field list independently of the schema it targets.
+ */
+export type CreateTriggerInput = Pick<TriggersModelAttrs, 'model' | 'active' | 'triggers'>
+
+/**
+ * Fields accepted to update an existing {@link TriggersModelAttrs} entry — see
+ * {@link CreateTriggerInput} for why this is derived rather than hand-declared.
+ */
+export type UpdateTriggerInput = Partial<Pick<TriggersModelAttrs, 'active' | 'triggers'>>

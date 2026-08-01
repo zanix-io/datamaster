@@ -1,8 +1,11 @@
 // deno-lint-ignore-file no-explicit-any
 import type { TriggerActionCommons, TriggerActions } from 'database/typings/triggers.ts'
+import type { BuiltInTriggerActionType } from 'database/defs/trigger-actions.ts'
 import { DEFAULT_TRIGGER_JOBS } from 'database/typings/triggers.ts'
 import { ProgramModule as ServerProgram, type ZanixWorkerProvider } from '@zanix/server'
 import { interpolate, interpolateEnv, interpolateUrl, toSearchParams } from '@zanix/helpers'
+import { InternalError } from '@zanix/errors'
+import ProgramModule from 'modules/program/mod.ts'
 import { validateConditions } from './conditions.ts'
 
 type TriggerActionType = keyof TriggerActions
@@ -18,12 +21,31 @@ type TriggerActionConfig<T extends TriggerActionType> =
  */
 const BODYLESS_METHODS = new Set(['GET', 'HEAD', 'DELETE'])
 
+/**
+ * Resolves the job name `type` dispatches to: `custom` always carries its own job name inline;
+ * every other action kind resolves through `ProgramModule.triggerActionJobs` (populated via
+ * `registerTriggerActionJob` — see `database/defs/trigger-actions.ts`), falling back to
+ * {@link DEFAULT_TRIGGER_JOBS}'s literal defaults for `mail`/`request` if nothing registered an
+ * override. A future built-in-like action kind with no registration and no default throws instead
+ * of dispatching to `undefined`.
+ */
 const jobNameFor = <T extends TriggerActionType>(
   type: T,
   action: TriggerActionConfig<T>,
 ): string => {
   if (type === 'custom') return (action as TriggerActionConfig<'custom'>).name
-  return DEFAULT_TRIGGER_JOBS[type as 'mail' | 'request']
+
+  const builtInType = type as BuiltInTriggerActionType
+  const registered = ProgramModule.triggerActionJobs.resolve(builtInType)
+  if (registered) return registered.name
+
+  if (builtInType === 'mail' || builtInType === 'request') {
+    return DEFAULT_TRIGGER_JOBS[builtInType]
+  }
+
+  throw new InternalError(
+    `No job registered for trigger action "${builtInType}". Call registerTriggerActionJob("${builtInType}", jobName) before dispatching it.`,
+  )
 }
 
 const dispatchAction = async <T extends TriggerActionType>(

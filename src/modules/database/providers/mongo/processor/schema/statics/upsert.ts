@@ -1,6 +1,67 @@
+// deno-lint-ignore-file no-explicit-any
 import type { UpsertTypeOptions } from 'mongo/typings/statics.ts'
 import type { DataObject } from 'database/typings/models.ts'
 import type { AdaptedModel } from 'mongo/typings/models.ts'
+
+import logger from '@zanix/logger'
+
+/** Max number of times a batch of individually-failed `bulkWrite` operations is retried. */
+const MAX_BULK_WRITE_RETRIES = 3
+
+/** Base delay (ms) before the first retry — doubles on each subsequent attempt. */
+const BULK_WRITE_RETRY_BASE_DELAY_MS = 200
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Runs a `bulkWrite`, retrying only the operations MongoDB reports as failed (via
+ * `MongoBulkWriteError.writeErrors`, each carrying the failing operation's index in the batch) —
+ * not the whole batch. `ordered: false` already lets the *other* operations in a batch succeed
+ * despite some failing; without this, a single transient failure (a momentary network blip, a
+ * replica election, a write conflict) would still surface as a thrown error on every call, even
+ * though most (or all, on a later attempt) of the batch actually landed.
+ *
+ * Recurses (rather than looping) so each retry is its own call, sidestepping the `no-await-in-loop`
+ * lint rule this project enforces — the same convention used elsewhere for repeated/polling work.
+ *
+ * Gives up and re-throws the original error once `MAX_BULK_WRITE_RETRIES` is reached, or
+ * immediately for an error that isn't a per-operation write-error batch (e.g. a connection failure
+ * that would just fail identically on retry) — logging exactly which operations never landed
+ * either way, so an operator investigating doesn't have to reconstruct that from a generic driver
+ * exception.
+ */
+async function bulkWriteWithRetry(
+  model: any,
+  ops: any[],
+  writeOptions: any,
+  attempt = 0,
+): Promise<void> {
+  try {
+    await model.bulkWrite(ops, writeOptions)
+  } catch (error: any) {
+    const writeErrors = error?.writeErrors ?? []
+
+    if (!writeErrors.length || attempt >= MAX_BULK_WRITE_RETRIES) {
+      if (writeErrors.length) {
+        logger.error(
+          `bulkWrite: giving up after ${attempt + 1} attempt(s) — ${writeErrors.length} of ` +
+            `${ops.length} operation(s) never succeeded`,
+          error,
+          {
+            meta: { source: 'zanix', operation: 'bulkWrite' },
+            code: 'DATAMASTER_BULK_WRITE_RETRY_EXHAUSTED',
+          },
+        )
+      }
+      throw error
+    }
+
+    await delay(BULK_WRITE_RETRY_BASE_DELAY_MS * 2 ** attempt)
+
+    const retryOps = writeErrors.map((writeError: any) => ops[writeError.index])
+    await bulkWriteWithRetry(model, retryOps, writeOptions, attempt + 1)
+  }
+}
 
 /**
  * Finds a document by its `_id` and update or creates it if it does not exist.
@@ -36,7 +97,6 @@ export async function upsertById(
   const { id: _id, ...obj } = data
   const filter = { _id }
 
-  // deno-lint-ignore no-explicit-any
   const props: { update?: any; options?: any } = {}
 
   if (type === 'insert') {
@@ -107,5 +167,5 @@ export async function upsertManyById(
 
   const ops = data.map((obj) => ({ updateOne: updateOne(obj) }))
 
-  await this.bulkWrite(ops, { ordered: false, writeConcern: { w: 'majority' } })
+  await bulkWriteWithRetry(this, ops, { ordered: false, writeConcern: { w: 'majority' } })
 }

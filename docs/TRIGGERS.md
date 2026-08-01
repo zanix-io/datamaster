@@ -100,11 +100,15 @@ to dispatch either way; it's purely a matter of how you want to read the config.
 
 ## Trigger actions (`TriggerActions`)
 
-| Action    | Fields                                    | How it's dispatched                                                              |
-| --------- | ----------------------------------------- | -------------------------------------------------------------------------------- |
-| `mail`    | `to`, `subject`, `body`, `from?`, `date?` | Well-known job `DEFAULT_TRIGGER_JOBS.mail`                                       |
-| `request` | `url`, `method`, `headers`, `body?`       | Well-known job `DEFAULT_TRIGGER_JOBS.request`                                    |
-| `custom`  | `name`                                    | The job named `name` — one you (or `@zanix/asyncmq`) already registered yourself |
+| Action    | Fields                                                    | How it's dispatched                                                                      |
+| --------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `mail`    | `to`, `subject`, plus whatever the registered job expects | `DEFAULT_TRIGGER_JOBS.mail`, or a `registerTriggerActionJob('mail', ...)` override       |
+| `request` | `url`, `method`, `headers`, `body?`                       | `DEFAULT_TRIGGER_JOBS.request`, or a `registerTriggerActionJob('request', ...)` override |
+| `custom`  | `name`                                                    | The job named `name` — one you (or `@zanix/asyncmq`) already registered yourself         |
+
+Datamaster only knows `mail` needs a recipient and a subject — the rest of the payload (e.g. which
+template to render, and its data) is interpreted entirely by whichever job actually handles it. See
+`@zanix/notifications`'s own docs for the concrete contract its default `mail` handler uses.
 
 **Every string field** on `mail`/`request` (`to`, `subject`, `url`, `headers`' values, `body`'s own
 values, ...) supports `{{field}}`/`{{nested.path}}` placeholders, resolved against the record the
@@ -126,11 +130,13 @@ placeholders, resolved from `Deno.env` — see
   produces the real string `'https://x.com?value=42'` HTTP can send. A placeholder resolving to
   `undefined`/`null` becomes `''` in this form.
 
-`mail.body` is `{ template: string; data?: Record<string, unknown> | string }` — `template` names
-the notifier template, and `data` is its render data: an object of fields the template expects (a
-`styles.css` key appends additional CSS to the template's own base stylesheet, concatenated, not
-replaced), or a literal string for templates that accept plain content directly. This maps directly
-onto `@zanix/notifications`'s `NotifyMessageWithTemplate`'s `{ template, data }` shape. String
+Beyond `to`/`subject`, `mail` accepts whatever additional fields the job registered for it expects —
+datamaster passes them through untyped and uninterpreted. The default job (self-registered by
+`@zanix/notifications` when bootstrapped via `@zanix/core`) expects a
+`body: { template: string;
+data?: Record<string, unknown> | string }` field: `template` names the
+notifier template, and `data` is its render data — see `@zanix/notifications`'s own docs
+(`MailTriggerActionData`, `sendMailTriggerNotification`) for that contract's full shape. String
 values within `data` support `{{field}}` interpolation, same as any other field.
 
 `request.body` is **entirely opt-in** — if you don't set it, no body is sent at all, even though the
@@ -165,14 +171,18 @@ All three also accept the common fields from `TriggerActionCommons`: `priority`
 (extra static data merged into the job's payload, not the same as `request.body` — see below), and
 `conditions` (see below).
 
-> ⚠️ **`mail`/`request` need a consumer-side job registered under their well-known name to actually
-> do anything.** Datamaster only **dispatches** — via `ProgramModule.providers.get('worker')` (from
-> `@zanix/server`). Apps bootstrapped via `@zanix/core`'s `Zanix.start()`/`Zanix.startWorker()` get
-> both handlers registered automatically — `@zanix/core` is the layer that depends on datamaster,
-> asyncmq, _and_ notifications simultaneously, so it (not asyncmq itself) owns this wiring. A
-> `custom` action works end-to-end today as long as you've registered that job name yourself via
-> `@zanix/asyncmq`'s `registerJob` — the same job a `this.worker.runJob(name, ...)` call from an
-> interactor would target.
+> ⚠️ **`mail`/`request` need a consumer-side job registered to actually do anything.** Datamaster
+> only **dispatches** — via `ProgramModule.providers.get('worker')` (from `@zanix/server`), to
+> whichever job `registerTriggerActionJob('mail' | 'request', descriptor)` last registered, falling
+> back to `DEFAULT_TRIGGER_JOBS`'s literal names if nothing did. Apps bootstrapped via
+> `@zanix/core`'s `Zanix.start()`/`Zanix.startWorker()` get both wired automatically: `request` is
+> registered by `@zanix/core` itself (generic `fetch`, no other owner); `mail` is self-registered by
+> `@zanix/notifications`'s own `/core` entrypoint, since it owns `NotifierProvider`'s contract.
+> `@zanix/core` drains every descriptor registered this way and performs the actual `@zanix/asyncmq`
+> `registerJob` call — the one place that happens, so a package registering its own trigger-action
+> job never needs to depend on `@zanix/asyncmq` itself. A `custom` action works end-to-end today as
+> long as you've registered that job name yourself via `@zanix/asyncmq`'s `registerJob` — the same
+> job a `this.worker.runJob(name, ...)` call from an interactor would target.
 >
 > Dispatch itself picks `runJob` (queue-backed) when `AMQP_URI` is configured, or falls back to
 > `runTask` (local, in-process) when it isn't — there's no queue to publish to in that case, the
@@ -296,6 +306,14 @@ const args = {
 yourself gets full, uninterpolated access to the record regardless of what (if anything) `mail`/
 `request` used via `{{field}}` placeholders.
 
+**Data protection is reversed before dispatch.** If the model has
+[Data Protection](./DATA-PROTECTION.md) configured, every document a trigger sees — the current
+record, `_oldData`, or the deleted record — has its protected paths already decrypted/unmasked
+(hashed paths are dropped instead, same as a client-facing read), exactly like a normal `toJSON()`
+response would show. A trigger's `{{field}}` interpolation and `conditions` never see raw ciphertext
+or a hash. This is consistent across every path: document-level `.save()` (`created`/`updated`) and
+query-level `updateOne`/`findOneAndUpdate`/`deleteOne`/`findOneAndDelete`.
+
 ## Persisted triggers (online adaptation)
 
 Triggers can also be added, edited, or toggled at runtime, without a redeploy, via the internal
@@ -362,6 +380,13 @@ This kind of entry **combines with** (never replaces) the target model's static
 its `active` field toggled would NOT (that one fully replaces, per point 1 above). The distinction
 is the `isDefault` field: `true` (auto-seeded, replaces static) vs. `false`/absent (created from
 scratch, adds on top of static).
+
+This package exports `TriggersAdminRepository`/`TriggersAdminService` as ready-made CRUD data
+access/business logic over exactly this collection — the same "created from scratch" case above,
+just implemented once instead of every consumer hand-rolling `TriggersModel.create`/`updateOne`
+calls. `@zanix/admin`'s `createTriggersAdminController` composes `TriggersAdminService` into a
+business service's own authenticated `/admin/triggers` HTTP API; this package only owns the data
+access, never the HTTP surface itself.
 
 Every `active` entry is read once at connector startup, and kept up to date after that without a
 restart — see [Keeping the registry fresh](#keeping-the-registry-fresh-without-a-restart) below. A

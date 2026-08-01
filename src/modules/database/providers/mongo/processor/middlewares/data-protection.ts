@@ -3,7 +3,38 @@ import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
 
 import { dataProtectionSetterDefinition } from 'database/policies/protection.ts'
 import { transformShallowByPaths } from '../schema/transforms/shallow.ts'
+import { AUTO_PROTECT_ON_UPDATE_ENV } from 'database/utils/constants.ts'
 import type { Document } from 'mongoose'
+
+/**
+ * Whether a protected path's current value is unchanged from `original` — a snapshot of what that
+ * path held when the document was last hydrated from the database (see the `post('init')` hook in
+ * {@link dataProtectionPreSave}).
+ *
+ * This is what lets an update tell "the exact same already-protected value was reassigned
+ * unchanged" (a no-op edit, or a partial update that round-trips other fields) apart from "this
+ * path was reassigned a genuinely new value" — without inspecting the value's shape at all (no
+ * format/version prefix guessing), so it works identically whether the value is legacy or current,
+ * and it's exact rather than a heuristic: two values are either byte-identical or they aren't.
+ *
+ * Arrays are compared element-by-element (own reference equality would always report "changed"
+ * for a fresh array produced by a partial re-assignment, even with identical contents).
+ */
+export const isProtectionUnchanged = (current: unknown, original: unknown): boolean => {
+  if (Array.isArray(current) || Array.isArray(original)) {
+    return Array.isArray(current) && Array.isArray(original) &&
+      current.length === original.length &&
+      current.every((value, index) => value === original[index])
+  }
+  return current === original
+}
+
+/** A protected path containing `*` addresses a per-element path inside an array of subdocuments —
+ * not yet supported by `autoProtectOnUpdate`'s detection (see the option's own JSDoc). */
+const isWildcardPath = (path: string): boolean => path.includes('*')
+
+const autoProtectOnUpdateFromEnv = (): boolean =>
+  Deno.env.get(AUTO_PROTECT_ON_UPDATE_ENV) === 'true'
 
 /**
  * Registers a Mongoose pre-save hook that enforces data protection rules.
@@ -16,11 +47,16 @@ import type { Document } from 'mongoose'
  * to ensure that sensitive fields are encrypted, masked or sanitized before persistence.
  *
  * @param {BaseCustomSchema} schema - The Mongoose schema where the data protection pre-save hook will be applied.
+ * @param {boolean} [autoProtectOnUpdate] - The model's `extensions.autoProtectOnUpdate` — whether a
+ * document-level update (`.save()` on an existing document) should also auto-protect a reassigned
+ * path. Falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var, then `false`, when omitted. See the
+ * option's own JSDoc (`database/typings/general.ts`) for the full rationale.
  *
  * @returns {void} Registers the pre-save hook on the schema (no direct return value).
  */
 export const dataProtectionPreSave = (
   schema: BaseCustomSchema,
+  autoProtectOnUpdate?: boolean,
 ): void => {
   const dataProtection = schema.statics._getDataProtection()
 
@@ -42,12 +78,52 @@ export const dataProtectionPreSave = (
     })
   }
 
-  // Pre save native hook
+  // Pre save native hook (creation)
   schema.pre('save', async function (next) {
     if (!this.isNew) return next()
     await tranform.call(this)
     next()
   })
+
+  if (autoProtectOnUpdate ?? autoProtectOnUpdateFromEnv()) {
+    const detectablePaths = allowedPaths.filter((path) => !isWildcardPath(path))
+
+    // Snapshots each protected (non-wildcard) path's as-loaded value right after hydration from a
+    // query — the reference point `isProtectionUnchanged` compares against below. Never fires for
+    // `new Model(data)` (that's `isNew`, handled by the hook above) — only for documents actually
+    // read back from the database, which is exactly the case that needs a "what did this look like
+    // before" baseline.
+    schema.post('init', function (this: any) {
+      this._protectionSnapshot = {}
+      for (const path of detectablePaths) {
+        const raw = this.get(path, undefined, { getters: false })
+        this._protectionSnapshot[path] = Array.isArray(raw) ? [...raw] : raw
+      }
+    })
+
+    // Pre save native hook (update via `.save()` on an existing document)
+    schema.pre('save', async function (this: any, next) {
+      if (this.isNew) return next()
+
+      const toProtect: Array<{ path: string; current: any }> = []
+      for (const path of detectablePaths) {
+        if (!this.isModified(path)) continue // provably unchanged — nothing to decide
+
+        const current = this.get(path, undefined, { getters: false })
+        const original = this._protectionSnapshot?.[path]
+
+        if (isProtectionUnchanged(current, original)) continue // same already-protected value, reassigned as-is
+
+        toProtect.push({ path, current })
+      }
+
+      await Promise.all(toProtect.map(async ({ path, current }) => {
+        this.set(path, await dataProtectionSetterDefinition(dataProtection[path], current))
+      }))
+
+      next()
+    })
+  }
 
   // upsertById custom hook, defined once
   schema.addListener('upsertWithDataPolicy', async (Model, data, options, next) => {

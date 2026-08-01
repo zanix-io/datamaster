@@ -10,10 +10,17 @@ import { triggersMiddleware } from '../triggers/mod.ts'
  * @param {string} modelName - The model's name, used to key the per-model trigger registry.
  * @param {Triggers} [triggers] - The model's static trigger configuration, wired up via
  * {@link triggersMiddleware}.
+ * @param {boolean} [autoProtectOnUpdate] - The model's `extensions.autoProtectOnUpdate`, wired up
+ * via {@link dataProtectionPreSave}.
  *
  * to their corresponding data protection methods.
  */
-export const hooks = (schema: BaseCustomSchema, modelName: string, triggers?: Triggers) => {
-  dataProtectionPreSave(schema)
+export const hooks = (
+  schema: BaseCustomSchema,
+  modelName: string,
+  triggers?: Triggers,
+  autoProtectOnUpdate?: boolean,
+) => {
+  dataProtectionPreSave(schema, autoProtectOnUpdate)
   triggersMiddleware(schema, modelName, triggers)
 }

@@ -95,7 +95,7 @@ export const preprocessSchema = <T extends BaseCustomSchema>(
   baseTransformations(schema)
 
   // hooks (data protection, triggers)
-  hooks(schema, modelName, extensions.triggers)
+  hooks(schema, modelName, extensions.triggers, extensions.autoProtectOnUpdate)
 
   // return adapted schema
   return schema
