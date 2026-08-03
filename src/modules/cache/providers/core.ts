@@ -8,23 +8,32 @@
  */
 
 import { ZanixCacheCoreProvider } from './mod.ts'
-import { Provider } from '@zanix/server'
+import { Provider, registerCoreProviderSlot, ZanixCacheProvider } from '@zanix/server'
 
 // Connectors DSL load
 import './qlru/core.ts'
 import './redis/core.ts'
 
-/** Provider DSL definition */
+/**
+ * Provider DSL definition — applies the decorator directly to `ZanixCacheCoreProvider` (calling it
+ * as a plain function, not `@Provider(...)` syntax) rather than wrapping it in a throwaway
+ * anonymous subclass, so `this.providers.get(ZanixCacheCoreProvider)` — the class every consumer
+ * actually imports — resolves correctly. See `@zanix/auth`'s `providers/core.ts` for the full
+ * rationale.
+ */
 const registerProvider = () => {
-  @Provider('cache')
-  class _ZanixCacheCoreProvider extends ZanixCacheCoreProvider {}
+  Provider('cache')(ZanixCacheCoreProvider)
 }
+
+// `@zanix/datamaster` owns the `'cache'` core-provider slot — registered unconditionally here,
+// mirroring `@zanix/auth`'s own `'auth'` slot registration (`auth/src/modules/providers/core.ts`).
+registerCoreProviderSlot('cache', ZanixCacheProvider, { sourcePackage: '@zanix/datamaster/core' })
 
 /**
  * Core cache provider loader for Zanix.
  *
- * This module automatically registers the default cache provider (`_ZanixCacheCoreProvider`).
- * It uses the `@Provider('cache')` decorator to register the provider
+ * This module automatically registers the default cache provider (`ZanixCacheCoreProvider`).
+ * It uses the `Provider('cache')` decorator to register the provider
  * with the Zanix framework.
  *
  * This behavior ensures a default cache provider is available without requiring manual setup.

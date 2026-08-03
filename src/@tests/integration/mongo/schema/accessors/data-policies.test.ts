@@ -7,6 +7,7 @@ import { assert, assertEquals } from '@std/assert'
 import { model, Schema } from 'mongoose'
 import { preprocessSchema } from 'mongo/processor/mod.ts'
 import { ProgramModule } from '@zanix/server'
+import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
 
 // mockups
 console.warn = () => {}
@@ -42,7 +43,7 @@ const userSchema = new Schema({
   ],
 })
 
-preprocessSchema(userSchema as never, 'test-model')
+preprocessSchema(userSchema as never, 'test-model', DEFAULT_CONNECTOR_KEY)
 
 const userModel = model('Example-accessor', userSchema)
 const UserModel = userModel as typeof userModel & SchemaStatics

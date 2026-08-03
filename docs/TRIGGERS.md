@@ -29,7 +29,7 @@ create/update/delete lifecycle, declared as data instead of imperative code.
 > `${{ENV_VAR}}` is resolved automatically from `Deno.env` right before the action executes — **as
 > long as that variable is registered in the environment of the application where the trigger (or
 > the model/schema that owns it) actually runs**. See
-> [Environment variable interpolation](#environment-variable-interpolation-envvar) below.
+> [Environment variable interpolation](#environment-variable-interpolation-env_var) below.
 
 ## Declaring triggers (`extensions.triggers`)
 
@@ -72,7 +72,7 @@ registerModel({
 `${{USER_UPDATED_WEBHOOK_URL}}`/`${{WEBHOOK_TOKEN}}` come from `Deno.env` instead, so the webhook
 URL and its bearer token never appear as literal text in the trigger definition. Both systems
 coexist freely, even within the same field — see
-[Environment variable interpolation](#environment-variable-interpolation-envvar) for the full
+[Environment variable interpolation](#environment-variable-interpolation-env_var) for the full
 resolution rules.
 
 `Triggers` is `{ pre?, post? } × { created?, updated?, deleted? } → Array<Partial<TriggerActions>>`
@@ -116,7 +116,7 @@ trigger fired for. This is the **only** way a field sees per-record data — not
 automatically beyond what a field's own placeholders resolve to (see
 [Dispatched payload](#dispatched-payload)). The same fields also support `${{ENV_VAR}}`
 placeholders, resolved from `Deno.env` — see
-[Environment variable interpolation](#environment-variable-interpolation-envvar) below.
+[Environment variable interpolation](#environment-variable-interpolation-env_var) below.
 
 - **A field whose entire value is one placeholder** (nothing before or after it, e.g.
   `amount: '{{amount}}'`) resolves to the record's **real value, of whatever type it is** — a
@@ -294,6 +294,8 @@ for `mail`, `url`/`method`/`headers`/`body` for `request`) — plus `priority`, 
 ```ts
 const args = {
   // ...the action's own fields, interpolated
+  priority,
+  delay,
   data: {
     _data: {/* the document's current fields (the deleted record, for a `deleted` trigger) */},
     _oldData: {/* the pre-change document, only present for updated/deleted */},
@@ -305,6 +307,16 @@ const args = {
 `args.data` is always there, for every action type, including `custom` — so a custom job you wrote
 yourself gets full, uninterpolated access to the record regardless of what (if anything) `mail`/
 `request` used via `{{field}}` placeholders.
+
+**`_timeout`** (also from `TriggerActionCommons`, alongside `priority`/`delay`/`data`/`conditions`)
+is only consumed on the local dispatch path (`runTask`, when `AMQP_URI` isn't configured), as that
+task's own timeout in milliseconds (default `20_000`). A queue-backed dispatch (`runJob`, when
+`AMQP_URI` is set) has no timeout counterpart to forward it to, so it's silently dropped in that
+case:
+
+```ts
+custom: { name: 'slow-report-job', _timeout: 60_000 }
+```
 
 **Data protection is reversed before dispatch.** If the model has
 [Data Protection](./DATA-PROTECTION.md) configured, every document a trigger sees — the current
@@ -384,9 +396,19 @@ scratch, adds on top of static).
 This package exports `TriggersAdminRepository`/`TriggersAdminService` as ready-made CRUD data
 access/business logic over exactly this collection — the same "created from scratch" case above,
 just implemented once instead of every consumer hand-rolling `TriggersModel.create`/`updateOne`
-calls. `@zanix/admin`'s `createTriggersAdminController` composes `TriggersAdminService` into a
-business service's own authenticated `/admin/triggers` HTTP API; this package only owns the data
-access, never the HTTP surface itself.
+calls. `create`/`update` accept `CreateTriggerInput`/`UpdateTriggerInput` — both derived from
+`TriggersModelAttrs` (`{ model, active, triggers }`, and a partial of `{ active, triggers }`,
+respectively) rather than hand-declared, so they can never drift from the schema they target.
+`@zanix/admin`'s `createTriggersAdminController` composes `TriggersAdminService` into a business
+service's own authenticated `/admin/triggers` HTTP API; this package only owns the data access,
+never the HTTP surface itself.
+
+This package also exports `createTriggersDiscoveryProvider()`, building the `DiscoveryProvider` for
+`/.well-known/zanix/triggers` (backed by `TriggersAdminRepository.list()`) that `@zanix/admin`'s
+`defineAdminMetadata` registers via `@zanix/server`'s `ProgramModule.defineDiscovery` — see
+`@zanix/server`'s `docs/HANDLERS.md` for what a Discovery provider is. As with the
+repository/service above, this package only authors the provider; `@zanix/admin` is what wires it
+into an HTTP surface.
 
 Every `active` entry is read once at connector startup, and kept up to date after that without a
 restart — see [Keeping the registry fresh](#keeping-the-registry-fresh-without-a-restart) below. A
@@ -406,10 +428,15 @@ in your code, adding a `custom` entry purely through this collection has nothing
 > triggers model were configured at all — it's just not yet editable from the database until a later
 > boot registers it early enough to be seen).
 >
-> ⚠️ **`triggersModel: false` always means "only code triggers,"** even across multiple connectors
-> in the same process (e.g. a reconnect, or a test suite creating several) — every connector resets
-> the in-memory persisted-triggers state on startup, regardless of its own `triggersModel` setting,
-> so it never inherits a previous connector's loaded entries.
+> ⚠️ **`triggersModel: false` always means "only code triggers" for that connector** — on startup, a
+> connector always resets its own in-memory persisted-triggers state first, regardless of its own
+> `triggersModel` setting, so it never inherits whatever was previously loaded into that same
+> bucket. This state is scoped per connector (see
+> [Multiple Mongo connectors](./DATABASE.md#multiple-mongo-connectors)): two genuinely different
+> connectors never share or wipe each other's persisted triggers. It only matters for the same
+> connector re-instantiated (e.g. a reconnect, or a test suite creating several instances of the
+> same class) — that case always starts from a clean slate, never carrying over what the previous
+> instance had loaded.
 
 ### Keeping the registry fresh without a restart
 

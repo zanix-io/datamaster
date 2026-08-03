@@ -1,12 +1,23 @@
 // deno-lint-ignore-file no-explicit-any
 import { assertEquals, assertExists } from '@std/assert'
-import { ProgramModule, Provider, ZanixWorkerProvider } from '@zanix/server'
+import {
+  ProgramModule,
+  Provider,
+  registerCoreProviderSlot,
+  ZanixWorkerProvider,
+} from '@zanix/server'
 import { handleTrigger } from 'mongo/processor/triggers/dispatch.ts'
 import { DEFAULT_TRIGGER_JOBS } from 'database/typings/triggers.ts'
 import { registerTriggerActionJob } from 'database/defs/trigger-actions.ts'
 import DatabaseProgramModule from 'modules/program/mod.ts'
 
 const calls: { name: string; options: any; via: 'runJob' | 'runTask' }[] = []
+
+// `'worker'` is owned by `@zanix/asyncmq`, which this package's tests don't depend on — must be
+// registered here explicitly before decorating a fixture for it, or the decorator throws (a
+// reserved core slot that isn't registered yet); see `zanix-libraries-architecture` skill's
+// registration-order rule.
+registerCoreProviderSlot('worker', ZanixWorkerProvider)
 
 @Provider('worker')
 class _FakeWorkerProvider extends ZanixWorkerProvider {

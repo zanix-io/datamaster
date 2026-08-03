@@ -56,16 +56,16 @@ import logger from '@zanix/logger'
  *    cluster.
  */
 export async function loadPersistedTriggersOnStart(this: ZanixMongoConnector) {
-  resetPersistedTriggers()
+  resetPersistedTriggers(this.resolvedConnectorKey)
   if (!this.triggersModel) return
 
   const modelName = this.triggersModel
 
-  registerTriggersModel(modelName)
+  registerTriggersModel(modelName, this.resolvedConnectorKey)
   defineModels.call(this)
 
   const Model = this.getModel<TriggersModelAttrs>(modelName)
-  const staticEntries = getStaticTriggerEntries()
+  const staticEntries = getStaticTriggerEntries(this.resolvedConnectorKey)
   const existing = await Model.find({}).lean()
 
   const { toDelete, toResync, toSeed } = planTriggerSync(staticEntries, existing)
@@ -92,7 +92,7 @@ export async function loadPersistedTriggersOnStart(this: ZanixMongoConnector) {
     )
   }
 
-  await refreshPersistedTriggers(Model)
+  await refreshPersistedTriggers(this.resolvedConnectorKey, Model)
 
   this.triggersModel = false
 
@@ -118,13 +118,15 @@ export async function loadPersistedTriggersOnStart(this: ZanixMongoConnector) {
  */
 function startTriggersPolling(
   this: ZanixMongoConnector,
-  Model: Parameters<typeof refreshPersistedTriggers>[0],
+  Model: Parameters<typeof refreshPersistedTriggers>[1],
 ): void {
   const interval = this.triggersPollInterval
   if (!interval) return
 
+  const connectorKey = this.resolvedConnectorKey
+
   const tick = () => {
-    refreshPersistedTriggers(Model)
+    refreshPersistedTriggers(connectorKey, Model)
       .catch((e) => logger.error('Failed to poll the persisted triggers collection', e, 'noSave'))
       .finally(() => {
         if (this.triggersPoll.stopped) return
@@ -150,7 +152,7 @@ function startTriggersPolling(
  */
 function startTriggersChangeStream(
   this: ZanixMongoConnector,
-  Model: Parameters<typeof refreshPersistedTriggers>[0] & {
+  Model: Parameters<typeof refreshPersistedTriggers>[1] & {
     watch: () => {
       on: (event: 'change' | 'error', listener: (arg: unknown) => void) => void
       close: () => Promise<void>
@@ -159,13 +161,15 @@ function startTriggersChangeStream(
 ): void {
   if (!this.triggersChangeStream) return
 
+  const connectorKey = this.resolvedConnectorKey
+
   try {
     const stream = Model.watch()
 
     stream.on(
       'change',
       () =>
-        void refreshPersistedTriggers(Model).catch((e) =>
+        void refreshPersistedTriggers(connectorKey, Model).catch((e) =>
           logger.error('Failed to refresh persisted triggers from change stream', e, 'noSave')
         ),
     )

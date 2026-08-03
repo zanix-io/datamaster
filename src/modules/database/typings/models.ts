@@ -60,10 +60,18 @@ export type BaseModel<Attrs extends object, T extends DatabaseTypes> = {
  * @type ModelDef
  *
  * @param {BaseModel & ModelDefinition<T, Attrs>} model - The base model and its definition that will be enhanced by the DSL definition.
+ * @param {Function} [connector] - The `@Connector`-decorated connector class this model is bound
+ * to — only needed when your app registers more than one Mongo connector. Defaults to
+ * `@zanix/datamaster`'s own default connector (the `'database'` core slot) when omitted, which is
+ * correct for the common single-connector case. Must already be `@Connector`-decorated (import it
+ * from wherever it's declared) at the time `registerModel` runs — throws immediately otherwise,
+ * rather than silently binding the model to the wrong connector.
  * @param {T} [type='mongo'] - An optional parameter to specify the database type. Defaults to, and today can only be, `'mongo'`.
  */
 export type ModelDef = <Attrs extends object = any, T extends DatabaseTypes = 'mongo'>(
   model: BaseModel<Attrs, T>,
+  // deno-lint-ignore ban-types
+  connector?: Function,
   type?: T,
 ) => void
 

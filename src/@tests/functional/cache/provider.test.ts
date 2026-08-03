@@ -3,7 +3,7 @@ import { assertEquals } from '@std/assert/assert-equals'
 import { assertRejects, assertThrows } from '@std/assert'
 import { ZanixCacheCoreProvider } from 'modules/cache/providers/mod.ts'
 import { ZanixRedisConnector } from 'modules/cache/providers/redis/connector/mod.ts'
-import { Connector } from '@zanix/server'
+import { Connector, registerCoreConnectorSlot, ZanixCacheConnector } from '@zanix/server'
 import logger from '@zanix/logger'
 
 // mocks
@@ -11,12 +11,18 @@ console.info = () => {}
 console.error = () => {}
 console.warn = () => {}
 
+// This test decorates `_Redis` directly rather than importing `cache/providers/redis/core.ts`, so
+// the `'cache:redis'` slot needs registering explicitly here — `@zanix/datamaster` owns it
+// (see `redis/core.ts`'s own registration), but that file is never reached by this test's own
+// import graph.
+registerCoreConnectorSlot('cache:redis', ZanixCacheConnector)
+
 const registerInstance = async () => {
   // Register instance
   await import('../../../modules/cache/providers/qlru/core.ts')
 
   // Register instance
-  @Connector({ type: 'cache:redis', autoInitialize: false })
+  @Connector({ slot: 'cache:redis', autoInitialize: false })
   class _Redis extends ZanixRedisConnector<string, string> {}
 }
 

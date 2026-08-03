@@ -3,6 +3,7 @@ import type { ModelMetadata } from 'database/typings/models.ts'
 import type { Seeders } from '@zanix/server'
 
 import ProgramModule from './mod.ts'
+import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
 
 /**
  * Represents the main program interface that can be exported and used by other libraries.
@@ -19,22 +20,25 @@ export class Program {
    * which allow consumers to interact with the defined database entities.
    *
    * @param {DatabaseTypes} [type='mongo'] - The type of database to retrieve metadata for.
+   * @param {string} [connectorKey] - Which connector's bucket to read — only relevant when your app
+   * registers more than one Mongo connector (see `registerModel`'s `connector` param). Defaults to
+   * the default connector's key.
    * @returns {{
    *     readonly models: ModelMetadata<any>[];
    *     readonly seeders: Seeders;
    * }} An object containing the models and seeders for the specified database type.
    */
-  public getMetadata(type: DatabaseTypes = 'mongo'): {
+  public getMetadata(type: DatabaseTypes = 'mongo', connectorKey: string = DEFAULT_CONNECTOR_KEY): {
     // deno-lint-ignore no-explicit-any
     readonly models: ModelMetadata<any>[]
     readonly seeders: Seeders
   } {
     return {
       get models() {
-        return ProgramModule.models.getModels(type)
+        return ProgramModule.models.getModels(type, connectorKey)
       },
       get seeders() {
-        return ProgramModule.seeders.getSeeders(type)
+        return ProgramModule.seeders.getSeeders(type, connectorKey)
       },
     }
   }
@@ -46,11 +50,16 @@ export class Program {
    *
    * @param {'seeders' | 'models'} meta - The type of metadata to delete.
    * @param {DatabaseTypes} [type='mongo'] - The type of database from which to delete metadata.
+   * @param {string} [connectorKey] - Which connector's bucket to delete — see {@link getMetadata}.
    * @returns {void}
    */
-  public deleteMetadata(meta: 'seeders' | 'models', type: DatabaseTypes = 'mongo'): void {
-    if (meta === 'seeders') ProgramModule.seeders.deleteSeeders(type)
-    else ProgramModule.models.deleteModels(type)
+  public deleteMetadata(
+    meta: 'seeders' | 'models',
+    type: DatabaseTypes = 'mongo',
+    connectorKey: string = DEFAULT_CONNECTOR_KEY,
+  ): void {
+    if (meta === 'seeders') ProgramModule.seeders.deleteSeeders(type, connectorKey)
+    else ProgramModule.models.deleteModels(type, connectorKey)
   }
 }
 

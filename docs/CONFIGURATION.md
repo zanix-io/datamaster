@@ -73,7 +73,7 @@ Rotate keys programmatically with `seedRotateProtectionKeys()` — see
   config, not just whoever executes the trigger. Reference any variable name you choose with
   `${{VARIABLE_NAME}}` instead; unlike the fixed variables in this document, this one reads whatever
   name you reference from `Deno.env` — see
-  [Triggers: environment variable interpolation](./TRIGGERS.md#environment-variable-interpolation-envvar).
+  [Triggers: environment variable interpolation](./TRIGGERS.md#environment-variable-interpolation-env_var).
 
 ## See also
 

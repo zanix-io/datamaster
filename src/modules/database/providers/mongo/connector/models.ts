@@ -19,7 +19,7 @@ import { Schema } from 'mongoose'
  * Finally, it clears the 'models' metadata to avoid redefinition.
  */
 export function defineModels(this: ZanixMongoConnector) {
-  const models = ProgramModule.models.getModels()
+  const models = ProgramModule.models.getModels('mongo', this.resolvedConnectorKey)
 
   for (const model of models) {
     const schema = new Schema(model.definition, model.options)
@@ -28,7 +28,7 @@ export function defineModels(this: ZanixMongoConnector) {
     this.bindModel(model.name, finalSchema, model.extensions)
   }
 
-  ProgramModule.models.deleteModels()
+  ProgramModule.models.deleteModels('mongo', this.resolvedConnectorKey)
 }
 
 /**
@@ -69,7 +69,11 @@ export function defineModelBySchema<S extends DefaultSchema>(
 export async function defineSeedModelOnce(this: ZanixMongoConnector) {
   if (!this.seederModel) return
 
-  const dataToFind = ProgramModule.seeders.consumeDataToQuery('find')
+  const dataToFind = ProgramModule.seeders.consumeDataToQuery(
+    'find',
+    'mongo',
+    this.resolvedConnectorKey,
+  )
   const dataKeys = Object.keys(dataToFind)
 
   const Models: Record<string, AdaptedModel> = {}
@@ -79,7 +83,7 @@ export async function defineSeedModelOnce(this: ZanixMongoConnector) {
 
   for await (const db of dataKeys) {
     const seedModel = seedModelName(db)
-    registerSeedModel(seedModel)
+    registerSeedModel(seedModel, this.resolvedConnectorKey)
   }
 
   defineModels.call(this)
@@ -90,7 +94,11 @@ export async function defineSeedModelOnce(this: ZanixMongoConnector) {
 
       const seeders = await Models[db].find({ $or: data as never }, { name: 1, version: 1 }).lean()
 
-      for (const doc of seeders) ProgramModule.seeders.existInDB.add(doc.name + '@' + doc.version)
+      for (const doc of seeders) {
+        ProgramModule.seeders.existInDB.add(
+          `${this.resolvedConnectorKey}:${doc.name}@${doc.version}`,
+        )
+      }
     }),
   )
 

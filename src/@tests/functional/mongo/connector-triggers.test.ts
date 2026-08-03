@@ -2,7 +2,7 @@
 import type { TriggersModelAttrs } from 'database/typings/models.ts'
 import { DropCollection, sanitize } from '../../(setup)/mongo/connector.ts'
 import { ZanixMongoConnector } from 'mongo/connector/mod.ts'
-import { Provider, ZanixWorkerProvider } from '@zanix/server'
+import { Provider, registerCoreProviderSlot, ZanixWorkerProvider } from '@zanix/server'
 import { DEFAULT_TRIGGER_JOBS } from 'database/typings/triggers.ts'
 import { registerModel } from 'database/defs/models.ts'
 import { assertEquals } from '@std/assert'
@@ -12,6 +12,12 @@ import logger from '@zanix/logger'
 console.error = () => {}
 
 const calls: { name: string }[] = []
+
+// `'worker'` is owned by `@zanix/asyncmq`, which this package's tests don't depend on — must be
+// registered here explicitly before decorating a fixture for it, or the decorator throws (a
+// reserved core slot that isn't registered yet); see `zanix-libraries-architecture` skill's
+// registration-order rule.
+registerCoreProviderSlot('worker', ZanixWorkerProvider)
 
 @Provider('worker')
 class _FakeWorkerProvider extends ZanixWorkerProvider {
@@ -701,42 +707,45 @@ Deno.test({
     })
     await db.isReady
 
+    const TriggersModel = db.getModel<TriggersModelAttrs>(triggersModelName)
     const Model = db.getModel<any>(targetModelName, new Schema({ str: String }))
 
-    // Simulates an out-of-band write from a separate process/service: a connector with
-    // `triggersModel: false` (so it never wires this collection's own refresh hooks or touches
-    // the shared in-memory registry) reaching the same collection through the raw schema-instance
-    // overload instead.
-    const other = new ZanixMongoConnector({ seedModel: false, triggersModel: false })
-    await other.isReady
+    try {
+      // Simulates an out-of-band write from a separate process/service: a connector with
+      // `triggersModel: false` (so it never wires this collection's own refresh hooks or touches
+      // the shared in-memory registry) reaching the same collection through the raw schema-instance
+      // overload instead.
+      const other = new ZanixMongoConnector({ seedModel: false, triggersModel: false })
+      await other.isReady
 
-    const rawTriggersSchema = new Schema({
-      model: String,
-      active: Boolean,
-      triggers: Object,
-      isDefault: Boolean,
-    }, { timestamps: true })
-    const OtherTriggersModel = other.getModel(triggersModelName, rawTriggersSchema)
-    await OtherTriggersModel.create({
-      model: targetModelName,
-      active: true,
-      triggers: { post: { created: [{ custom: { name: 'polled-job' } }] } },
-    })
-    await other['close']()
+      const rawTriggersSchema = new Schema({
+        model: String,
+        active: Boolean,
+        triggers: Object,
+        isDefault: Boolean,
+      }, { timestamps: true })
+      const OtherTriggersModel = other.getModel(triggersModelName, rawTriggersSchema)
+      await OtherTriggersModel.create({
+        model: targetModelName,
+        active: true,
+        triggers: { post: { created: [{ custom: { name: 'polled-job' } }] } },
+      })
+      await other['close']()
 
-    // Nothing yet — `db` hasn't polled since the write.
-    await new Model({ str: 'before-poll' }).save()
-    assertEquals(calls.length, 0)
+      // Nothing yet — `db` hasn't polled since the write.
+      await new Model({ str: 'before-poll' }).save()
+      assertEquals(calls.length, 0)
 
-    // Wait past the poll interval for `db` to pick up the out-of-band write.
-    await new Promise((resolve) => setTimeout(resolve, 500))
+      // Wait past the poll interval for `db` to pick up the out-of-band write.
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-    await new Model({ str: 'after-poll' }).save()
-    assertEquals(calls.map((c) => c.name), ['polled-job'])
-
-    await DropCollection(db.getModel<TriggersModelAttrs>(triggersModelName), db)
-    await DropCollection(Model, db)
-    await db['close']()
+      await new Model({ str: 'after-poll' }).save()
+      assertEquals(calls.map((c) => c.name), ['polled-job'])
+    } finally {
+      await DropCollection(TriggersModel, db)
+      await DropCollection(Model, db)
+      await db['close']()
+    }
   },
 })
 
@@ -750,16 +759,21 @@ Deno.test({
     const originalError = logger.error.bind(logger)
     logger.error = ((...args: unknown[]) => errors.push(args)) as any
 
-    try {
-      const triggersModelName = 'test-connector-triggers-changestream-persisted'
-      const targetModelName = 'test-connector-triggers-changestream-target'
+    const triggersModelName = 'test-connector-triggers-changestream-persisted'
+    const targetModelName = 'test-connector-triggers-changestream-target'
 
-      const db = new ZanixMongoConnector({
-        seedModel: false,
-        triggersModel: triggersModelName,
-        triggersChangeStream: true,
-      })
+    const db = new ZanixMongoConnector({
+      seedModel: false,
+      triggersModel: triggersModelName,
+      triggersChangeStream: true,
+    })
+    let TriggersModel: any
+    let Model: any
+
+    try {
       await db.isReady
+      TriggersModel = db.getModel<TriggersModelAttrs>(triggersModelName)
+      Model = db.getModel<any>(targetModelName, new Schema({ str: String }))
 
       // The test Mongo instance is a standalone server (no replica set) — `Model.watch()` doesn't
       // throw synchronously for this; MongoDB rejects the underlying $changeStream command
@@ -777,22 +791,19 @@ Deno.test({
       assertEquals(errors.length > 0, true)
 
       // The other two refresh mechanisms (on-write, polling) are unaffected by the failed watch.
-      const TriggersModel = db.getModel<TriggersModelAttrs>(triggersModelName)
       await TriggersModel.create({
         model: targetModelName,
         active: true,
         triggers: { post: { created: [{ custom: { name: 'still-works-job' } }] } },
       })
 
-      const Model = db.getModel<any>(targetModelName, new Schema({ str: String }))
       await new Model({ str: 'a' }).save()
 
       assertEquals(calls.map((c) => c.name), ['still-works-job'])
-
-      await DropCollection(TriggersModel, db)
-      await DropCollection(Model, db)
-      await db['close']()
     } finally {
+      if (TriggersModel) await DropCollection(TriggersModel, db)
+      if (Model) await DropCollection(Model, db)
+      await db['close']()
       logger.error = originalError
     }
   },
@@ -811,29 +822,32 @@ Deno.test({
     await db.isReady
 
     const TriggersModel = db.getModel<TriggersModelAttrs>(triggersModelName)
-    await TriggersModel.create({
-      model: targetModelName,
-      active: true,
-      triggers: { post: { created: [{ custom: { name: 'toggle-job' } }] } },
-    })
-
     const Model = db.getModel<any>(targetModelName, new Schema({ str: String }))
-    await new Model({ str: 'a' }).save()
-    assertEquals(calls.map((c) => c.name), ['toggle-job'])
 
-    // Disable it via a query-level write (`updateOne`, not `.save()`) — exercises the query-level
-    // refresh hook (`refreshAfterQuery`), not the document-level one the earlier "instant refresh"
-    // test already covers.
-    calls.length = 0
-    await TriggersModel.updateOne({ model: targetModelName }, { $set: { active: false } })
+    try {
+      await TriggersModel.create({
+        model: targetModelName,
+        active: true,
+        triggers: { post: { created: [{ custom: { name: 'toggle-job' } }] } },
+      })
 
-    // Same connector, no reconnect — should no longer dispatch.
-    await new Model({ str: 'b' }).save()
-    assertEquals(calls.length, 0)
+      await new Model({ str: 'a' }).save()
+      assertEquals(calls.map((c) => c.name), ['toggle-job'])
 
-    await DropCollection(TriggersModel, db)
-    await DropCollection(Model, db)
-    await db['close']()
+      // Disable it via a query-level write (`updateOne`, not `.save()`) — exercises the query-level
+      // refresh hook (`refreshAfterQuery`), not the document-level one the earlier "instant refresh"
+      // test already covers.
+      calls.length = 0
+      await TriggersModel.updateOne({ model: targetModelName }, { $set: { active: false } })
+
+      // Same connector, no reconnect — should no longer dispatch.
+      await new Model({ str: 'b' }).save()
+      assertEquals(calls.length, 0)
+    } finally {
+      await DropCollection(TriggersModel, db)
+      await DropCollection(Model, db)
+      await db['close']()
+    }
   },
 })
 
@@ -850,26 +864,29 @@ Deno.test({
     await db.isReady
 
     const TriggersModel = db.getModel<TriggersModelAttrs>(triggersModelName)
-    await TriggersModel.create({
-      model: targetModelName,
-      active: true,
-      triggers: { post: { created: [{ custom: { name: 'delete-job' } }] } },
-    })
-
     const Model = db.getModel<any>(targetModelName, new Schema({ str: String }))
-    await new Model({ str: 'a' }).save()
-    assertEquals(calls.map((c) => c.name), ['delete-job'])
 
-    // Remove the entry entirely via a query-level delete — same `refreshAfterQuery` hook.
-    calls.length = 0
-    await TriggersModel.deleteOne({ model: targetModelName })
+    try {
+      await TriggersModel.create({
+        model: targetModelName,
+        active: true,
+        triggers: { post: { created: [{ custom: { name: 'delete-job' } }] } },
+      })
 
-    await new Model({ str: 'b' }).save()
-    assertEquals(calls.length, 0)
+      await new Model({ str: 'a' }).save()
+      assertEquals(calls.map((c) => c.name), ['delete-job'])
 
-    await DropCollection(TriggersModel, db)
-    await DropCollection(Model, db)
-    await db['close']()
+      // Remove the entry entirely via a query-level delete — same `refreshAfterQuery` hook.
+      calls.length = 0
+      await TriggersModel.deleteOne({ model: targetModelName })
+
+      await new Model({ str: 'b' }).save()
+      assertEquals(calls.length, 0)
+    } finally {
+      await DropCollection(TriggersModel, db)
+      await DropCollection(Model, db)
+      await db['close']()
+    }
   },
 })
 

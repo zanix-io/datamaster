@@ -102,7 +102,7 @@ const dispatchAction = async <T extends TriggerActionType>(
   // `data` merges into the job's own `data` payload (alongside `_data`/`_oldData`) instead of
   // top-level `args` — it's split off only now, after already going through both interpolation
   // passes above like any other field.
-  const { data: interpolatedExtraData, ...topLevelFields } = interpolatedFields
+  const { data: interpolatedExtraData, _timeout, ...topLevelFields } = interpolatedFields
 
   const args = {
     type,
@@ -123,7 +123,7 @@ const dispatchAction = async <T extends TriggerActionType>(
   if (Deno.env.has('AMQP_URI')) {
     await worker.runJob(jobName, { contextId, args, settings: { priority: priority || 'low' } })
   } else {
-    worker.runTask(jobName, { contextId, args })
+    worker.runTask(jobName, { contextId, args, timeout: _timeout ?? 20_000 })
   }
 }
 

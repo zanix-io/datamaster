@@ -62,6 +62,8 @@ export type TriggerActionCommons = {
   data: Record<string, unknown>
   /** Conditions that must be met for the action to trigger. */
   conditions: Condition[]
+  /** Worker timeout in milliseconds. Primarily used for local workers. Defaults to 20_000 ms */
+  _timeout?: number
 }
 
 /**

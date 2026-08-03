@@ -1,7 +1,7 @@
 # Database
 
-`ZanixMongoConnector`, the `registerModel` DSL, seeders, multi-database support, and the SQLite
-key-value store.
+`ZanixMongoConnector`, the `registerModel` DSL, seeders, multi-database support, multiple Mongo
+connectors, and the SQLite key-value store.
 
 ## `ZanixMongoConnector`
 
@@ -124,6 +124,10 @@ Promise<void>` function, or
 `{ handler, options: { version, verbose, runningMode } }` for more control. Seeders run
 **sequentially**. `callback` receives the built `schema` and must return it (possibly modified).
 
+`registerModel` also accepts an optional third argument — the connector class this model belongs to
+— needed only when your app registers more than one Mongo connector; see
+[Multiple Mongo connectors](#multiple-mongo-connectors) below.
+
 ## Seeders (`registerModel`'s `extensions.seeders`)
 
 ```ts
@@ -184,6 +188,49 @@ The model is registered and looked up under the **full prefixed string** — alw
 > ⚠️ **Not recommended for microservices**: prefer one independent database per service to keep
 > services decoupled, autonomous, and independently scalable. This convention exists for
 > monoliths/shared-database scenarios where it's unavoidable.
+
+## Multiple Mongo connectors
+
+Registering a second `ZanixMongoConnector` (a different `@Connector` slot, typically a different
+connection/`uri`) doesn't need any extra setup **by default** — but `registerModel` targets the
+default connector (the `'database'` core slot) unless told otherwise, so a model meant for the
+second connector needs to say so explicitly, or the default connector will bind it instead:
+
+```ts
+import { Connector, ZanixConnector } from 'jsr:@zanix/server@[version]'
+import { registerModel, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]'
+
+@Connector({ slot: 'billing' })
+class BillingConnector extends ZanixMongoConnector {
+  constructor() {
+    super({ uri: 'mongodb://billing-host/billing' })
+  }
+}
+
+// Targets the default connector — no third argument needed.
+registerModel({ name: 'orders', definition: { total: Number } })
+
+// Targets BillingConnector specifically.
+registerModel({ name: 'invoices', definition: { amount: Number } }, BillingConnector)
+```
+
+No `slot` string needs to match anything by hand: passing the connector _class_ is enough —
+`registerModel` resolves its identity the same way `@zanix/server`'s own DI container does
+internally, so it works whether or not `BillingConnector` was given an explicit `slot` at all. The
+connector class must already be `@Connector`-decorated (imported) by the time `registerModel` runs
+with it, or the call throws immediately, naming the connector — a deliberate fail-fast, since a
+silent mismatch here would otherwise surface later as a confusing "model not found" from a
+completely different connector's `getModel()` call.
+
+Calling `getModel()` for a model registered under a _different_ connector throws
+`ERR_MONGO_MODEL_NOT_FOUND` naming which connector(s) it IS registered for — distinct from the error
+you get when a model was never registered at all (`error.meta.kind` is `'wrong-connector'` vs
+`'never-registered'`, respectively, for programmatic handling).
+
+Seeders and [persisted triggers](./TRIGGERS.md#persisted-triggers-online-adaptation) follow the same
+per-connector isolation as models: each connector only ever reads/writes its own bucket, so two
+genuinely different connectors (different `@Connector` slots) never share or clobber each other's
+state, even when both happen to point at the same physical database.
 
 ## SQLite key-value store
 

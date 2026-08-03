@@ -2,11 +2,17 @@
 import { DropCollection, getDB, sanitize } from '../../../../(setup)/mongo/connector.ts'
 import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
 import { assert, assertEquals } from '@std/assert'
-import { Provider, ZanixWorkerProvider } from '@zanix/server'
+import { Provider, registerCoreProviderSlot, ZanixWorkerProvider } from '@zanix/server'
 import { Schema } from 'mongoose'
 import type { Triggers } from 'database/typings/triggers.ts'
 
 const calls: { name: string; args: any }[] = []
+
+// `'worker'` is owned by `@zanix/asyncmq`, which this package's tests don't depend on — must be
+// registered here explicitly before decorating a fixture for it, or the decorator throws (a
+// reserved core slot that isn't registered yet); see `zanix-libraries-architecture` skill's
+// registration-order rule.
+registerCoreProviderSlot('worker', ZanixWorkerProvider)
 
 @Provider('worker')
 class _FakeWorkerProvider extends ZanixWorkerProvider {

@@ -9,7 +9,11 @@ import type { BaseAttributes, Extensions } from 'database/typings/general.ts'
 import type { MongoConnectorOptions } from '../typings/process.ts'
 import type { Model } from '../typings/commons.ts'
 
-import { ProgramModule as ServerProgram, ZanixDatabaseConnector } from '@zanix/server'
+import {
+  ProgramModule as ServerProgram,
+  registerCoreConnectorSlot,
+  ZanixDatabaseConnector,
+} from '@zanix/server'
 import { createDatabase, postBindModel, preprocessSchema } from '../processor/mod.ts'
 import { type Mongoose, Schema, type SchemaOptions } from 'mongoose'
 import { defineModelBySchema, defineModels } from './models.ts'
@@ -17,6 +21,8 @@ import { loadPersistedTriggersOnStart } from './triggers.ts'
 import { runSeedersOnStart } from './seeders.ts'
 import { HttpError } from '@zanix/errors'
 import logger from '@zanix/logger'
+import ProgramModule from 'modules/program/mod.ts'
+import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
 
 /** Env var names for the constructor options that also accept one — see the class-level doc.
  * Exported so other packages (e.g. a general config bootstrap) can set/read them without
@@ -27,6 +33,22 @@ export const TRIGGERS_POLL_INTERVAL_ENV = 'TRIGGERS_POLL_INTERVAL'
 export const TRIGGERS_CHANGE_STREAM_ENV = 'TRIGGERS_CHANGE_STREAM'
 /** Default persisted-triggers collection name when `TRIGGERS_MODEL_NAME` isn't set. */
 export const DEFAULT_TRIGGERS_MODEL = 'zanix-triggers'
+
+// `@zanix/datamaster` owns the `'database'` core-connector slot — registered unconditionally, here
+// (this module, not `core.ts`) specifically so it's guaranteed by merely importing
+// `ZanixMongoConnector`, regardless of whether the consumer's execution context ever imports
+// `core.ts`'s own conditional `registerConnector()`. This matters for anything with its own,
+// separately-evaluated module graph — a Worker being the concrete case that surfaced it: a
+// consumer decorating their own `class Mongo extends ZanixMongoConnector { }` with
+// `@Connector({ slot: 'database' })` inside a Worker, without that Worker's own entrypoint ever
+// importing `core.ts`, would otherwise hit `@zanix/server`'s "reserved core slot not registered
+// yet" error — even though their class is a perfectly valid customization of the default
+// connector. `registerCoreConnectorSlot` is idempotent and side-effect-free (no I/O, no env
+// lookup), so registering it here unconditionally is safe regardless of whether a concrete
+// connector ever actually gets auto-installed by `core.ts`.
+registerCoreConnectorSlot(DEFAULT_CONNECTOR_KEY, ZanixDatabaseConnector, {
+  sourcePackage: '@zanix/datamaster/core',
+})
 
 /**
  * Resolves a `string | false` model-name option from its env var, for whichever of `seedModel`/
@@ -159,6 +181,19 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   /** Defines and binds a model initialized directly by a schema, bound as an instance method. */
   private defineModelBySchema = defineModelBySchema
 
+  /**
+   * `this.connectorKey` (from `@zanix/server`'s `ZanixConnector`), falling back to
+   * {@link DEFAULT_CONNECTOR_KEY} whenever it's empty — which happens for an instance that was
+   * never actually run through the real `@Connector` decorator (e.g. a test harness that pokes
+   * `_znx_props_` directly without the underlying class having been decorated at all). Falling back
+   * to the default bucket here is what keeps every such instance behaving exactly like the single,
+   * implicit connector this package assumed before per-connector namespacing existed — the same
+   * assumption `registerModel`'s own default (no `connector` argument) already makes.
+   */
+  protected get resolvedConnectorKey(): string {
+    return this.connectorKey || DEFAULT_CONNECTOR_KEY
+  }
+
   /** Creates a new MongoDB connector instance. */
   constructor(
     /**
@@ -198,7 +233,10 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     const baseSchema = schema as BaseCustomSchema
     baseSchema.statics.isReplicaSet = () => this.isReplicaSet
 
-    return this.#database.model(name, preprocessSchema(baseSchema, name, extensions))
+    return this.#database.model(
+      name,
+      preprocessSchema(baseSchema, name, this.resolvedConnectorKey, extensions),
+    )
   }
 
   /**
@@ -308,12 +346,46 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     }
 
     if (!hasSchema) {
+      const registeredFor = ProgramModule.models.findRegisteredConnectors('mongo', name)
+        .filter((entry) => entry.key !== this.resolvedConnectorKey)
+
+      if (registeredFor.length) {
+        const registeredNames = registeredFor.map((entry) => entry.connectorName)
+
+        throw new HttpError('INTERNAL_SERVER_ERROR', {
+          code: 'ERR_MONGO_MODEL_NOT_FOUND',
+          message:
+            `Model "${name}" is registered for connector(s) "${registeredNames.join('", "')}", ` +
+            `not for the current connector "${this.name}". Either register it for this connector ` +
+            `(pass it as the third argument to registerModel), or resolve it through ` +
+            `"${registeredNames[0]}" instead.`,
+          cause: 'Mongo model was registered via `registerModel`, but for a different connector ' +
+            'than the one calling `getModel()` — each connector only binds models registered for it.',
+          meta: {
+            source: 'zanix',
+            connectorName: this.name,
+            connectorKey: this.resolvedConnectorKey,
+            modelName: name,
+            registeredFor: registeredNames,
+            kind: 'wrong-connector',
+          },
+          shouldLog: true,
+        })
+      }
+
       throw new HttpError('INTERNAL_SERVER_ERROR', {
         code: 'ERR_MONGO_MODEL_NOT_FOUND',
-        message:
-          'A required internal resource is missing. The system could not complete the operation.',
+        message: `Model "${name}" was not found for connector "${this.name}". It was never ` +
+          `registered via \`registerModel\`, and no schema/definition was supplied to \`getModel\`.`,
         cause:
           'Mongo model not found. To proceed, please use `registerModel` or supply a valid schema.',
+        meta: {
+          source: 'zanix',
+          connectorName: this.name,
+          connectorKey: this.resolvedConnectorKey,
+          modelName: name,
+          kind: 'never-registered',
+        },
         shouldLog: true,
       })
     }

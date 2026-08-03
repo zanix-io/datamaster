@@ -7,6 +7,7 @@ import { DATABASE_SEEDERS_ENV } from 'database/utils/constants.ts'
 import ProgramModule from 'modules/program/mod.ts'
 import { defineSeedModelOnce } from './models.ts'
 import logger from '@zanix/logger'
+import { InternalError } from '@zanix/errors'
 
 const seederErrorMsg =
   `Verify configuration settings and ensure there are no duplicated seeder names.`
@@ -19,12 +20,40 @@ async function runAndSaveSeeders(this: ZanixMongoConnector, seeders: Seeders) {
 
   await this.runSeeders(seeders)
 
-  if (!Models) return ProgramModule.seeders.deleteSeeders()
+  if (!Models) return ProgramModule.seeders.deleteSeeders('mongo', this.resolvedConnectorKey)
 
-  const dataToSave = ProgramModule.seeders.consumeDataToQuery('save')
+  const dataToSave = ProgramModule.seeders.consumeDataToQuery(
+    'save',
+    'mongo',
+    this.resolvedConnectorKey,
+  )
   await Promise.all(
     Object.entries(dataToSave).map(async ([db, data]) => {
-      await Models[db].insertMany(data).catch((e) => {
+      const Model = Models[db]
+
+      if (!Model) {
+        logger.error(
+          `Operation failed while registering the seeder process for the '${this.name}' class.`,
+          new InternalError(
+            `No seed-tracking model bound for database "${db}" — the seeder data collected for ` +
+              `it can't be saved.`,
+            {
+              code: 'MONGO_SEEDER_MODEL_NOT_BOUND',
+              meta: {
+                source: 'zanix',
+                connectorName: this.name,
+                connectorKey: this.resolvedConnectorKey,
+                database: db,
+              },
+            },
+          ),
+          { suggestion: seederErrorMsg },
+          'noSave',
+        )
+        return
+      }
+
+      await Model.insertMany(data).catch((e) => {
         logger.error(
           `Operation failed while registering the seeder process for the '${this.name}' class.`,
           e,
@@ -35,7 +64,7 @@ async function runAndSaveSeeders(this: ZanixMongoConnector, seeders: Seeders) {
     }),
   )
 
-  ProgramModule.seeders.deleteSeeders()
+  ProgramModule.seeders.deleteSeeders('mongo', this.resolvedConnectorKey)
 }
 
 /**
@@ -47,7 +76,7 @@ async function runAndSaveSeeders(this: ZanixMongoConnector, seeders: Seeders) {
  * population during development or setup.
  */
 export async function runSeedersOnStart(this: ZanixMongoConnector) {
-  const seeders = ProgramModule.seeders.getSeeders()
+  const seeders = ProgramModule.seeders.getSeeders('mongo', this.resolvedConnectorKey)
 
   if (!seeders.length) return
 
@@ -72,7 +101,7 @@ export async function runSeedersBySchema(
   // Normalize seeders
   const adaptedSeeders: Seeders = [{
     model: modelName,
-    handlers: seederAdaptation(seeders, { modelName }, 'mongo'),
+    handlers: seederAdaptation(seeders, { modelName }, 'mongo', this.resolvedConnectorKey),
   }]
 
   await runAndSaveSeeders.call(this, adaptedSeeders)

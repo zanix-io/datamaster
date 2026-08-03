@@ -64,16 +64,20 @@ const forDispatch = async (doc: any): Promise<any> => {
  *
  * @param schema - The Mongoose schema to attach trigger hooks to.
  * @param modelName - The model's name, used to key the per-model trigger registry.
+ * @param connectorKey - The connector this model is bound to (`ZanixConnector.connectorKey`) —
+ * scopes the registry lookup/registration to this connector only, captured once here by closure
+ * so every hook below reads the right bucket on every invocation.
  * @param triggers - The model's static `extensions.triggers`, registered into the store.
  */
 export const triggersMiddleware = (
   schema: BaseCustomSchema,
   modelName: string,
+  connectorKey: string,
   triggers?: Triggers,
 ): void => {
-  setStaticTriggers(modelName, triggers)
+  setStaticTriggers(connectorKey, modelName, triggers)
 
-  const current = () => getTriggers(modelName)
+  const current = () => getTriggers(connectorKey, modelName)
   ;(['created', 'updated'] as const).forEach((event) => {
     const isCreated = event === 'created'
 

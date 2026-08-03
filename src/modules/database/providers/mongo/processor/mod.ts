@@ -59,12 +59,16 @@ export const postBindModel = <T extends Model>(Model: T): T => {
  * @template T
  * @param {T} schema - A Mongoose `Schema` instance to preprocess.
  * @param {string} modelName - The model's name, used to key the per-model trigger registry.
+ * @param {string} connectorKey - The connector this model is bound to (`ZanixConnector.connectorKey`)
+ * — threaded down to {@link hooks}/`triggersMiddleware` so the trigger registry stays scoped per
+ * connector.
  * @param {Omit<Extensions, 'seeders'>} extensions - Schema extensions options.
  * @returns {T} The same schema instance after preprocessing.
  */
 export const preprocessSchema = <T extends BaseCustomSchema>(
   schema: T,
   modelName: string,
+  connectorKey: string,
   extensions: Omit<Extensions, 'seeders'> = {},
 ): T => {
   // Data protection process
@@ -95,7 +99,7 @@ export const preprocessSchema = <T extends BaseCustomSchema>(
   baseTransformations(schema)
 
   // hooks (data protection, triggers)
-  hooks(schema, modelName, extensions.triggers, extensions.autoProtectOnUpdate)
+  hooks(schema, modelName, connectorKey, extensions.triggers, extensions.autoProtectOnUpdate)
 
   // return adapted schema
   return schema

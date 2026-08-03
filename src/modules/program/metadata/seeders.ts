@@ -1,15 +1,20 @@
 import type { DatabaseTypes } from 'database/typings/general.ts'
 import { ProgramContainer, type Seeders } from '@zanix/server'
 import { readConfig } from '@zanix/helpers'
+import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
 
 /**
  * A container for holding and managing seeders.
+ *
+ * Namespaced by `(type, connectorKey)` — `connectorKey` defaults to {@link DEFAULT_CONNECTOR_KEY}
+ * for the same reason `ModelsContainer` does (see its doc).
  */
 export class SeedersContainer extends ProgramContainer {
   public existInDB: Set<string> = new Set()
 
-  #key = (type: DatabaseTypes) => `${type}:db-seeders`
-  #keyData = (dbType: DatabaseTypes, action: string) => `${dbType}:data-${action}-seeders`
+  #key = (type: DatabaseTypes, connectorKey: string) => `${type}:${connectorKey}:db-seeders`
+  #keyData = (type: DatabaseTypes, connectorKey: string, action: string) =>
+    `${type}:${connectorKey}:data-${action}-seeders`
 
   /**
    * Add seeder data
@@ -17,10 +22,11 @@ export class SeedersContainer extends ProgramContainer {
   public addSeeder<T extends Seeders[0] = Seeders[0]>(
     seeder: T,
     type: DatabaseTypes = 'mongo',
+    connectorKey: string = DEFAULT_CONNECTOR_KEY,
     container: object = this,
   ) {
-    const key = this.#key(type)
-    const seeders = this.getSeeders(type)
+    const key = this.#key(type, connectorKey)
+    const seeders = this.getSeeders(type, connectorKey, container)
     seeders.push(seeder)
     this.setData(key, seeders, container)
   }
@@ -30,9 +36,10 @@ export class SeedersContainer extends ProgramContainer {
    */
   public getSeeders<T extends Seeders = Seeders>(
     type: DatabaseTypes = 'mongo',
+    connectorKey: string = DEFAULT_CONNECTOR_KEY,
     container: object = this,
   ): T {
-    const key = this.#key(type)
+    const key = this.#key(type, connectorKey)
     return this.getData<T>(key, container) || []
   }
 
@@ -44,10 +51,17 @@ export class SeedersContainer extends ProgramContainer {
     action: 'save' | 'find'
     database?: string
     type?: DatabaseTypes
+    connectorKey?: string
   }, container: object = this) {
-    const { data, action, database = 'default', type = 'mongo' } = options
-    const key = this.#keyData(type, action)
-    const seeders = this.consumeDataToQuery(action, type)
+    const {
+      data,
+      action,
+      database = 'default',
+      type = 'mongo',
+      connectorKey = DEFAULT_CONNECTOR_KEY,
+    } = options
+    const key = this.#keyData(type, connectorKey, action)
+    const seeders = this.consumeDataToQuery(action, type, connectorKey, container)
 
     if (database !== 'default') Object.assign(data, { 'executedBy': readConfig().name })
 
@@ -61,19 +75,24 @@ export class SeedersContainer extends ProgramContainer {
   public consumeDataToQuery(
     action: 'save' | 'find',
     type: DatabaseTypes = 'mongo',
+    connectorKey: string = DEFAULT_CONNECTOR_KEY,
     container: object = this,
   ) {
-    const key = this.#keyData(type, action)
+    const key = this.#keyData(type, connectorKey, action)
     const data = this.getData<Record<string, unknown[]>>(key, container) || {}
     this.deleteData(key, container)
     return data
   }
 
   /**
-   * delete all seeders data by db type
+   * delete all seeders data by db type, scoped to a single connector's bucket
    */
-  public deleteSeeders(type: DatabaseTypes = 'mongo', container: object = this): void {
-    const key = this.#key(type)
+  public deleteSeeders(
+    type: DatabaseTypes = 'mongo',
+    connectorKey: string = DEFAULT_CONNECTOR_KEY,
+    container: object = this,
+  ): void {
+    const key = this.#key(type, connectorKey)
     return this.deleteData(key, container)
   }
 }

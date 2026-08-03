@@ -55,6 +55,9 @@ local caching utilities, such as in-memory Map for fast, etc.
     valid in population refs. <br>⚠️ **This approach is not recommended for microservices**, since
     each microservice should have **its own independent database** to maintain decoupling, autonomy,
     and scalability.
+  - Supports **multiple Mongo connectors** in the same app — `registerModel`'s optional third
+    argument targets a specific `@Connector`-decorated connector class, isolated from the default
+    one (models, seeders, and persisted triggers all scoped per connector).
 
 - **Redis connector**
 
@@ -141,7 +144,7 @@ groups the main exports by category — each links to a guide with full usage ex
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Mongo connector & models      | `ZanixMongoConnector`, `registerModel`, `Schema`                                                                                                                                                      | [Database](./docs/DATABASE.md)                                          |
 | Seeders                       | `seedByIdIfMissing`, `seedManyByIdIfMissing`, `seedRotateProtectionKeys`                                                                                                                              | [Database](./docs/DATABASE.md#seeders-registermodels-extensionsseeders) |
-| Triggers                      | `extensions.triggers`, `DEFAULT_TRIGGER_JOBS`                                                                                                                                                         | [Triggers](./docs/TRIGGERS.md)                                          |
+| Triggers                      | `extensions.triggers`, `DEFAULT_TRIGGER_JOBS`, `registerTriggerActionJob`, `TriggersAdminRepository`, `TriggersAdminService`, `createTriggersDiscoveryProvider`                                       | [Triggers](./docs/TRIGGERS.md)                                          |
 | SQLite (KV store)             | `ZanixKVStoreConnector`, `LocalSQLite`                                                                                                                                                                | [Database](./docs/DATABASE.md#sqlite-key-value-store)                   |
 | Transforms & schema utilities | `transformRecursively`, `transformDeepByPaths`, `transformShallowByPaths`, `transformByDataAccess`, `transformByDataProtection`, `getAllSubschemas`, `findPathsWithAccessorsDeep`                     | [Transforms](./docs/TRANSFORMS.md)                                      |
 | Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject` | [Data Protection](./docs/DATA-PROTECTION.md)                            |

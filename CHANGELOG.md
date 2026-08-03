@@ -7,6 +7,94 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-02
+
+### Added
+
+- **Multiple Mongo connectors**: `registerModel` accepts an optional connector class as its second
+  argument — `registerModel(model, SomeConnector, type?)` — binding a model (and its seeders) to a
+  Mongo connector other than the default `'database'` slot. The target connector must already be
+  `@Connector`-decorated by the time `registerModel` runs with it, or the call throws immediately,
+  naming it. Models, seeders, and persisted triggers are now scoped per connector internally
+  (previously one flat, unscoped registry) — see
+  [Multiple Mongo connectors](docs/DATABASE.md#multiple-mongo-connectors). `getModel()` now throws a
+  specific `'wrong-connector'` error (`error.meta.kind`) naming which connector(s) a model IS
+  registered for, distinct from `'never-registered'` when it isn't registered anywhere.
+- `extensions.autoProtectOnUpdate` (+ `AUTO_PROTECT_ON_DB_UPDATE` env var, explicit option always
+  wins): opt-in automatic data protection on document-level `.save()` updates to an existing
+  document, not just its first save. Detection compares a protected path's current value against a
+  snapshot taken when the document was hydrated (a `post('init')` hook) — not a content/format
+  heuristic — so it's safe even for one-way `hash` fields, which can't otherwise be checked without
+  risking a silent, permanent re-hash.
+- `checkProtectionRotationStatus()`: reports, per protected path, how many documents remain on an
+  older protection version than the one currently active — the way to confirm it's actually safe to
+  remove an old protection key from the environment after running `seedRotateProtectionKeys()`.
+- `upsertManyById`'s underlying `bulkWrite` now retries only the specific operations MongoDB reports
+  as failed (up to 3 times, with backoff) before giving up and re-throwing with the failed count
+  logged — a transient failure for a handful of documents no longer requires re-running the whole
+  operation.
+- Triggers now consistently reverse data protection (decrypt/unmask protected fields, drop hashed
+  ones) for every dispatched payload — the current document, `_old`, and a deleted document — across
+  **all** document- and query-level paths (`save`, `updateOne`, `findOneAndUpdate`, `deleteOne`,
+  `findOneAndDelete`). Previously only `updateOne`/`findOneAndUpdate`'s post-update dispatch did
+  this; the rest saw raw encrypted/hashed values.
+- New exports backing a local `/admin/triggers` API over the persisted triggers collection —
+  `TriggersAdminRepository`, `TriggersAdminService`, and `createTriggersDiscoveryProvider()` (builds
+  the Discovery provider for `/.well-known/zanix/triggers`) — plus `CreateTriggerInput`/
+  `UpdateTriggerInput` types, derived from `TriggersModelAttrs`. `@zanix/admin` composes these into
+  an actual HTTP surface; this package only owns the data access. See
+  [Triggers: persisted triggers](docs/TRIGGERS.md#persisted-triggers-online-adaptation).
+- `registerTriggerActionJob(actionKind, descriptor)`/`getRegisteredTriggerActionJobs()`: lets a
+  package (`@zanix/notifications` for `mail`, `@zanix/core` for `request`) register the real job a
+  built-in trigger action dispatches to, instead of every consumer being hardcoded to
+  `DEFAULT_TRIGGER_JOBS`'s literal job names. `mail`/`request` still work with nothing registered —
+  `DEFAULT_TRIGGER_JOBS` remains the fallback. See
+  [Trigger actions](docs/TRIGGERS.md#trigger-actions-triggeractions).
+- `_timeout` (milliseconds, default `20_000`) on `TriggerActionCommons`: sets the worker task's
+  timeout when a trigger action dispatches locally (`runTask`, no `AMQP_URI` configured); has no
+  effect on a queue-backed dispatch (`runJob`), which has no equivalent timeout parameter to forward
+  it to.
+
+### Changed
+
+- **Breaking (call-signature)**: `registerModel`'s second positional parameter is now an optional
+  connector class, pushing `type` to the third position (was: `registerModel(model, type?)`, now:
+  `registerModel(model, connector?, type?)`). `DatabaseTypes` has been `'mongo'`-only since `0.6.0`
+  and already defaults to it, so this only affects a caller that explicitly passed `'mongo'`
+  positionally as the second argument — such a call must now pass `undefined` in that slot instead.
+
+### Fixed
+
+- A second core connector/provider booting (a second `ZanixMongoConnector`, or any other one of this
+  package's built-in connectors/providers) no longer wipes the first's in-memory persisted-triggers
+  registrations — every connector's persisted-triggers layer is now namespaced by its own
+  `connectorKey` instead of sharing one flat, global registry. Confirmed with two real connectors on
+  different `@Connector` slots and different physical databases; same slot or same database alone
+  didn't surface the bug, since either one leaves both connectors reading/resetting what's
+  effectively the same underlying state.
+- A trigger action's `data` field (extra static payload merged into the dispatched job) is now
+  actually interpolated — both `{{field}}` against the record and `${{ENV_VAR}}` against the
+  environment — before being merged in. Previously it was split off _before_ either interpolation
+  pass ran, so any placeholder written inside `data` was forwarded to the job unresolved, as literal
+  text.
+- `@Provider`/`@Connector` registration for every one of this package's built-in core
+  connectors/providers (`ZanixMongoConnector`, `ZanixCacheCoreProvider`, `ZanixQLRUConnector`,
+  `ZanixRedisConnector`, `ZanixKVStoreConnector`, `ZanixElasticsearchConnector`) now decorates the
+  real class directly instead of wrapping it in a throwaway anonymous subclass — a DI lookup by the
+  actual class every consumer imports (`this.providers.get(ZanixCacheCoreProvider)`,
+  `this.connectors.get(ZanixMongoConnector)`, ...) now resolves correctly.
+- `dataProtectionGetterDefinition`/`transformByDataProtection` no longer crash when reversing an
+  unset `[String]` protected path (Mongoose defaults it to `[]`, which is truthy but has nothing to
+  reverse) — this was surfacing through the triggers consistency fix above for any model with an
+  array-typed protected field left unset.
+- Corrected a `seedRotateProtectionKeys` doc claim: values already on the target protection version
+  are **not** left untouched on a re-run — `mask` is deterministic (so it happens to look
+  unchanged), but `encrypt` re-encrypts with a fresh IV every time, even without a key change.
+- `ZanixMongoConnector#close()` no longer silently fails to stop triggers polling when the connector
+  instance has been frozen by `TargetContainer` (every DI-managed deployment) — the poll timer/stop
+  flag moved into a mutable nested object, since a direct property assignment on a frozen instance
+  throws.
+
 ## [0.8.1] - 2026-07-28
 
 ## Added

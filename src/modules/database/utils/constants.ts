@@ -13,3 +13,12 @@ export const DATABASE_SEEDERS_ENV = 'DATABASE_SEEDERS'
  * in production changes behavior without asking for it.
  */
 export const AUTO_PROTECT_ON_UPDATE_ENV = 'AUTO_PROTECT_ON_DB_UPDATE'
+
+/**
+ * The DI key `@zanix/datamaster`'s own default Mongo connector resolves to — matches
+ * `Connector('database')(ZanixMongoConnector)` (`mongo/connector/core.ts`) exactly, regardless of
+ * which concrete subclass implements it (`getConnectorKey` resolves the core-slot alias, not the
+ * class reference — see `@zanix/server`'s `utils/targets.ts`). `registerModel`/`ModelsContainer`/
+ * `SeedersContainer` target this bucket whenever no explicit connector is given.
+ */
+export const DEFAULT_CONNECTOR_KEY = 'database'

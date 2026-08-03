@@ -12,7 +12,7 @@ import {
   OPENSEARCH_URL_ENV,
   ZanixElasticsearchConnector,
 } from './connector.ts'
-import { Connector } from '@zanix/server'
+import { Connector, registerCoreConnectorSlot, ZanixSearchConnector } from '@zanix/server'
 
 /** Connector DSL definition */
 const registerConnector = () => {
@@ -21,6 +21,12 @@ const registerConnector = () => {
   @Connector('search')
   class _ZanixElasticsearchCoreConnector extends ZanixElasticsearchConnector {}
 }
+
+// `@zanix/datamaster` owns the `'search'` core-connector slot — registered unconditionally,
+// independent of whether a cluster URL is actually configured (see `registerConnector` above).
+registerCoreConnectorSlot('search', ZanixSearchConnector, {
+  sourcePackage: '@zanix/datamaster/core',
+})
 
 /**
  * Core Elasticsearch/OpenSearch connector loader for Zanix.
