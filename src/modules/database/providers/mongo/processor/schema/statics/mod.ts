@@ -7,6 +7,7 @@ import { transactions } from './transactions.ts'
 import { upsertById, upsertManyById } from './upsert.ts'
 import { readBatch, readCursor, readDocuments, readFind } from './find.ts'
 import { paginate, paginateCursor } from './pagination.ts'
+import { protectedBulkWrite } from './bulk-write.ts'
 
 /**
  * @function statics
@@ -41,6 +42,12 @@ export const statics = (
 
   schema.statics.upsertById ??= upsertById
   schema.statics.upsertManyById ??= upsertManyById
+
+  // Overrides (not `??=`) — Mongoose's native `bulkWrite` is inherited from the base `Model` class,
+  // not present as an own `schema.statics` entry, so `??=` would never fire; this shadows it with a
+  // version that additionally understands `useDataPolicies` (see `bulk-write.ts` for why `bulkWrite`
+  // needs this instead of a query-middleware hook like `updateOne`/`findOneAndUpdate` get).
+  schema.statics.bulkWrite = protectedBulkWrite
 
   schema.statics.readFind ??= readFind
   schema.statics.readCursor ??= readCursor

@@ -7,6 +7,31 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-03
+
+### Added
+
+- `useDataPolicies` query option on `updateOne` and `findOneAndUpdate` (and therefore
+  `findByIdAndUpdate`, implemented as sugar over `findOneAndUpdate`): protects the update's
+  `$set`/`$setOnInsert` payload in place before it executes, using each field's own configured
+  protection settings — opt-in (`false`/unset by default), mirrors `upsertById`'s existing
+  `useDataPolicies` flag, extended to a raw query call. See
+  [Data Protection: query-level protection](docs/DATA-PROTECTION.md#query-level-protection-usedatapolicies).
+- `bulkWrite` gets the same `useDataPolicies` option via a static override — Mongoose has no
+  query-middleware hook for `bulkWrite` at all (a driver/ODM limitation, not specific to this
+  library) — covering `updateOne`/`updateMany`'s `$set`/`$setOnInsert`, `insertOne`'s `document`,
+  and `replaceOne`'s `replacement` within the batch.
+
+### Changed
+
+- **Breaking**: `AUTO_PROTECT_ON_DB_UPDATE` (and `extensions.autoProtectOnUpdate` when neither is
+  set) is now **on by default** — previously opt-in (disabled unless explicitly enabled). Set the
+  env var to the literal `'false'`, or `extensions.autoProtectOnUpdate: false` on a specific model,
+  to opt back out. Still only ever covers document-level `.save()` on an already-hydrated,
+  non-`isNew` document — never `updateOne`/`findOneAndUpdate`/`bulkWrite` (see the `useDataPolicies`
+  addition above for those). See
+  [Data Protection: automatic update-time protection](docs/DATA-PROTECTION.md#automatic-update-time-protection-autoprotectonupdate).
+
 ## [1.0.0] - 2026-08-02
 
 ### Added

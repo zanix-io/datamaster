@@ -36,6 +36,68 @@ attached method gives you the original value back (or, for `hash`, whether an in
 Array-valued fields get the same method attached to the array itself, except `hash`, whose `verify`
 wraps each array element individually.
 
+### Typing a hydrated document's protected fields
+
+Mongoose infers a document's field types from the schema's `type:` marker only (`String` → `string`)
+— it has no way to know a `get:` function changes what actually comes back at read time, so
+`InferSchemaType`/a hand-written `Attrs` type will keep saying `string` for a protected field even
+though you get a wrapper object back. There's no way to make this fully automatic without
+re-implementing Mongoose's own type inference; the practical pattern is a **separate type for the
+hydrated/read side**, since a protected field's write shape (`string`, what you assign) and read
+shape (the wrapper) are genuinely different — and always reached with a **type assertion (`as`)**,
+never a plain `:` annotation. Mongoose's declared type (`string`) and the wrapper type are
+deliberately structurally incompatible (that mismatch is the whole point — it's what makes a stray
+`user.email` hard to accidentally treat as plaintext), so a `:` annotation always fails
+assignability where an `as` assertion succeeds:
+
+```ts
+import type {
+  RequiredDecryptableScalar,
+  RequiredUnmaskableScalar,
+  RequiredVerifiableScalar,
+} from '@zanix/datamaster'
+
+// What you write (create/update payloads) — unchanged, plain strings
+export type AuthenticationAttrs = {
+  id: string
+  password?: string
+  oauthRefreshToken?: string
+}
+
+// What you read off a hydrated document — one type describing every protected field's real shape.
+// Pick the `Required<Strategy>Scalar`/`Required<Strategy>Array` matching each field's actual shape
+// (scalar `String` vs. array, e.g. `phones: [String]`) — the same rule for every strategy, no
+// exceptions to remember.
+export type HydratedAuthentication =
+  & Omit<AuthenticationAttrs, 'password' | 'oauthRefreshToken'>
+  & {
+    password?: RequiredVerifiableScalar
+    oauthRefreshToken?: RequiredDecryptableScalar
+  }
+
+const userAuth = user?.auth as HydratedAuthentication
+await userAuth.password?.verify('input') // no `!`/`?.` needed on the method itself
+await userAuth.oauthRefreshToken?.decrypt()
+
+// Reading a single field off a loosely-typed source works the same way:
+const email = (user?.email) as RequiredUnmaskableScalar | undefined
+const fullEmail = email?.unmask()
+```
+
+**Use the `Required<Strategy>Scalar`/`Required<Strategy>Array` variant consistently, for every
+protected field, regardless of strategy** — `RequiredVerifiableScalar`/`RequiredVerifiableArray`
+(`hash`), `RequiredDecryptableScalar`/`RequiredDecryptableArray` (`encrypt`),
+`RequiredUnmaskableScalar`/`RequiredUnmaskableArray` (`mask`). One rule, no per-strategy exceptions:
+pick `*Scalar` or `*Array` to match the field's real shape, and the method (`verify`/`decrypt`/
+`unmask`) is always directly callable, no narrowing or `!`/`?.` on the method itself needed.
+
+(Technically, `mask`/`encrypt`'s plain union types — `UnmaskableObject`/`DecryptableObject` —
+already let you call `.unmask?.()`/`.decrypt?.()` without narrowing, since both their scalar and
+array branches carry the method; only `hash`'s `VerifiableArray` lacks it entirely on the array
+itself. Still, sticking to the `Required*` pattern everywhere — rather than switching approach per
+strategy — keeps one convention to remember, and forces you to be explicit about whether a given
+field is scalar- or array-valued instead of leaning on the union to gloss over it.)
+
 ## Access strategies (`dataAccessGetter`)
 
 ```ts
@@ -106,10 +168,16 @@ concern only, with nothing to apply before storage.
 That automatic path does **not** cover every write, though:
 
 - Saving over an **already-existing** document again (`isNew` is `false` on that second `.save()`)
-  does not re-run the transform — only the very first save of a document does.
-- Query-level operations that update a collection directly — `updateOne`, `findOneAndUpdate`,
-  `bulkWrite`, etc. — bypass Mongoose's document middleware entirely, so the pre-save hook never
-  fires for them.
+  does not re-run the transform on its own — see
+  [Automatic update-time protection](#automatic-update-time-protection-autoprotectonupdate) below
+  for the option that extends it there too.
+- Query-level operations that update a collection directly — `updateOne`, `findOneAndUpdate` (and
+  therefore `findByIdAndUpdate`, implemented as sugar over it), `bulkWrite` — bypass Mongoose's
+  document middleware entirely, so the pre-save hook never fires for them. `updateOne`/
+  `findOneAndUpdate` accept an opt-in `useDataPolicies` query option instead (`bulkWrite` gets its
+  own static override for the same option, since Mongoose has no query-middleware hook for it at
+  all) — see [Query-level protection (`useDataPolicies`)](#query-level-protection-usedatapolicies)
+  below.
 
 This is **deliberate, not an oversight**: on an update, the field's current in-memory value could
 either be a genuine new plaintext value (needs protecting) or the same already-protected value being
@@ -189,9 +257,62 @@ user.ssn = 'a-genuinely-new-value'
 await user.save() // now protected automatically, no `upsertById` needed
 ```
 
-`false` by default — falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var (`'true'` to enable
-everywhere an explicit per-model value isn't set) when the option itself is omitted, same
-explicit-wins-over-env-var rule every option/env-var pair in this package follows.
+**On by default** — falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var (the literal `'false'` to
+opt out everywhere an explicit per-model value isn't set) when the option itself is omitted, same
+explicit-wins-over-env-var rule every option/env-var pair in this package follows. Set
+`extensions.autoProtectOnUpdate: false` on a specific model (or the env var to `'false'` globally)
+to opt back out.
+
+This only ever covers document-level `.save()` — it does **not** extend to `updateOne`,
+`findOneAndUpdate`, or `bulkWrite`; see the next section for those.
+
+### Query-level protection (`useDataPolicies`)
+
+`updateOne` and `findOneAndUpdate` (and therefore `findByIdAndUpdate`, implemented as sugar over
+`findOneAndUpdate`) accept a `useDataPolicies: true` query option that protects the update's
+`$set`/`$setOnInsert` payload in place before it executes — same purpose as `upsertById`'s own
+`useDataPolicies` flag, extended to a raw query call:
+
+```ts
+await User.updateOne(
+  { _id: id },
+  { $set: { password: 'a-new-password' } },
+  { useDataPolicies: true },
+) // `password` is hashed before the update runs, using the field's own configured settings
+
+await User.findOneAndUpdate(
+  { _id: id },
+  { $setOnInsert: { ssn: 'a-new-ssn' } },
+  { upsert: true, useDataPolicies: true },
+)
+```
+
+`bulkWrite` gets the same option through a static override instead of a query hook — Mongoose has no
+query-middleware hook for `bulkWrite` at all (a driver/ODM limitation, not specific to this library)
+— covering `updateOne`/`updateMany`'s `$set`/`$setOnInsert`, `insertOne`'s `document`, and
+`replaceOne`'s `replacement` within the batch:
+
+```ts
+await User.bulkWrite(
+  [{ updateOne: { filter: { _id: id }, update: { $set: { password: 'a-new-password' } } } }],
+  { useDataPolicies: true },
+)
+```
+
+**Opt-in only, `false`/unset by default — never automatic**, unlike `autoProtectOnUpdate` above.
+That option can safely default to on because it has a loaded document to snapshot-diff against (see
+`isProtectionUnchanged`); here there is no document at all, only a `$set`/`$setOnInsert` payload the
+caller built themselves — it could be genuine plaintext that needs protecting, or a value the caller
+already protected by hand (e.g. via `Model.hash()`) before building the update. Only an explicit ask
+resolves that ambiguity safely; guessing would risk silently double-protecting an already-protected
+value (the exact same risk `autoProtectOnUpdate`'s own heuristics section above rules out for the
+general case).
+
+**Typing note**: `findOneAndUpdate`/`bulkWrite` pick up `useDataPolicies` through a `mongoose`
+module augmentation (so it survives a Mongoose version bump with nothing to keep in sync).
+`updateOne` needs an explicit additional overload on the bound model instead — its own options type
+can't be augmented the same way (see `mongo/typings/mongoose-augment.ts`'s own comments for the full
+reason). Both are covered either way; this only affects how the typing is wired internally.
 
 **Not yet supported for wildcard (`*`) protected paths** — a per-element protected path inside an
 array of subdocuments (see [Combining both](#combining-both-datapoliciesgetter) for an example

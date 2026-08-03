@@ -1,15 +1,24 @@
 // deno-lint-ignore-file no-explicit-any
 import type {
+  FilterQuery,
   HydratedDocument,
   InferSchemaType,
   Model as MongoModel,
   ObtainSchemaGeneric,
+  QueryOptions,
   Schema,
   SchemaDefinition,
   SchemaOptions,
+  UpdateQuery,
+  UpdateWithAggregationPipeline,
 } from 'mongoose'
 import type { BaseCustomSchema, MongoSchemaDefinition } from './schema.ts'
 import type { SchemaStatics } from './statics.ts'
+// Side-effect import (types only): wherever `AdaptedModel`/`ModelBySchema` are referenced, the
+// `useDataPolicies` augmentation of `findOneAndUpdate`/`bulkWrite`'s option types (see the file
+// itself) must be part of the same TS program for it to apply — declaration merging only takes
+// effect for compilations that actually include the augmenting file, transitively or otherwise.
+import './mongoose-augment.ts'
 import type { BaseAttributes, Extensions, SeederOptions } from 'database/typings/general.ts'
 import type { Model, MongoSeeder, SchemaMethods } from './commons.ts'
 
@@ -112,6 +121,21 @@ export type AdaptedModel<
 > = Model<Attrs> & SchemaStatics & {
   /** The model's underlying schema, with its custom statics and methods available. */
   schema: SchemaDefinition<Opts> & BaseCustomSchema
+  /**
+   * Additional `updateOne` overload accepting `useDataPolicies` (see
+   * `processor/middlewares/data-protection.ts`'s query-level protection hook). Needed as an
+   * explicit overload rather than a `mongoose` module augmentation (unlike `findOneAndUpdate`/
+   * `bulkWrite`, covered by `mongo/typings/mongoose-augment.ts`): `updateOne`'s options type is
+   * `mongodb.UpdateOptions & MongooseUpdateQueryOptions`, and the latter is a `Pick<>` type alias
+   * (not an interface) restricted to a fixed key allowlist — not augmentable — while
+   * `mongodb.UpdateOptions` resolves to a separate physical module instance from what Mongoose's
+   * own bundled types reference internally, so augmenting it doesn't merge either.
+   */
+  updateOne(
+    filter: FilterQuery<Attrs>,
+    update: UpdateQuery<Attrs> | UpdateWithAggregationPipeline,
+    options: QueryOptions<Attrs> & { useDataPolicies?: boolean },
+  ): ReturnType<Model<Attrs>['updateOne']>
 }
 
 /**
@@ -120,6 +144,13 @@ export type AdaptedModel<
 export type AdaptedModelBySchema<S extends Schema> = ModelBySchema<S> & SchemaStatics & {
   /** The model's underlying schema, with its custom statics and methods available. */
   schema: BaseCustomSchema & ModelBySchema<S>['schema']
+  /** Additional `updateOne` overload accepting `useDataPolicies` — see `AdaptedModel`'s own copy
+   * of this override for the full rationale. */
+  updateOne(
+    filter: FilterQuery<InferSchemaType<S>>,
+    update: UpdateQuery<InferSchemaType<S>> | UpdateWithAggregationPipeline,
+    options: QueryOptions<InferSchemaType<S>> & { useDataPolicies?: boolean },
+  ): ReturnType<ModelBySchema<S>['updateOne']>
 }
 
 /**

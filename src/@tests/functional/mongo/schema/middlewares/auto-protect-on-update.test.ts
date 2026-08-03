@@ -21,18 +21,41 @@ const newProtectedSchema = () =>
 
 Deno.test({
   ...sanitize,
-  name: 'autoProtectOnUpdate: off by default — a reassigned protected field is left as plaintext',
+  name: 'autoProtectOnUpdate: on by default — a reassigned protected field gets protected',
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-default-off', newProtectedSchema())
+    const Model = db.getModel('test-autoprotect-default-on', newProtectedSchema())
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     doc.secret = 'second-secret'
     await doc.save()
 
     const raw = (await Model.findOne({ _id: doc._id }).lean()) as any
-    assertEquals(raw.secret, 'second-secret') // never protected — status quo, unchanged by this feature
+    assert(raw.secret !== 'second-secret') // protected without any opt-in — on by default now
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name: 'autoProtectOnUpdate: an explicit false on the model disables it even with no env var set',
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-autoprotect-explicit-false-no-env', newProtectedSchema(), {
+      extensions: { autoProtectOnUpdate: false },
+    })
+
+    const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
+    doc.secret = 'second-secret'
+    await doc.save()
+
+    const raw = (await Model.findOne({ _id: doc._id }).lean()) as any
+    assertEquals(raw.secret, 'second-secret') // explicit false wins over the on-by-default behavior
 
     Deno.env.delete('DATA_SECRET_KEY')
     await DropCollection(Model, db)
@@ -154,19 +177,20 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
-  name: 'autoProtectOnUpdate: AUTO_PROTECT_ON_DB_UPDATE=true enables it when the option is omitted',
+  name:
+    'autoProtectOnUpdate: AUTO_PROTECT_ON_DB_UPDATE=false disables it when the option is omitted',
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
-    Deno.env.set('AUTO_PROTECT_ON_DB_UPDATE', 'true')
+    Deno.env.set('AUTO_PROTECT_ON_DB_UPDATE', 'false')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-env-var', newProtectedSchema())
+    const Model = db.getModel('test-autoprotect-env-var-false', newProtectedSchema())
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     doc.secret = 'second-secret'
     await doc.save()
 
     const raw = (await Model.findOne({ _id: doc._id }).lean()) as any
-    assert(raw.secret !== 'second-secret')
+    assertEquals(raw.secret, 'second-secret') // opted out via the env var — left as plaintext
 
     Deno.env.delete('DATA_SECRET_KEY')
     Deno.env.delete('AUTO_PROTECT_ON_DB_UPDATE')

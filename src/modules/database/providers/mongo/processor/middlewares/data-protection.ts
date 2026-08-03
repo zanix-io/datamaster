@@ -33,8 +33,11 @@ export const isProtectionUnchanged = (current: unknown, original: unknown): bool
  * not yet supported by `autoProtectOnUpdate`'s detection (see the option's own JSDoc). */
 const isWildcardPath = (path: string): boolean => path.includes('*')
 
+/** `'false'` (the literal string) is the only value that disables it — unset, `'true'`, or anything
+ * else all enable it. On-by-default, same convention `DATABASE_SEEDERS_ENV` uses elsewhere in this
+ * package for an opt-out (rather than opt-in) feature. */
 const autoProtectOnUpdateFromEnv = (): boolean =>
-  Deno.env.get(AUTO_PROTECT_ON_UPDATE_ENV) === 'true'
+  Deno.env.get(AUTO_PROTECT_ON_UPDATE_ENV) !== 'false'
 
 /**
  * Registers a Mongoose pre-save hook that enforces data protection rules.
@@ -49,8 +52,12 @@ const autoProtectOnUpdateFromEnv = (): boolean =>
  * @param {BaseCustomSchema} schema - The Mongoose schema where the data protection pre-save hook will be applied.
  * @param {boolean} [autoProtectOnUpdate] - The model's `extensions.autoProtectOnUpdate` — whether a
  * document-level update (`.save()` on an existing document) should also auto-protect a reassigned
- * path. Falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var, then `false`, when omitted. See the
- * option's own JSDoc (`database/typings/general.ts`) for the full rationale.
+ * path. Falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var, then `true`, when omitted — on by
+ * default; set the env var to the literal `'false'` (or the option itself to `false`) to opt out.
+ * This only ever covers document-level `.save()` — query-level operations (`updateOne`,
+ * `findOneAndUpdate`, `bulkWrite`) bypass Mongoose document middleware entirely and are never
+ * protected by this, regardless of the setting. See the option's own JSDoc
+ * (`database/typings/general.ts`) for the full rationale.
  *
  * @returns {void} Registers the pre-save hook on the schema (no direct return value).
  */
@@ -138,4 +145,47 @@ export const dataProtectionPreSave = (
     await schema.statics.upsertManyById.call(Model, data, options)
     next()
   })
+
+  // Query-level: updateOne / findOneAndUpdate (this also covers `findByIdAndUpdate`, which
+  // Mongoose implements as sugar over `findOneAndUpdate` — same underlying query op, same hook).
+  //
+  // Opt-in only, via `{ useDataPolicies: true }` in the query options — never automatic, unlike
+  // `autoProtectOnUpdate` above. That feature can safely default to on because it has a loaded
+  // document to snapshot-diff against (see `isProtectionUnchanged`); here there is no document at
+  // all, only a `$set`/`$setOnInsert` payload the caller built themselves — it could be genuine
+  // plaintext that needs protecting, or a value the caller already protected by hand (e.g. via
+  // `Model.hash()`) before building the update. Only an explicit ask resolves that ambiguity
+  // safely; guessing would risk silently double-protecting an already-protected value.
+  //
+  // `bulkWrite` is deliberately not covered here — Mongoose has no query-middleware hook for it at
+  // all (not a limitation of this library); see `processor/schema/statics/bulk-write.ts` for the
+  // separate override that covers it instead.
+  schema.pre(
+    ['updateOne', 'findOneAndUpdate'],
+    { document: false, query: true },
+    async function (this: any, next) {
+      const options = this.getOptions()
+      if (!options?.useDataPolicies) return next()
+
+      delete options.useDataPolicies // never forwarded to the MongoDB driver
+
+      const update = this.getUpdate()
+      if (!update) return next()
+
+      await Promise.all(
+        (['$set', '$setOnInsert'] as const).map((op) => {
+          const value = update[op]
+          if (!value) return
+
+          return transformShallowByPaths(value, {
+            allowedPaths,
+            transform: (fieldValue, path) =>
+              dataProtectionSetterDefinition(dataProtection[path], fieldValue),
+          })
+        }),
+      )
+
+      next()
+    },
+  )
 }

@@ -7,10 +7,15 @@
 export const DATABASE_SEEDERS_ENV = 'DATABASE_SEEDERS'
 
 /**
- * Env var that, set to the literal string `'true'`, enables `autoProtectOnUpdate` for every model
- * that doesn't set the `extensions.autoProtectOnUpdate` option explicitly — an explicit per-model
- * value always wins over this default. `false`/unset by default (opt-in), so no application already
- * in production changes behavior without asking for it.
+ * Env var that enables `autoProtectOnUpdate` for every model that doesn't set the
+ * `extensions.autoProtectOnUpdate` option explicitly — an explicit per-model value always wins over
+ * this default. On by default: only the literal string `'false'` disables it; unset, `'true'`, or
+ * anything else all leave it enabled.
+ *
+ * This only ever covers document-level `.save()` on an already-hydrated, non-`isNew` document —
+ * query-level operations (`updateOne`, `findOneAndUpdate`, `bulkWrite`) bypass Mongoose document
+ * middleware entirely and are **never** protected by this, on or off. See
+ * [Data Protection: automatic update-time protection](../../../../docs/DATA-PROTECTION.md#automatic-update-time-protection-autoprotectonupdate).
  */
 export const AUTO_PROTECT_ON_UPDATE_ENV = 'AUTO_PROTECT_ON_DB_UPDATE'
 

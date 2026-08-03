@@ -458,16 +458,19 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
-  name:
-    'a document-level .save() update reassigning a protected field does NOT get it re-encrypted ' +
-    '(pre-existing gap, independent of the trigger dispatch decrypt above)',
+  name: 'a document-level .save() update with autoProtectOnUpdate explicitly disabled leaves a ' +
+    'reassigned protected field as plaintext (isolates this from the triggers middleware, ' +
+    'independent of the trigger dispatch decrypt above)',
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    // No triggers at all — isolates this from `forDispatch`/`transformByDataProtection` entirely,
-    // to confirm the plaintext leak comes from `dataProtectionPreSave`'s own `isNew`-only guard
-    // (see middlewares/data-protection.ts), not from the triggers middleware added in this change.
-    const Model = db.getModel('test-no-triggers-protected-reencrypt', newProtectedSchema())
+    // No triggers at all, and `autoProtectOnUpdate` explicitly off (on by default otherwise — see
+    // middlewares/data-protection.ts) — isolates this from both `forDispatch`/
+    // `transformByDataProtection` and `autoProtectOnUpdate`, to confirm the triggers middleware
+    // added in this change never re-protects a reassigned field on its own.
+    const Model = db.getModel('test-no-triggers-protected-reencrypt', newProtectedSchema(), {
+      extensions: { autoProtectOnUpdate: false },
+    })
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
 

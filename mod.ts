@@ -61,4 +61,20 @@ export {
 } from 'utils/protection.ts'
 
 // General types
-export type { DecryptableObject, UnmaskableObject, VerifiableObject } from 'typings/data.ts'
+export type {
+  DecryptableArray,
+  DecryptableObject,
+  DecryptableScalar,
+  RequiredDecryptableArray,
+  RequiredDecryptableScalar,
+  RequiredUnmaskableArray,
+  RequiredUnmaskableScalar,
+  RequiredVerifiableArray,
+  RequiredVerifiableScalar,
+  UnmaskableArray,
+  UnmaskableObject,
+  UnmaskableScalar,
+  VerifiableArray,
+  VerifiableObject,
+  VerifiableScalar,
+} from 'typings/data.ts'
