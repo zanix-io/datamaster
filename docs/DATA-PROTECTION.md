@@ -308,11 +308,11 @@ resolves that ambiguity safely; guessing would risk silently double-protecting a
 value (the exact same risk `autoProtectOnUpdate`'s own heuristics section above rules out for the
 general case).
 
-**Typing note**: `findOneAndUpdate`/`bulkWrite` pick up `useDataPolicies` through a `mongoose`
-module augmentation (so it survives a Mongoose version bump with nothing to keep in sync).
-`updateOne` needs an explicit additional overload on the bound model instead — its own options type
-can't be augmented the same way (see `mongo/typings/mongoose-augment.ts`'s own comments for the full
-reason). Both are covered either way; this only affects how the typing is wired internally.
+**Typing note**: `updateOne`, `findOneAndUpdate`, and `bulkWrite` all pick up `useDataPolicies`
+through explicit overloads declared on the bound model type (`mongo/typings/models.ts`), rather than
+a `mongoose` module augmentation — JSR's "no slow types" publish policy bans `declare module`/
+`declare global` anywhere reachable from a package's public API. All three are covered either way;
+this only affects how the typing is wired internally.
 
 **Not yet supported for wildcard (`*`) protected paths** — a per-element protected path inside an
 array of subdocuments (see [Combining both](#combining-both-datapoliciesgetter) for an example

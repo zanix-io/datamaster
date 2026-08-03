@@ -1,9 +1,13 @@
 // deno-lint-ignore-file no-explicit-any
 import type {
+  AnyBulkWriteOperation,
   FilterQuery,
   HydratedDocument,
   InferSchemaType,
   Model as MongoModel,
+  mongo,
+  MongooseBulkWriteOptions,
+  MongooseBulkWriteResult,
   ObtainSchemaGeneric,
   QueryOptions,
   Schema,
@@ -14,11 +18,6 @@ import type {
 } from 'mongoose'
 import type { BaseCustomSchema, MongoSchemaDefinition } from './schema.ts'
 import type { SchemaStatics } from './statics.ts'
-// Side-effect import (types only): wherever `AdaptedModel`/`ModelBySchema` are referenced, the
-// `useDataPolicies` augmentation of `findOneAndUpdate`/`bulkWrite`'s option types (see the file
-// itself) must be part of the same TS program for it to apply — declaration merging only takes
-// effect for compilations that actually include the augmenting file, transitively or otherwise.
-import './mongoose-augment.ts'
 import type { BaseAttributes, Extensions, SeederOptions } from 'database/typings/general.ts'
 import type { Model, MongoSeeder, SchemaMethods } from './commons.ts'
 
@@ -123,19 +122,51 @@ export type AdaptedModel<
   schema: SchemaDefinition<Opts> & BaseCustomSchema
   /**
    * Additional `updateOne` overload accepting `useDataPolicies` (see
-   * `processor/middlewares/data-protection.ts`'s query-level protection hook). Needed as an
-   * explicit overload rather than a `mongoose` module augmentation (unlike `findOneAndUpdate`/
-   * `bulkWrite`, covered by `mongo/typings/mongoose-augment.ts`): `updateOne`'s options type is
-   * `mongodb.UpdateOptions & MongooseUpdateQueryOptions`, and the latter is a `Pick<>` type alias
-   * (not an interface) restricted to a fixed key allowlist — not augmentable — while
-   * `mongodb.UpdateOptions` resolves to a separate physical module instance from what Mongoose's
-   * own bundled types reference internally, so augmenting it doesn't merge either.
+   * `processor/middlewares/data-protection.ts`'s query-level protection hook). Declared as an
+   * explicit overload rather than a `mongoose` module augmentation — JSR's "no slow types" policy
+   * hard-bans `declare module`/`declare global` anywhere reachable from a package's public API, so
+   * augmenting Mongoose's own types isn't an option here regardless of whether the target type
+   * would otherwise merge cleanly.
    */
   updateOne(
     filter: FilterQuery<Attrs>,
     update: UpdateQuery<Attrs> | UpdateWithAggregationPipeline,
     options: QueryOptions<Attrs> & { useDataPolicies?: boolean },
   ): ReturnType<Model<Attrs>['updateOne']>
+  /**
+   * Additional `findOneAndUpdate` overloads accepting `useDataPolicies` — same rationale as
+   * `updateOne` above. `useDataPolicies` is required (not optional) in these signatures, unlike
+   * `updateOne`'s: Mongoose's own `findOneAndUpdate` has several overloads returning different
+   * shapes depending on `lean`/`includeResultMetadata`/`upsert`+`new`, and a required key means
+   * these overloads only match calls that actually pass `useDataPolicies`, so Mongoose's own more
+   * precise overloads stay reachable — and preferred — for calls that don't use the flag. Combining
+   * `useDataPolicies` with those other flags still type-checks, just against this catch-all return
+   * shape rather than the fine-grained native one.
+   */
+  findOneAndUpdate(
+    filter: FilterQuery<Attrs>,
+    update: UpdateQuery<Attrs>,
+    options: QueryOptions<Attrs> & { useDataPolicies: boolean },
+  ): ReturnType<Model<Attrs>['findOneAndUpdate']>
+  /**
+   * Additional `bulkWrite` overloads accepting `useDataPolicies` (see `processor/schema/statics/
+   * bulk-write.ts`'s static override — Mongoose has no query-middleware hook for `bulkWrite` at
+   * all, so the runtime protection lives there instead of a `schema.pre` hook). Same
+   * required-key rationale as `findOneAndUpdate` above; mirrors both of Mongoose's own `bulkWrite`
+   * overloads (distinguished by `ordered: false`) so the richer `validationErrors`-carrying result
+   * type is preserved when combined with `useDataPolicies`.
+   */
+  bulkWrite<DocContents = Attrs>(
+    writes: Array<AnyBulkWriteOperation<DocContents extends mongo.Document ? DocContents : any>>,
+    options: mongo.BulkWriteOptions & MongooseBulkWriteOptions & {
+      ordered: false
+      useDataPolicies: boolean
+    },
+  ): Promise<MongooseBulkWriteResult>
+  bulkWrite<DocContents = Attrs>(
+    writes: Array<AnyBulkWriteOperation<DocContents extends mongo.Document ? DocContents : any>>,
+    options: mongo.BulkWriteOptions & MongooseBulkWriteOptions & { useDataPolicies: boolean },
+  ): Promise<mongo.BulkWriteResult>
 }
 
 /**
@@ -151,6 +182,26 @@ export type AdaptedModelBySchema<S extends Schema> = ModelBySchema<S> & SchemaSt
     update: UpdateQuery<InferSchemaType<S>> | UpdateWithAggregationPipeline,
     options: QueryOptions<InferSchemaType<S>> & { useDataPolicies?: boolean },
   ): ReturnType<ModelBySchema<S>['updateOne']>
+  /** Additional `findOneAndUpdate` overload accepting `useDataPolicies` — see `AdaptedModel`'s own
+   * copy of this override for the full rationale. */
+  findOneAndUpdate(
+    filter: FilterQuery<InferSchemaType<S>>,
+    update: UpdateQuery<InferSchemaType<S>>,
+    options: QueryOptions<InferSchemaType<S>> & { useDataPolicies: boolean },
+  ): ReturnType<ModelBySchema<S>['findOneAndUpdate']>
+  /** Additional `bulkWrite` overloads accepting `useDataPolicies` — see `AdaptedModel`'s own copy
+   * of this override for the full rationale. */
+  bulkWrite<DocContents = InferSchemaType<S>>(
+    writes: Array<AnyBulkWriteOperation<DocContents extends mongo.Document ? DocContents : any>>,
+    options: mongo.BulkWriteOptions & MongooseBulkWriteOptions & {
+      ordered: false
+      useDataPolicies: boolean
+    },
+  ): Promise<MongooseBulkWriteResult>
+  bulkWrite<DocContents = InferSchemaType<S>>(
+    writes: Array<AnyBulkWriteOperation<DocContents extends mongo.Document ? DocContents : any>>,
+    options: mongo.BulkWriteOptions & MongooseBulkWriteOptions & { useDataPolicies: boolean },
+  ): Promise<mongo.BulkWriteResult>
 }
 
 /**

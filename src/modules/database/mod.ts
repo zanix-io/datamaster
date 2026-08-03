@@ -19,11 +19,6 @@
  * @module zanixDatabase
  */
 
-// Mongoose module augmentation (types only — adds `useDataPolicies` to `updateOne`/
-// `findOneAndUpdate`/`bulkWrite`'s option shapes). Side-effect import: must be reachable from this
-// entrypoint for consumers to pick up the augmentation, since it declares no runtime exports.
-import 'mongo/typings/mongoose-augment.ts'
-
 /**
  * DATABASE COMMONS
  */
