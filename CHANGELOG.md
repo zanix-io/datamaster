@@ -7,6 +7,36 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-03
+
+### Added
+
+- `useDataPolicies` query option on `find`/`findOne`/`countDocuments` (and therefore `paginate`/
+  `paginateCursor`, which use them internally): protects a filter's `mask`-strategy plaintext
+  conditions (`$eq`/plain equality, or `$in` — including inside `$or`/`$and`/`$nor`) before the
+  query runs, so a filter written against plaintext still matches masked-at-rest data — the
+  read-side counterpart of the `updateOne`/`findOneAndUpdate` hook added in
+  [1.1.0](#110---2026-08-03). Scoped to `mask`-strategy paths only (throws for `hash`/`encrypt`,
+  which aren't deterministic); any other operator on a protected path also throws rather than
+  silently returning wrong results. See
+  [Data Protection: query-level protection](docs/DATA-PROTECTION.md#query-level-protection-usedatapolicies).
+- `Model.buildSearchFilter(query, fields, conditions?)`: builds a partial-match `$or` search filter
+  across `fields`, generalizing the common "search a few text fields, filter a couple of exact ones"
+  repository pattern. Detects each field's data protection config automatically — an unprotected
+  field gets a plain case-insensitive `$regex`; a `mask`-protected field has the search term masked
+  first and matched as a **prefix** (`^...`, not an arbitrary substring — masking is a
+  position-keyed transform, confirmed empirically); a `hash`/`encrypt`-protected field throws
+  instead of silently matching nothing. See [Database: Search](docs/DATABASE.md#search-search).
+- `paginate`/`paginateCursor` accept a `search: { query, fields }` option, sugar over
+  `buildSearchFilter` — combined with `filter` via `$and` (never merged into one object) so an
+  `$or`/`$and` already present in `filter` is never overwritten by the search's own `$or`.
+
+### Fixed
+
+- `docs/DATA-PROTECTION.md`'s masked-field partial-search example was missing the `^` anchor —
+  masking is a position-keyed transform, so an unanchored `$regex` only reliably matches when the
+  search term is a prefix of the plaintext, silently missing it when it occurs mid-string.
+
 ## [1.1.0] - 2026-08-03
 
 ### Added

@@ -2,9 +2,11 @@
 import { assert, assertEquals } from '@std/assert'
 import { paginate, paginateCursor } from 'mongo/processor/schema/statics/pagination.ts'
 
-function createMockModel(data: any[]) {
+function createMockModel(data: any[], { capturedFilters }: { capturedFilters?: any[] } = {}) {
   return {
     find(filter: any) {
+      capturedFilters?.push(filter)
+
       // Apply basic filtering with exact match or $gt operator
       let result = data.filter((d) => {
         for (const k in filter) {
@@ -37,6 +39,8 @@ function createMockModel(data: any[]) {
     },
 
     countDocuments(filter: any) {
+      capturedFilters?.push(filter)
+
       // Counts items matching the filter
       return Promise.resolve(
         data.filter((d) => {
@@ -46,6 +50,14 @@ function createMockModel(data: any[]) {
           return true
         }).length,
       )
+    },
+
+    // Mocked to return a fixed, recognizable shape — this file only tests how `paginate`/
+    // `paginateCursor` combine `search`'s result with `filter`, not the real search-building logic
+    // (that's `buildSearchFilter`'s own functional test suite).
+    buildSearchFilter(query: string | undefined, fields: string[], conditions?: any) {
+      if (!query) return { ...conditions }
+      return { ...conditions, $or: fields.map((f) => ({ [f]: { $regex: query } })) }
     },
   }
 }
@@ -170,4 +182,68 @@ Deno.test('paginateCursor: returns second page using cursor', async () => {
   assertEquals(second.docs.length, 1)
   assertEquals(second.hasNextPage, false)
   assertEquals(second.nextCursor, null)
+})
+
+Deno.test(
+  'paginate: search alone (no filter) is used as-is, without extra $and nesting',
+  async () => {
+    const captured: any[] = []
+    const model = createMockModel([{ _id: 1, name: 'A' }], { capturedFilters: captured })
+
+    await paginate.call(model as any, { search: { query: 'a', fields: ['name'] } })
+
+    assertEquals(captured[0], { $or: [{ name: { $regex: 'a' } }] })
+  },
+)
+
+Deno.test(
+  'paginate: search combined with a non-empty filter wraps both in $and, never merging top-level keys',
+  async () => {
+    const captured: any[] = []
+    const model = createMockModel([{ _id: 1, name: 'A', status: 'active' }], {
+      capturedFilters: captured,
+    })
+
+    await paginate.call(model as any, {
+      filter: { status: 'active' },
+      search: { query: 'a', fields: ['name'] },
+    })
+
+    assertEquals(captured[0], {
+      $and: [{ $or: [{ name: { $regex: 'a' } }] }, { status: 'active' }],
+    })
+    // Both the `find` and the `countDocuments` calls must receive the same combined shape.
+    assertEquals(captured[1], captured[0])
+  },
+)
+
+Deno.test(
+  'paginate: an empty search query is a no-op — the plain filter is used untouched',
+  async () => {
+    const captured: any[] = []
+    const model = createMockModel([{ _id: 1, status: 'active' }], { capturedFilters: captured })
+
+    await paginate.call(model as any, {
+      filter: { status: 'active' },
+      search: { query: '', fields: ['name'] },
+    })
+
+    assertEquals(captured[0], { status: 'active' })
+  },
+)
+
+Deno.test('paginateCursor: search combined with filter wraps both in $and', async () => {
+  const captured: any[] = []
+  const model = createMockModel([{ _id: 1, name: 'A', status: 'active' }], {
+    capturedFilters: captured,
+  })
+
+  await paginateCursor.call(model as any, {
+    filter: { status: 'active' },
+    search: { query: 'a', fields: ['name'] },
+  })
+
+  assertEquals(captured[0], {
+    $and: [{ $or: [{ name: { $regex: 'a' } }] }, { status: 'active' }],
+  })
 })

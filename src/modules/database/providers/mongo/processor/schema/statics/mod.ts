@@ -8,6 +8,7 @@ import { upsertById, upsertManyById } from './upsert.ts'
 import { readBatch, readCursor, readDocuments, readFind } from './find.ts'
 import { paginate, paginateCursor } from './pagination.ts'
 import { protectedBulkWrite } from './bulk-write.ts'
+import { buildSearchFilter } from './search.ts'
 
 /**
  * @function statics
@@ -68,4 +69,6 @@ export const statics = (
 
   schema.statics.paginate = paginate
   schema.statics.paginateCursor = paginateCursor
+
+  schema.statics.buildSearchFilter ??= buildSearchFilter
 }

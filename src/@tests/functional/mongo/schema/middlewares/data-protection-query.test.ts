@@ -3,7 +3,7 @@ import type { UnmaskableObject } from 'typings/data.ts'
 
 import { DropCollection, getDB, sanitize } from '../../../../(setup)/mongo/connector.ts'
 import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
-import { assert, assertEquals } from '@std/assert'
+import { assert, assertEquals, assertRejects } from '@std/assert'
 import { Schema, Types } from 'mongoose'
 
 const newProtectedSchema = () =>
@@ -12,6 +12,15 @@ const newProtectedSchema = () =>
     secret: {
       type: String,
       get: dataProtectionGetter('mask'),
+    },
+  })
+
+const newHashProtectedSchema = () =>
+  new Schema({
+    str: String,
+    secret: {
+      type: String,
+      get: dataProtectionGetter('hash'),
     },
   })
 
@@ -259,6 +268,212 @@ Deno.test({
     assert(reloaded)
     const masked: UnmaskableObject = reloaded.secret as any
     assertEquals(masked?.unmask?.(), 'fresh-secret')
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name: 'useDataPolicies (findOne): off by default — a plaintext filter matches nothing',
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-findone-default-off', newProtectedSchema())
+
+    await new Model({ str: 'a', secret: 'a-secret' }).save()
+    const found = await Model.findOne({ secret: 'a-secret' })
+    assertEquals(found, null) // stored masked, queried as plaintext — never protected without the opt-in flag
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name: 'useDataPolicies (findOne): true — protects a plain equality filter before the query runs',
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-findone', newProtectedSchema())
+
+    await new Model({ str: 'a', secret: 'a-secret' }).save()
+    const found = await Model.findOne({ secret: 'a-secret' }, null, { useDataPolicies: true })
+
+    assert(found)
+    const masked: UnmaskableObject = found.secret as any
+    assertEquals(masked?.unmask?.(), 'a-secret')
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name: "useDataPolicies (find): true — protects a protected path's $in condition",
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-find-in', newProtectedSchema())
+
+    await new Model({ str: 'a', secret: 'secret-one' }).save()
+    await new Model({ str: 'b', secret: 'secret-two' }).save()
+    await new Model({ str: 'c', secret: 'secret-three' }).save()
+
+    const docs = await Model.find(
+      { secret: { $in: ['secret-one', 'secret-two'] } },
+      null,
+      { useDataPolicies: true },
+    )
+
+    assertEquals(docs.length, 2)
+    assertEquals(new Set(docs.map((d) => d.str)), new Set(['a', 'b']))
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name: "useDataPolicies (find): true — protects a protected path used inside '$or'",
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-find-or', newProtectedSchema())
+
+    await new Model({ str: 'a', secret: 'secret-one' }).save()
+    await new Model({ str: 'no-match', secret: 'other' }).save()
+
+    const docs = await Model.find(
+      { $or: [{ secret: 'secret-one' }, { str: 'never-matches' }] },
+      null,
+      { useDataPolicies: true },
+    )
+
+    assertEquals(docs.length, 1)
+    assertEquals(docs[0].str, 'a')
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name:
+    "useDataPolicies (findOne): true — throws on an unsupported operator ('$regex') against a protected path",
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-findone-unsupported-op', newProtectedSchema())
+
+    await assertRejects(() =>
+      Model.findOne({ secret: { $regex: 'a' } } as any, null, { useDataPolicies: true }).exec()
+    )
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name:
+    "useDataPolicies (findOne): true — throws when the protected path's active strategy isn't 'mask'",
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-findone-hash-strategy', newHashProtectedSchema())
+
+    await assertRejects(() =>
+      Model.findOne({ secret: 'a-secret' }, null, { useDataPolicies: true }).exec()
+    )
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name: 'useDataPolicies (paginate): off by default — a plaintext filter matches nothing',
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-paginate-default-off', newProtectedSchema())
+
+    await new Model({ str: 'a', secret: 'a-secret' }).save()
+    const { docs, total } = await Model.paginate({ filter: { secret: 'a-secret' } })
+
+    assertEquals(docs.length, 0)
+    assertEquals(total, 0)
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name:
+    'useDataPolicies (paginate): true — protects the filter for both the find and the countDocuments call',
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-paginate', newProtectedSchema())
+
+    await new Model({ str: 'a', secret: 'shared-secret' }).save()
+    await new Model({ str: 'b', secret: 'shared-secret' }).save()
+    await new Model({ str: 'c', secret: 'other-secret' }).save()
+
+    const { docs, total } = await Model.paginate({
+      filter: { secret: 'shared-secret' },
+      useDataPolicies: true,
+    })
+
+    // Both the parallel `find` and `countDocuments` calls must independently protect the same
+    // caller-provided filter object without racing or double-protecting each other.
+    assertEquals(total, 2)
+    assertEquals(docs.length, 2)
+    assertEquals(new Set(docs.map((d) => d.str)), new Set(['a', 'b']))
+
+    Deno.env.delete('DATA_SECRET_KEY')
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
+
+Deno.test({
+  ...sanitize,
+  name: 'useDataPolicies (paginateCursor): true — protects the filter before the find call',
+  fn: async () => {
+    Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
+    const db = await getDB()
+    const Model = db.getModel('test-query-protect-paginate-cursor', newProtectedSchema())
+
+    await new Model({ str: 'a', secret: 'shared-secret' }).save()
+    await new Model({ str: 'b', secret: 'shared-secret' }).save()
+    await new Model({ str: 'c', secret: 'other-secret' }).save()
+
+    const { docs } = await Model.paginateCursor({
+      filter: { secret: 'shared-secret' },
+      useDataPolicies: true,
+    })
+
+    assertEquals(docs.length, 2)
+    assertEquals(new Set(docs.map((d) => d.str)), new Set(['a', 'b']))
 
     Deno.env.delete('DATA_SECRET_KEY')
     await DropCollection(Model, db)

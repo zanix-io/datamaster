@@ -263,6 +263,39 @@ const cursorPage = await UsersModel.paginateCursor({ limit: 10, cursor: page.doc
 // { docs, limit, nextCursor, hasNextPage }
 ```
 
+Both also accept `useDataPolicies: true`, protecting `filter`'s `mask`-strategy paths before the
+query runs — see
+[Data Protection: query-level protection](./DATA-PROTECTION.md#query-level-protection-usedatapolicies).
+
+### Search (`search`)
+
+`paginate`/`paginateCursor` also accept a `search: { query, fields }` option — a partial-match `$or`
+across `fields`, combined with `filter` (never merged into it: if both are non-empty, they're
+wrapped as `{ $and: [search, filter] }`, so an `$or`/`$and` already present in `filter` is never
+silently overwritten by the search's own `$or`):
+
+```ts
+const page = await OrganizationsModel.paginate({
+  filter: { status: 'active' },
+  search: { query, fields: ['name', 'legalName', 'countryOfInOrganization', 'taxId'] },
+})
+```
+
+Each field in `fields` is checked against the model's own data protection config: an unprotected
+field gets a plain case-insensitive substring match; a `mask`-protected field (like `taxId` above)
+has the search term masked first and matched as a **prefix**, not an arbitrary substring — masking
+is a deterministic, position-keyed transform, so only a term starting at index 0 of the plaintext is
+guaranteed to mask to a matching prefix of the stored value. A field protected with `hash`/`encrypt`
+throws — neither strategy allows any partial match against what's actually stored.
+
+This is sugar over the model's own `buildSearchFilter` static, which you can call directly to build
+a filter for `find`/`findOne`, or to merge into a larger filter yourself:
+
+```ts
+const filter = Model.buildSearchFilter(query, ['name', 'legalName', 'taxId'], { status })
+await Model.find(filter)
+```
+
 ## See also
 
 - [Triggers](./TRIGGERS.md) — `extensions.triggers`, reactive actions tied to the model lifecycle.

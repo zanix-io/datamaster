@@ -3,6 +3,7 @@ import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
 
 import { dataProtectionSetterDefinition } from 'database/policies/protection.ts'
 import { transformShallowByPaths } from '../schema/transforms/shallow.ts'
+import { protectFilterByPaths } from '../schema/transforms/filter.ts'
 import { AUTO_PROTECT_ON_UPDATE_ENV } from 'database/utils/constants.ts'
 import type { Document } from 'mongoose'
 
@@ -54,10 +55,15 @@ const autoProtectOnUpdateFromEnv = (): boolean =>
  * document-level update (`.save()` on an existing document) should also auto-protect a reassigned
  * path. Falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var, then `true`, when omitted — on by
  * default; set the env var to the literal `'false'` (or the option itself to `false`) to opt out.
- * This only ever covers document-level `.save()` — query-level operations (`updateOne`,
+ * This only ever covers document-level `.save()` — query-level write operations (`updateOne`,
  * `findOneAndUpdate`, `bulkWrite`) bypass Mongoose document middleware entirely and are never
  * protected by this, regardless of the setting. See the option's own JSDoc
  * (`database/typings/general.ts`) for the full rationale.
+ *
+ * This function also registers the query-level `useDataPolicies` hooks — both the write-side one
+ * (`updateOne`/`findOneAndUpdate`) and the read-side one (`find`/`findOne`/`countDocuments`, which
+ * `protectFilterByPaths` backs) — since both share the same schema-plugin entry point and the same
+ * opt-in option name.
  *
  * @returns {void} Registers the pre-save hook on the schema (no direct return value).
  */
@@ -70,6 +76,7 @@ export const dataProtectionPreSave = (
   if (!schema.statics._hasDataProtection()) return
 
   const allowedPaths = schema.statics._getDataProtectionPaths()
+  const detectablePaths = allowedPaths.filter((path) => !isWildcardPath(path))
 
   // Base data protection transform function
   // `Document` fully loosened: this runs against hydrated documents produced from
@@ -93,8 +100,6 @@ export const dataProtectionPreSave = (
   })
 
   if (autoProtectOnUpdate ?? autoProtectOnUpdateFromEnv()) {
-    const detectablePaths = allowedPaths.filter((path) => !isWildcardPath(path))
-
     // Snapshots each protected (non-wildcard) path's as-loaded value right after hydration from a
     // query — the reference point `isProtectionUnchanged` compares against below. Never fires for
     // `new Model(data)` (that's `isNew`, handled by the hook above) — only for documents actually
@@ -184,6 +189,35 @@ export const dataProtectionPreSave = (
           })
         }),
       )
+
+      next()
+    },
+  )
+
+  // Query-level: find / findOne / countDocuments — the read-side counterpart of the updateOne/
+  // findOneAndUpdate hook above, so a filter written against plaintext can still match masked-at-
+  // rest data without the caller manually calling `Model.mask(...)` on every protected field.
+  //
+  // Opt-in only, via the same `{ useDataPolicies: true }` query option — never automatic, for the
+  // same ambiguity reason as the write-side hook. Each query mutates its own `getFilter()` object
+  // (Mongoose clones the filter it's given into a fresh `_conditions` per `Query` — confirmed by
+  // reading `utils.merge`/`clonePOJOsAndArrays` in Mongoose's own source), so `paginate`'s parallel
+  // `find`/`countDocuments` calls over the *same* caller-provided filter object never race or
+  // double-protect each other.
+  //
+  // Only `mask`-strategy paths, and only `$eq`/`$in` conditions, can be handled generically here —
+  // see `protectFilterByPaths`'s own JSDoc for the full rationale (non-deterministic strategies,
+  // and operators like `$regex` that a masked field can never safely match against plaintext).
+  schema.pre(
+    ['find', 'findOne', 'countDocuments'],
+    { document: false, query: true },
+    function (this: any, next) {
+      const options = this.getOptions()
+      if (!options?.useDataPolicies) return next()
+
+      delete options.useDataPolicies // never forwarded to the MongoDB driver
+
+      protectFilterByPaths(this.getFilter(), detectablePaths, dataProtection)
 
       next()
     },

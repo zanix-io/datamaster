@@ -211,12 +211,24 @@ Model.unmask(maskedEmail) // reverse of mask
 Model.validateHash(input, storedHash) // verify a value against a previously-hashed one
 ```
 
-This is also how you search a field that's stored masked: mask the search term the same way before
-building the query, then match against the stored (masked) value —
+This is also how you search a field that's stored masked for a **partial/regex** match: mask the
+search term the same way before building the query, then match against the stored (masked) value —
 
 ```ts
-const filter = { email: { $regex: Model.mask(searchTerm), $options: 'i' } }
+const filter = { email: { $regex: `^${Model.mask(searchTerm)}`, $options: 'i' } }
 ```
+
+**Anchor the regex with `^`** — masking is a deterministic, position-keyed transform, not a
+substring-preserving one: only a term starting at index 0 of the plaintext is guaranteed to mask to
+a matching _prefix_ of the stored value. A term that only occurs in the middle of the plaintext
+masks to different bytes than what's actually stored there, so an unanchored `$regex` would silently
+miss it — build a "starts with" search, not a "contains" one. `buildSearchFilter` (see
+[Database: Search](./DATABASE.md#search-search)) already does this anchoring for you across multiple
+fields at once, and is the recommended way to build this kind of filter.
+
+For an **exact-match** filter (equality or `$in`), you don't have to mask the value by hand — see
+[Query-level protection (`useDataPolicies`)](#query-level-protection-usedatapolicies) below, which
+covers `find`/`findOne`/`countDocuments`/`paginate` in addition to the write-side operations.
 
 **Reconstructing a new document from an already-protected one** (cloning/duplicating a record,
 exporting and re-importing between environments) needs the reverse first — decrypt/unmask it back to
@@ -319,6 +331,41 @@ array of subdocuments (see [Combining both](#combining-both-datapoliciesgetter) 
 shape). Those keep today's behavior: only the explicit `upsertById`/`upsertManyById` path protects
 them on update. Query-level operations (`updateOne`, `findOneAndUpdate`, `bulkWrite`) are also
 unaffected either way — this option only extends the document-level `.save()` path.
+
+#### Read-side: `find` / `findOne` / `countDocuments` / `paginate`
+
+The same `useDataPolicies: true` option also works the other way around: it protects a **filter's**
+plaintext conditions on `mask`-strategy paths before the query runs, so code can search by plaintext
+without calling `Model.mask(...)` by hand first:
+
+```ts
+// Instead of:
+await Account.findOne({ accountNumber: Account.mask(number, {}, 'v1') })
+
+// Automatic, and never drifts from the field's own configured active version:
+await Account.findOne({ accountNumber: number }, null, { useDataPolicies: true })
+```
+
+`paginate`/`paginateCursor` accept the same flag directly in their options object, and apply it to
+both the `find` and (for `paginate`) the `countDocuments` call it runs internally — each query
+independently protects its own copy of the filter, so the two never race or double-protect each
+other:
+
+```ts
+await Account.paginate({ filter: { accountNumber: number }, useDataPolicies: true })
+```
+
+**Only a plain equality value, `$eq`, or `$in`** on a protected path are rewritten — the shapes that
+stay meaningful after a deterministic transform — including inside `$or`/`$and`/`$nor` branches. Any
+other operator on a protected path (`$regex`, `$gt`, ...) throws, rather than silently returning an
+always-wrong result set; build that filter with `Model.mask(term)` by hand instead (see
+[above](#protecting-a-value-before-writing-it)).
+
+**Only the `mask` strategy is supported** for this — it's the one strategy guaranteed deterministic
+(no salt/IV), so masking the same plaintext twice always reproduces what's actually stored. A
+protected path configured with `hash`/`encrypt` throws if used in a `useDataPolicies` query filter,
+for the same reason `hash` can't be reversed to check "is this already hashed": there's no safe way
+to know a re-hashed/re-encrypted query value would match what was stored.
 
 ## Versioned keys
 

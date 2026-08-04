@@ -20,6 +20,15 @@ export type UpsertTypeOptions = {
   type?: 'update' | 'insert'
 }
 
+/** Partial-match search options, as accepted by `paginate`/`paginateCursor`'s own `search` param —
+ * see `buildSearchFilter`, which both build on internally. */
+export type SearchFilterOptions = {
+  /** The search term. Falsy (`undefined`, `''`) is a no-op — no `$or` is added. */
+  query?: string
+  /** The schema paths to search across. */
+  fields: string[]
+}
+
 /**
  * Defines the shape of **static methods** attached to a schema (e.g., a Mongoose schema).
  *
@@ -166,6 +175,36 @@ export type SchemaStatics = {
     settings?: MaskingBaseOptions,
     version?: DataPolicyVersion,
   ) => T
+
+  /**
+   * Builds a partial-match (`$regex`) search filter across `fields`, combined with an `$or`, plus
+   * any direct-match `conditions` merged in alongside it.
+   *
+   * Each field is checked against the model's own data protection config: an unprotected field gets
+   * a plain case-insensitive `$regex`; a `mask`-protected field has the search term masked first
+   * (masking preserves substrings, so a partial match on the masked value means a partial match on
+   * the plaintext). A field protected with `hash`/`encrypt` throws — neither strategy preserves
+   * substrings, so no partial match against what's actually stored is possible.
+   *
+   * @this {AdaptedModel} The bound Mongoose model.
+   * @param {string} [query] - The search term. Falsy skips the `$or` entirely.
+   * @param {string[]} fields - The schema paths to search across.
+   * @param {Record<string, unknown>} [conditions] - Direct-match conditions merged into the
+   * returned filter alongside the `$or` (e.g. `{ status: 'active' }`).
+   *
+   * @returns {Record<string, unknown>} A MongoDB filter object, ready to pass to `find`/`paginate`/
+   * `paginateCursor`, or merge into a larger filter yourself.
+   *
+   * @example
+   * const filter = Model.buildSearchFilter(query, ['name', 'legalName', 'taxId'], { status })
+   * await Model.paginate({ filter })
+   */
+  buildSearchFilter(
+    this: AdaptedModel,
+    query: string | undefined,
+    fields: string[],
+    conditions?: Record<string, unknown>,
+  ): Record<string, unknown>
 
   /**
    * Initiates a transaction on the schema with commit and abort capabilities.
@@ -345,6 +384,13 @@ export type SchemaStatics = {
    * @param {number} [params.limit=10] - Number of documents per page.
    * @param {Record<string, unknown>} [params.filter={}] - MongoDB filter query.
    * @param {Record<string, 1 | -1>} [params.sort={ _id: 1 }] - Sort object.
+   * @param {boolean} [params.useDataPolicies] - Protects `filter`'s `mask`-strategy paths before
+   * both the `find` and the `countDocuments` calls this runs — see the query-level `useDataPolicies`
+   * hook (`processor/middlewares/data-protection.ts`). Defaults to `false`.
+   * @param {SearchFilterOptions} [params.search] - Partial-match search, combined with `filter` —
+   * see `buildSearchFilter`. When both are given and non-empty, they're combined with `$and` (never
+   * merged into one object) so an `$or`/`$and` already present in `filter` is never overwritten by
+   * the search's own `$or`.
    *
    * @returns {Promise<Object>} Result containing docs and metadata.
    * @returns {Array<Object>} return.docs - List of documents.
@@ -363,6 +409,8 @@ export type SchemaStatics = {
       filter?: Record<string, unknown>
       sort?: Record<string, 1 | -1>
       omit?: string[]
+      useDataPolicies?: boolean
+      search?: SearchFilterOptions
     },
   ): Promise<{
     // deno-lint-ignore no-explicit-any
@@ -382,6 +430,11 @@ export type SchemaStatics = {
    * @param {number} [params.limit=10] - Number of documents to return.
    * @param {Object} [params.filter={}] - MongoDB filter query.
    * @param {string|null} [params.cursor=null] - Last document _id for pagination.
+   * @param {boolean} [params.useDataPolicies] - Protects `filter`'s `mask`-strategy paths before the
+   * `find` call this runs — see the query-level `useDataPolicies` hook
+   * (`processor/middlewares/data-protection.ts`). Defaults to `false`.
+   * @param {SearchFilterOptions} [params.search] - Partial-match search, combined with `filter` —
+   * see `paginate`'s own copy of this option for the full rationale.
    *
    * @returns {Promise<Object>} Result including cursor and documents.
    * @returns {Array<Object>} return.docs - List of paginated documents.
@@ -395,6 +448,8 @@ export type SchemaStatics = {
       filter?: Record<string, unknown>
       cursor?: string | null
       omit?: string[]
+      useDataPolicies?: boolean
+      search?: SearchFilterOptions
     },
   ): Promise<{
     // deno-lint-ignore no-explicit-any

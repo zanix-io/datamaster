@@ -9,6 +9,7 @@ import type {
   MongooseBulkWriteOptions,
   MongooseBulkWriteResult,
   ObtainSchemaGeneric,
+  ProjectionType,
   QueryOptions,
   Schema,
   SchemaDefinition,
@@ -149,6 +150,21 @@ export type AdaptedModel<
     options: QueryOptions<Attrs> & { useDataPolicies: boolean },
   ): ReturnType<Model<Attrs>['findOneAndUpdate']>
   /**
+   * Additional `findOne` overload accepting `useDataPolicies` (see
+   * `processor/middlewares/data-protection.ts`'s query-level `find`/`findOne`/`countDocuments`
+   * hook) — protects the filter's `mask`-strategy paths (`$eq`/plain equality, or `$in`) before the
+   * query runs, so a filter written against plaintext still matches masked-at-rest data. Same
+   * required-key rationale as `findOneAndUpdate` above — `findOne` has several native overloads
+   * distinguished by `lean`, and a required key keeps those reachable for calls that don't use the
+   * flag. `projection` must be passed explicitly (`null` if unused) to reach the `options` slot,
+   * same as `updateOne`/`findOneAndUpdate` already require.
+   */
+  findOne(
+    filter: FilterQuery<Attrs>,
+    projection: ProjectionType<Attrs> | null | undefined,
+    options: QueryOptions<Attrs> & { useDataPolicies: boolean },
+  ): ReturnType<Model<Attrs>['findOne']>
+  /**
    * Additional `bulkWrite` overloads accepting `useDataPolicies` (see `processor/schema/statics/
    * bulk-write.ts`'s static override — Mongoose has no query-middleware hook for `bulkWrite` at
    * all, so the runtime protection lives there instead of a `schema.pre` hook). Same
@@ -189,6 +205,13 @@ export type AdaptedModelBySchema<S extends Schema> = ModelBySchema<S> & SchemaSt
     update: UpdateQuery<InferSchemaType<S>>,
     options: QueryOptions<InferSchemaType<S>> & { useDataPolicies: boolean },
   ): ReturnType<ModelBySchema<S>['findOneAndUpdate']>
+  /** Additional `findOne` overload accepting `useDataPolicies` — see `AdaptedModel`'s own copy of
+   * this override for the full rationale. */
+  findOne(
+    filter: FilterQuery<InferSchemaType<S>>,
+    projection: ProjectionType<InferSchemaType<S>> | null | undefined,
+    options: QueryOptions<InferSchemaType<S>> & { useDataPolicies: boolean },
+  ): ReturnType<ModelBySchema<S>['findOne']>
   /** Additional `bulkWrite` overloads accepting `useDataPolicies` — see `AdaptedModel`'s own copy
    * of this override for the full rationale. */
   bulkWrite<DocContents = InferSchemaType<S>>(
