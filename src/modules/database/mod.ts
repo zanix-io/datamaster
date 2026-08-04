@@ -29,6 +29,14 @@ export {
   registerModel,
 } from './defs/models.ts'
 
+// pagination RTOs
+export {
+  /** Validates cursor-based pagination query params (`cursor`, `limit`) — matches `Model.paginateCursor`'s own shape. */
+  ScrollPaginationRTO,
+  /** Validates skip/limit pagination query params (`page`, `limit`, `sortBy`) — matches `Model.paginate`'s own shape. */
+  SearchPaginationRTO,
+} from './rtos/pagination.ts'
+
 // accessors
 export {
   /** Creates a schema accessor that transparently applies data protection operations (such as `decrypt` or `unmask`) when reading a protected field. */

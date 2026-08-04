@@ -7,6 +7,23 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-08-03
+
+### Added
+
+- `ScrollPaginationRTO`/`SearchPaginationRTO` (`@zanix/datamaster`'s `./database` entrypoint):
+  ready-made, extensible `@zanix/validator` RTOs for `Model.paginateCursor`/`Model.paginate`'s own
+  query-param shape (`cursor`/`limit`, and `page`/`limit`/`sortBy`). `sortBy` coerces every value to
+  a number _before_ validating it's exactly `1`/`-1` — a raw HTTP query string always sends string
+  values (e.g. `?sortBy[createdAt]=-1`), and passing those straight through to `Model.paginate`'s
+  `sort` option throws a Mongoose `TypeError: Invalid sort value`, since Mongoose checks each value
+  with strict equality against the numbers `1`/`-1`. Extend either class (redeclaring an `accessor`
+  with its own decorator) to change a default or add fields — verified empirically that this doesn't
+  affect the base class or lose inherited validation.
+- New dependency: `@zanix/validator` (a `@zanix/utils` subpath already available transitively via
+  this package's existing `@zanix/errors`/`@zanix/helpers`/`@zanix/logger`/`@zanix/types` imports —
+  not a new package in the dependency graph).
+
 ## [1.2.0] - 2026-08-03
 
 ### Added
