@@ -6,6 +6,8 @@ import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
 import { assert, assertEquals, assertRejects } from '@std/assert'
 import { Schema, Types } from 'mongoose'
 
+console.error = () => {}
+
 const newProtectedSchema = () =>
   new Schema({
     str: String,
