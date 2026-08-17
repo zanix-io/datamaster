@@ -68,4 +68,4 @@ jobs:
         run: deno test --allow-all
 
       - name: Publish to Deno
-        run: deno publish --no-check
+        run: deno publish
