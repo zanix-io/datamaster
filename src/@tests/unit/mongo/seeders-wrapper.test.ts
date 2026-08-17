@@ -5,7 +5,9 @@ import type { SeederProcessor } from 'database/typings/general.ts'
 console.error = () => {}
 console.warn = () => {}
 
-const buildProcessor = (avoidRun: SeederProcessor['avoidRun'] = () => false) => {
+const buildProcessor = (
+  avoidRun: SeederProcessor['avoidRun'] = () => false,
+) => {
   const calls: unknown[] = []
   const processor: SeederProcessor = {
     avoidRun,
@@ -48,7 +50,9 @@ Deno.test('seederBaseWrapper reports failure when the handler throws synchronous
 Deno.test('seederBaseWrapper reports success for a synchronous handler', () => {
   const { processor, calls } = buildProcessor()
 
-  const wrapped = seederBaseWrapper(() => {}, processor, { name: 'SyncSeeder' })
+  const wrapped = seederBaseWrapper(() => {}, processor, {
+    name: 'SyncSeeder',
+  })
 
   wrapped({} as never, {} as never)
 
@@ -72,7 +76,9 @@ Deno.test('seederBaseWrapper reports success for an async handler', async () => 
 Deno.test('seederBaseWrapper skips execution when avoidRun returns true', () => {
   const { processor, calls } = buildProcessor(() => true)
 
-  const wrapped = seederBaseWrapper(() => {}, processor, { name: 'SkippedSeeder' })
+  const wrapped = seederBaseWrapper(() => {}, processor, {
+    name: 'SkippedSeeder',
+  })
 
   const result = wrapped({} as never, {} as never)
 

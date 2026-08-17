@@ -60,7 +60,9 @@ const Model = connector.getModel('users', schema, { useALS: true })
 //    one model never have to import `mongoose` themselves
 const Model = connector.getModel<Attrs>('users', {
   definition: { name: { type: String, required: true } },
-  extensions: { triggers: { post: { created: [{ custom: { name: 'my-job' } }] } } },
+  extensions: {
+    triggers: { post: { created: [{ custom: { name: 'my-job' } }] } },
+  },
 })
 
 // 3. Look up a model that was already bound via registerModel (throws if not found)
@@ -139,7 +141,10 @@ registerModel({
   extensions: {
     seeders: [
       seedByIdIfMissing({ id: '...', name: 'Admin' }),
-      seedManyByIdIfMissing([{ id: '...', name: 'A' }, { id: '...', name: 'B' }]),
+      seedManyByIdIfMissing([{ id: '...', name: 'A' }, {
+        id: '...',
+        name: 'B',
+      }]),
     ],
   },
 })
@@ -211,7 +216,10 @@ class BillingConnector extends ZanixMongoConnector {
 registerModel({ name: 'orders', definition: { total: Number } })
 
 // Targets BillingConnector specifically.
-registerModel({ name: 'invoices', definition: { amount: Number } }, BillingConnector)
+registerModel(
+  { name: 'invoices', definition: { amount: Number } },
+  BillingConnector,
+)
 ```
 
 No `slot` string needs to match anything by hand: passing the connector _class_ is enough —
@@ -243,7 +251,10 @@ const kv = new MyKVStore({ filename: 'my-store.sqlite' }) // default: 'znx.kv.tm
 
 await kv.set('key', 'value', 60) // TTL in seconds; 'KEEPTTL' preserves the current expiration
 const value = await kv.get('key')
-await kv.withLock('key', async () => {/* exclusive per-key access, same lock manager as cache */})
+await kv.withLock(
+  'key',
+  async () => {/* exclusive per-key access, same lock manager as cache */},
+)
 ```
 
 TTL expiry is **lazy** — an expired entry is skipped on read, not proactively deleted. `withLock`
@@ -256,10 +267,18 @@ directly.
 Available on any bound model as `Model.paginate(...)`/`Model.paginateCursor(...)`:
 
 ```ts
-const page = await UsersModel.paginate({ page: 1, limit: 10, filter: {}, sort: { _id: 1 } })
+const page = await UsersModel.paginate({
+  page: 1,
+  limit: 10,
+  filter: {},
+  sort: { _id: 1 },
+})
 // { docs, page, limit, total, totalPages, hasNextPage, hasPrevPage }
 
-const cursorPage = await UsersModel.paginateCursor({ limit: 10, cursor: page.docs.at(-1)?._id })
+const cursorPage = await UsersModel.paginateCursor({
+  limit: 10,
+  cursor: page.docs.at(-1)?._id,
+})
 // { docs, limit, nextCursor, hasNextPage }
 ```
 
@@ -277,7 +296,10 @@ silently overwritten by the search's own `$or`):
 ```ts
 const page = await OrganizationsModel.paginate({
   filter: { status: 'active' },
-  search: { query, fields: ['name', 'legalName', 'countryOfInOrganization', 'taxId'] },
+  search: {
+    query,
+    fields: ['name', 'legalName', 'countryOfInOrganization', 'taxId'],
+  },
 })
 ```
 
@@ -292,7 +314,9 @@ This is sugar over the model's own `buildSearchFilter` static, which you can cal
 a filter for `find`/`findOne`, or to merge into a larger filter yourself:
 
 ```ts
-const filter = Model.buildSearchFilter(query, ['name', 'legalName', 'taxId'], { status })
+const filter = Model.buildSearchFilter(query, ['name', 'legalName', 'taxId'], {
+  status,
+})
 await Model.find(filter)
 ```
 

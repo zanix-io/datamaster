@@ -29,7 +29,10 @@ export class Mongo extends ZanixMongoConnector {
   }
 }
 
-Mongo.prototype['_znx_props_'] = { ...Mongo.prototype['_znx_props_'], startMode: 'onBoot' }
+Mongo.prototype['_znx_props_'] = {
+  ...Mongo.prototype['_znx_props_'],
+  startMode: 'onBoot',
+}
 
 export const getDB = async () => {
   const bd = await new Promise<Mongo>((resolve) => {

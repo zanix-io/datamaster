@@ -47,7 +47,11 @@ Deno.test('getCachedOrFetch should return cached value from local cache', async 
 
   // Call fbGet to retrieve the value from the cache
   const result = await provider.getCachedOrFetch('redis', key)
-  assertEquals(result, value, 'Should return the cached value from the local cache')
+  assertEquals(
+    result,
+    value,
+    'Should return the cached value from the local cache',
+  )
 
   provider.redis['close']()
 })
@@ -64,7 +68,11 @@ Deno.test('getCachedOrFetch should fetch and store data when cache miss occurs',
 
   // Call fbGet, which should invoke the fetchFn since the cache is missed
   const result = await provider.getCachedOrFetch('redis', key, { fetcher })
-  assertEquals(result, value, 'Should return the fetched value from the fetch function')
+  assertEquals(
+    result,
+    value,
+    'Should return the fetched value from the fetch function',
+  )
   assertEquals(
     provider.local.has(key),
     true,
@@ -92,8 +100,14 @@ Deno.test('getCachedOrRevalidate should return cached value within soft TTL wind
   const softTtl = 5 // Soft TTL is set to 5 seconds
 
   // Call softTtlGet and check if the value is returned from the cache within the soft TTL window
-  const result = await provider.getCachedOrRevalidate('redis', key, { softTtl })
-  assertEquals(result, value.value, 'Should return the cached value within soft TTL')
+  const result = await provider.getCachedOrRevalidate('redis', key, {
+    softTtl,
+  })
+  assertEquals(
+    result,
+    value.value,
+    'Should return the cached value within soft TTL',
+  )
 
   provider.redis['close']()
 })
@@ -118,12 +132,19 @@ Deno.test(
     await new Promise((resolve) => setTimeout(resolve, 50))
 
     // Call softTtlGet to check if the data is refreshed in the background
-    const result = await provider.getCachedOrRevalidate('redis', key, { softTtl, fetcher })
+    const result = await provider.getCachedOrRevalidate('redis', key, {
+      softTtl,
+      fetcher,
+    })
 
     // Wait a bit to ensure fetchFn is completed on backround
     await new Promise((resolve) => setTimeout(resolve, 500))
 
-    assertEquals(result, 'old-value', 'Should return the old value after soft TTL expiry')
+    assertEquals(
+      result,
+      'old-value',
+      'Should return the old value after soft TTL expiry',
+    )
 
     assertEquals(
       provider.local.get(key).value,
@@ -136,7 +157,10 @@ Deno.test(
       'Should update the external cache with the new value in the background',
     )
 
-    assertEquals(await provider.getCachedOrRevalidate('redis', key, { softTtl }), 'new-fresh-value')
+    assertEquals(
+      await provider.getCachedOrRevalidate('redis', key, { softTtl }),
+      'new-fresh-value',
+    )
 
     provider.redis['close']()
   },
@@ -152,7 +176,9 @@ Deno.test('getCachedOrRevalidate should fallback to fetch if no cache available'
   const fetcher = () => Promise.resolve('fresh-data') // A function to fetch new data
 
   // Simulate cache miss (the value doesn't exist in either cache)
-  const result = await provider.getCachedOrRevalidate('redis', key, { fetcher })
+  const result = await provider.getCachedOrRevalidate('redis', key, {
+    fetcher,
+  })
 
   assertEquals(result, 'fresh-data', 'Should fetch data if not found in cache')
   assertEquals(
@@ -223,7 +249,10 @@ Deno.test('getCachedOrFetch returns undefined with nothing cached and no fetcher
   const provider = new ZanixCacheCoreProvider('testContext')
   await provider.redis['initialize']()
 
-  const result = await provider.getCachedOrFetch('redis', 'totally-missing-key')
+  const result = await provider.getCachedOrFetch(
+    'redis',
+    'totally-missing-key',
+  )
 
   assertEquals(result, undefined)
 
@@ -290,7 +319,9 @@ Deno.test('getCachedOrRevalidate returns an external-cache hit within soft TTL',
   // soft TTL" branch instead of the local-cache short-circuit at the top of the method.
   await provider.redis.set(key, value, {})
 
-  const result = await provider.getCachedOrRevalidate('redis', key, { softTtl: 5 })
+  const result = await provider.getCachedOrRevalidate('redis', key, {
+    softTtl: 5,
+  })
 
   assertEquals(result, 'fresh-from-redis')
   assertEquals(provider.local.get(key).value, 'fresh-from-redis')
@@ -303,7 +334,10 @@ Deno.test('getCachedOrRevalidate returns undefined with no cache/fetcher', async
   const provider = new ZanixCacheCoreProvider('testContext')
   await provider.redis['initialize']()
 
-  const result = await provider.getCachedOrRevalidate('redis', 'totally-missing-revalidate-key')
+  const result = await provider.getCachedOrRevalidate(
+    'redis',
+    'totally-missing-revalidate-key',
+  )
 
   assertEquals(result, undefined)
 
@@ -345,9 +379,13 @@ Deno.test('getCachedOrRevalidate falls through to the fetcher when the read fail
   logger.error = ((...args: unknown[]) => errors.push(args)) as any
 
   try {
-    const result = await provider.getCachedOrRevalidate('redis', 'revalidate-fallback-key', {
-      fetcher: () => 'fetched-despite-error',
-    })
+    const result = await provider.getCachedOrRevalidate(
+      'redis',
+      'revalidate-fallback-key',
+      {
+        fetcher: () => 'fetched-despite-error',
+      },
+    )
 
     assertEquals(result, 'fetched-despite-error')
     assertEquals(errors.length, 1)
@@ -386,7 +424,10 @@ Deno.test('getCachedOrRevalidate logs when a background refresh fetcher fails', 
 
     await new Promise((resolve) => setTimeout(resolve, 100))
     assertEquals(errors.length, 1)
-    assertEquals((errors[0] as unknown[])[0], 'Cache refresh operation failed.')
+    assertEquals(
+      (errors[0] as unknown[])[0],
+      'Cache refresh operation failed.',
+    )
   } finally {
     logger.error = originalError
     provider.redis['close']()
@@ -426,7 +467,10 @@ Deno.test('withLock runs the function under an exclusive lock and returns its re
   await registerInstance()
   const provider = new ZanixCacheCoreProvider('testContext')
 
-  const result = await provider.withLock('lock-key', () => Promise.resolve('locked-result'))
+  const result = await provider.withLock(
+    'lock-key',
+    () => Promise.resolve('locked-result'),
+  )
 
   assertEquals(result, 'locked-result')
 })

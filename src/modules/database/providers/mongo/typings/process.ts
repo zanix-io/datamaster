@@ -17,7 +17,10 @@ export type RecoursiveTransformOptions = {
     value: T,
   ) => T
   /** Function to transform non-primitive values (objects, arrays, Maps, etc.). */
-  transformNested?: (value: any, type: 'array' | 'object') => NestedValue | Document
+  transformNested?: (
+    value: any,
+    type: 'array' | 'object',
+  ) => NestedValue | Document
 }
 
 /**

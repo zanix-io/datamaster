@@ -5,11 +5,11 @@ import type {
   ElasticsearchLogSaveOptions,
 } from './typings/general.ts'
 
-import { WorkerManager } from '@zanix/workers'
 import logger from '@zanix/logger'
 import { BulkBuffer } from './bulk-buffer.ts'
-import { ZanixElasticsearchConnector } from './connector.ts'
+import { getConnector, type ZanixElasticsearchConnector } from './connector.ts'
 import { flushBulkInWorker, workerFlushMetaUrl } from './worker-flush.ts'
+import { dispatchWorkerTask } from '@zanix/server'
 
 /**
  * Aliases the formatted log's own timestamp to `@timestamp` — the field Kibana/OpenSearch
@@ -44,28 +44,37 @@ const reportFlushFailure = (context: string, error: unknown): void => {
 
 /** Flushes a batch on the main thread, logging (never throwing) on failure. */
 const flushInline = (
-  connector: ZanixElasticsearchConnector,
+  connector: ZanixElasticsearchConnector | undefined,
+  connectorOptions: ElasticsearchConnectorOptions & {
+    indexInitialize?: boolean
+  },
   docs: Record<string, unknown>[],
-): Promise<void> =>
-  connector.bulkIndex(docs).then(
+): Promise<void> => {
+  const conn = connector || getConnector(connectorOptions)
+  return conn.bulkIndex(docs).then(
     () => {},
     (e) => reportFlushFailure('inline', e),
   )
-
-/** Flushes a batch inside a `WorkerManager` worker thread — see `worker-flush.ts`. */
+}
+/** Flushes a batch inside a worker thread — see `worker-flush.ts` and `@zanix/server`'s
+ * `dispatchWorkerTask` for the `'one-time'`/`'persisted'` dispatch strategies themselves. */
 const flushViaWorker = (
-  connectorOptions: ElasticsearchConnectorOptions,
+  connectorOptions: ElasticsearchConnectorOptions & {
+    indexInitialize?: boolean
+  },
+  worker: 'one-time' | 'persisted',
   docs: Record<string, unknown>[],
 ): Promise<void> =>
   new Promise((resolve) => {
-    new WorkerManager().task(flushBulkInWorker, {
+    dispatchWorkerTask(flushBulkInWorker, {
+      mode: worker,
       metaUrl: workerFlushMetaUrl,
-      autoClose: true,
-      onFinish: ({ error }) => {
+      verbose: false,
+      callback: ({ error }) => {
         if (error) reportFlushFailure('worker', error)
         resolve()
       },
-    }).invoke(connectorOptions, docs)
+    })(connectorOptions, docs)
   })
 
 /**
@@ -99,17 +108,18 @@ export function elasticsearchLogSave(
   options: ElasticsearchLogSaveOptions = {},
 ): ElasticsearchLogSaveFunction {
   const {
-    connector: providedConnector,
     bulk,
+    connector,
     addTimestampField = true,
-    useWorker = false,
+    useWorker,
     ...connectorOptions
   } = options
 
-  const connector = providedConnector ?? new ZanixElasticsearchConnector(connectorOptions)
-
   const buffer = new BulkBuffer<Record<string, unknown>>(
-    (docs) => useWorker ? flushViaWorker(connectorOptions, docs) : flushInline(connector, docs),
+    (docs) =>
+      useWorker
+        ? flushViaWorker(connectorOptions, useWorker, docs)
+        : flushInline(connector, connectorOptions, docs),
     bulk,
   )
 

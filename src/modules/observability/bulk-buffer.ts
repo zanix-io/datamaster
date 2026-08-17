@@ -25,7 +25,10 @@ export class BulkBuffer<T> {
    */
   constructor(
     onFlush: (items: T[]) => Promise<unknown>,
-    { maxSize = 100, flushIntervalMs = 5000 }: { maxSize?: number; flushIntervalMs?: number } = {},
+    { maxSize = 100, flushIntervalMs = 5000 }: {
+      maxSize?: number
+      flushIntervalMs?: number
+    } = {},
   ) {
     this.#onFlush = onFlush
     this.#maxSize = maxSize

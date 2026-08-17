@@ -48,7 +48,9 @@ export function protectFilterByPaths(
   for (const combinator of FILTER_COMBINATORS) {
     const branch = filter[combinator]
     if (Array.isArray(branch)) {
-      for (const condition of branch) protectFilterByPaths(condition, allowedPaths, dataProtection)
+      for (const condition of branch) {
+        protectFilterByPaths(condition, allowedPaths, dataProtection)
+      }
     }
   }
 
@@ -77,9 +79,11 @@ export function protectFilterByPaths(
     }
 
     const isPlain = typeof value === 'string'
-    const isEq = !isPlain && value && typeof value === 'object' && '$eq' in value &&
+    const isEq = !isPlain && value && typeof value === 'object' &&
+      '$eq' in value &&
       Object.keys(value).length === 1 && typeof value.$eq === 'string'
-    const isIn = !isPlain && value && typeof value === 'object' && '$in' in value &&
+    const isIn = !isPlain && value && typeof value === 'object' &&
+      '$in' in value &&
       Object.keys(value).length === 1 && Array.isArray(value.$in)
 
     if (!isPlain && !isEq && !isIn) {
@@ -96,9 +100,11 @@ export function protectFilterByPaths(
       })
     }
 
-    if (isPlain) filter[path] = mask(value, activeConfig.settings, config.activeVersion)
-    else if (isEq) value.$eq = mask(value.$eq, activeConfig.settings, config.activeVersion)
-    else {
+    if (isPlain) {
+      filter[path] = mask(value, activeConfig.settings, config.activeVersion)
+    } else if (isEq) {
+      value.$eq = mask(value.$eq, activeConfig.settings, config.activeVersion)
+    } else {
       // Each `$in` entry is an independent value, not parts of one grouped value — `mask()`'s array
       // form only prepends the version prefix to element 0 (it's meant for a single field whose own
       // stored value is an array, e.g. `String[]`), so masking the whole `$in` array in one call

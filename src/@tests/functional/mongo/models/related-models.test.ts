@@ -11,7 +11,10 @@ Deno.test({
 
     const relatedSchema = new Schema({ name: String })
     const mainSchema = new Schema({
-      related: { type: Schema.Types.ObjectId, ref: 'test-related-model-inline' },
+      related: {
+        type: Schema.Types.ObjectId,
+        ref: 'test-related-model-inline',
+      },
     })
 
     const Model = db.getModel<any>('test-main-model-inline', mainSchema, {

@@ -17,7 +17,10 @@ import { InternalError } from '@zanix/errors'
  * @param conditions - The set of conditions to validate.
  * @returns Whether every condition in the set passed.
  */
-export const validateConditions = (data: any, conditions: Condition[]): boolean => {
+export const validateConditions = (
+  data: any,
+  conditions: Condition[],
+): boolean => {
   return conditions.every((condition) => evaluateCondition(condition, data))
 }
 
@@ -38,14 +41,17 @@ const evaluateCondition = (condition: Condition, data: any): boolean => {
     return !(condition as NotCondition).not.every((sub) => evaluateCondition(sub, data))
   }
 
-  throw new InternalError('An error occurred while evaluating a trigger condition', {
-    cause: `Invalid condition format: ${JSON.stringify(condition)}`,
-    meta: {
-      source: 'zanix',
-      suggestion:
-        'A condition must have { field, op, value }, or one of { and }, { or }, { not } (each an array of conditions).',
+  throw new InternalError(
+    'An error occurred while evaluating a trigger condition',
+    {
+      cause: `Invalid condition format: ${JSON.stringify(condition)}`,
+      meta: {
+        source: 'zanix',
+        suggestion:
+          'A condition must have { field, op, value }, or one of { and }, { or }, { not } (each an array of conditions).',
+      },
     },
-  })
+  )
 }
 
 /**
@@ -58,11 +64,16 @@ const evaluateCondition = (condition: Condition, data: any): boolean => {
  */
 const resolveValue = (value: SingleCondition['value'], data: any): any => {
   if (value === '!$undefined') return undefined
-  if (typeof value === 'string' && value.startsWith('$')) return data?.[value.slice(1)]
+  if (typeof value === 'string' && value.startsWith('$')) {
+    return data?.[value.slice(1)]
+  }
   return value
 }
 
-const evaluateSingleCondition = (condition: SingleCondition, data: any): boolean => {
+const evaluateSingleCondition = (
+  condition: SingleCondition,
+  data: any,
+): boolean => {
   const { field, op, value } = condition
 
   const fieldValue = data?.[field]
@@ -84,12 +95,15 @@ const evaluateSingleCondition = (condition: SingleCondition, data: any): boolean
     case 'includes':
       return Boolean(fieldValue?.includes?.(opValue))
     default:
-      throw new InternalError('An error occurred while evaluating a trigger condition', {
-        cause: `Unsupported conditional operator: ${op}`,
-        meta: {
-          source: 'zanix',
-          suggestion: "Use one of '<' | '>' | '=' | '<=' | '>=' | 'includes' | '!='.",
+      throw new InternalError(
+        'An error occurred while evaluating a trigger condition',
+        {
+          cause: `Unsupported conditional operator: ${op}`,
+          meta: {
+            source: 'zanix',
+            suggestion: "Use one of '<' | '>' | '=' | '<=' | '>=' | 'includes' | '!='.",
+          },
         },
-      })
+      )
   }
 }

@@ -95,7 +95,9 @@ Deno.test({
   fn: async () => {
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-fou', newTriggerSchema(), { extensions: { triggers } })
+    const Model = db.getModel('test-triggers-fou', newTriggerSchema(), {
+      extensions: { triggers },
+    })
 
     const doc = await new Model({ str: 'a', bool: true }).save()
     reset()
@@ -212,20 +214,24 @@ Deno.test({
   fn: async () => {
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-conditions-match', newTriggerSchema(), {
-      extensions: {
-        triggers: {
-          post: {
-            created: [{
-              custom: {
-                name: 'post-created-conditional',
-                conditions: [{ field: 'bool', op: '=', value: false }],
-              },
-            }],
+    const Model = db.getModel(
+      'test-triggers-conditions-match',
+      newTriggerSchema(),
+      {
+        extensions: {
+          triggers: {
+            post: {
+              created: [{
+                custom: {
+                  name: 'post-created-conditional',
+                  conditions: [{ field: 'bool', op: '=', value: false }],
+                },
+              }],
+            },
           },
         },
       },
-    })
+    )
 
     await new Model({ str: 'a', bool: false }).save()
 
@@ -288,9 +294,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-protected-create', newProtectedSchema(), {
-      extensions: { triggers: protectedTriggers },
-    })
+    const Model = db.getModel(
+      'test-triggers-protected-create',
+      newProtectedSchema(),
+      {
+        extensions: { triggers: protectedTriggers },
+      },
+    )
 
     await new Model({ str: 'a', secret: 'top-secret' }).save()
 
@@ -311,9 +321,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-protected-doc-update', newProtectedSchema(), {
-      extensions: { triggers: protectedTriggers },
-    })
+    const Model = db.getModel(
+      'test-triggers-protected-doc-update',
+      newProtectedSchema(),
+      {
+        extensions: { triggers: protectedTriggers },
+      },
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     reset()
@@ -342,9 +356,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-protected-fou', newProtectedSchema(), {
-      extensions: { triggers: protectedTriggers },
-    })
+    const Model = db.getModel(
+      'test-triggers-protected-fou',
+      newProtectedSchema(),
+      {
+        extensions: { triggers: protectedTriggers },
+      },
+    )
 
     await new Model({ str: 'a', secret: 'first-secret' }).save()
     reset()
@@ -371,9 +389,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-protected-updateone', newProtectedSchema(), {
-      extensions: { triggers: protectedTriggers },
-    })
+    const Model = db.getModel(
+      'test-triggers-protected-updateone',
+      newProtectedSchema(),
+      {
+        extensions: { triggers: protectedTriggers },
+      },
+    )
 
     await new Model({ str: 'a', secret: 'first-secret' }).save()
     reset()
@@ -398,9 +420,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-protected-no-leak-create', newProtectedSchema(), {
-      extensions: { triggers: protectedTriggers },
-    })
+    const Model = db.getModel(
+      'test-triggers-protected-no-leak-create',
+      newProtectedSchema(),
+      {
+        extensions: { triggers: protectedTriggers },
+      },
+    )
 
     const saved = await new Model({ str: 'a', secret: 'top-secret' }).save()
 
@@ -430,9 +456,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-protected-no-leak-update', newProtectedSchema(), {
-      extensions: { triggers: protectedTriggers },
-    })
+    const Model = db.getModel(
+      'test-triggers-protected-no-leak-update',
+      newProtectedSchema(),
+      {
+        extensions: { triggers: protectedTriggers },
+      },
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     const rawBefore = (await Model.findOne({ _id: doc._id }).lean()) as any
@@ -468,9 +498,13 @@ Deno.test({
     // middlewares/data-protection.ts) — isolates this from both `forDispatch`/
     // `transformByDataProtection` and `autoProtectOnUpdate`, to confirm the triggers middleware
     // added in this change never re-protects a reassigned field on its own.
-    const Model = db.getModel('test-no-triggers-protected-reencrypt', newProtectedSchema(), {
-      extensions: { autoProtectOnUpdate: false },
-    })
+    const Model = db.getModel(
+      'test-no-triggers-protected-reencrypt',
+      newProtectedSchema(),
+      {
+        extensions: { autoProtectOnUpdate: false },
+      },
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
 
@@ -493,9 +527,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     reset()
     const db = await getDB()
-    const Model = db.getModel('test-triggers-protected-delete', newProtectedSchema(), {
-      extensions: { triggers: protectedTriggers },
-    })
+    const Model = db.getModel(
+      'test-triggers-protected-delete',
+      newProtectedSchema(),
+      {
+        extensions: { triggers: protectedTriggers },
+      },
+    )
 
     await new Model({ str: 'a', secret: 'top-secret' }).save()
     reset()

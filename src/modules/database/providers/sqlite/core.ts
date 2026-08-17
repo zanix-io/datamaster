@@ -17,11 +17,15 @@ import { ZanixKVStoreConnector } from './connector.ts'
  * imports — resolves correctly. See `@zanix/auth`'s `providers/core.ts` for the full rationale.
  */
 const registerConnector = () => {
-  Connector({ slot: 'kvLocal', autoInitialize: false, startMode: 'lazy' })(ZanixKVStoreConnector)
+  Connector({ slot: 'kvLocal', autoInitialize: false, startMode: 'lazy' })(
+    ZanixKVStoreConnector,
+  )
 }
 
 // `@zanix/datamaster` owns the `'kvLocal'` core-connector slot.
-registerCoreConnectorSlot('kvLocal', ZanixKVConnector, { sourcePackage: '@zanix/datamaster/core' })
+registerCoreConnectorSlot('kvLocal', ZanixKVConnector, {
+  sourcePackage: '@zanix/datamaster/core',
+})
 
 /**
  * Core Zanix KV connector loader for the Zanix framework.

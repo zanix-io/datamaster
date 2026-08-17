@@ -329,17 +329,5 @@ export {
 export { Schema } from 'mongoose'
 
 /**
- * SQLite
- */
-
-export {
-  /** A lightweight and fast key-value local store backed by SQLite, with optional TTL support. */
-  ZanixKVStoreConnector,
-} from './providers/sqlite/connector.ts'
-export {
-  /** Base class for interacting with a local SQLite database. */
-  LocalSQLite,
-} from './utils/sqlite.ts'
-/**
  * OTHER DATABASES...
  */

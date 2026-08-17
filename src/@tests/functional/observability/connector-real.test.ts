@@ -41,7 +41,9 @@ Deno.test({
   name: 'checkClusterHealth() reflects a real reachable local cluster',
   ignore: !shouldRun,
   fn: async () => {
-    const connector = new ZanixElasticsearchConnector({ autoInitialize: false })
+    const connector = new ZanixElasticsearchConnector({
+      autoInitialize: false,
+    })
     assert(await connector.checkClusterHealth())
   },
 })
@@ -51,18 +53,26 @@ Deno.test({
   ignore: !shouldRun,
   fn: async () => {
     const index = uniqueIndex()
-    const connector = new ZanixElasticsearchConnector({ index, autoInitialize: false })
+    const connector = new ZanixElasticsearchConnector({
+      index: { name: index },
+      autoInitialize: false,
+    })
     const tag = crypto.randomUUID()
 
     try {
       await connector.index({ tag, kind: 'single' })
-      await connector.bulkIndex([{ tag, kind: 'bulk-1' }, { tag, kind: 'bulk-2' }])
+      await connector.bulkIndex([{ tag, kind: 'bulk-1' }, {
+        tag,
+        kind: 'bulk-2',
+      }])
       await connector.refresh()
 
       // `tag` gets dynamically mapped as `text` (analyzed), so an exact `term` match needs the
       // `.keyword` sub-field OpenSearch generates alongside it — a `term` query directly against
       // `tag` would search the tokenized/analyzed terms, not the raw UUID string.
-      const result = await connector.search<{ hits: { total: { value: number } } }>({
+      const result = await connector.search<
+        { hits: { total: { value: number } } }
+      >({
         query: { term: { 'tag.keyword': tag } },
       })
       assertEquals(result.hits.total.value, 3)
@@ -77,7 +87,10 @@ Deno.test({
   ignore: !shouldRun,
   fn: async () => {
     const index = uniqueIndex()
-    const connector = new ZanixElasticsearchConnector({ index, autoInitialize: false })
+    const connector = new ZanixElasticsearchConnector({
+      index: { name: index },
+      autoInitialize: false,
+    })
 
     try {
       // The first document establishes a dynamic mapping of `conflictField` as `long` — a numeric
@@ -107,18 +120,29 @@ Deno.test({
   ignore: !shouldRun,
   fn: async () => {
     const index = uniqueIndex()
-    const connector = new ZanixElasticsearchConnector({ index, autoInitialize: false })
+    const connector = new ZanixElasticsearchConnector({
+      index: { name: index },
+      autoInitialize: false,
+    })
     const tag = crypto.randomUUID()
 
     try {
-      const save = elasticsearchLogSave({ connector, bulk: { flushIntervalMs: 100_000 } })
-      const logger = new Logger({ storage: { save }, disableGlobalAssign: true })
+      const save = elasticsearchLogSave({
+        connector,
+        bulk: { flushIntervalMs: 100_000 },
+      })
+      const logger = new Logger({
+        storage: { save },
+        disableGlobalAssign: true,
+      })
 
       logger.error(`functional test log ${tag}`, { meta: { tag } })
       await save.flush()
       await connector.refresh()
 
-      const result = await connector.search<{ hits: { total: { value: number } } }>({
+      const result = await connector.search<
+        { hits: { total: { value: number } } }
+      >({
         query: { match_phrase: { message: tag } },
       })
 

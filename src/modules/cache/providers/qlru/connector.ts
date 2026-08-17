@@ -113,7 +113,11 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
       opts.expirationTime = oldValue?.expirationTime ?? expire(this.ttl)
       opts.ttl = oldValue?.ttl ?? this.ttl * 1000
     } else {
-      const ttlWithOffset = this.getTTLWithOffset(ttl, maxTTLOffset, minTTLForOffset)
+      const ttlWithOffset = this.getTTLWithOffset(
+        ttl,
+        maxTTLOffset,
+        minTTLForOffset,
+      )
       opts.expirationTime = expire(ttlWithOffset)
       opts.ttl = ttlWithOffset * 1000
     }

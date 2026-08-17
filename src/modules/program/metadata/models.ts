@@ -38,7 +38,8 @@ export class ModelsContainer extends ProgramContainer {
     // `ZanixMongoConnector.getModel()` distinguish "never registered" from "registered, but for a
     // different connector" when building its error. Deduplicated by `key`.
     const idxKey = this.#indexKey(type, model.name)
-    const registered = this.getData<RegisteredConnector[]>(idxKey, container) || []
+    const registered = this.getData<RegisteredConnector[]>(idxKey, container) ||
+      []
     if (!registered.some((entry) => entry.key === connectorKey)) {
       registered.push({ key: connectorKey, connectorName })
       this.setData(idxKey, registered, container)
@@ -79,6 +80,9 @@ export class ModelsContainer extends ProgramContainer {
     name: string,
     container: object = this,
   ): RegisteredConnector[] {
-    return this.getData<RegisteredConnector[]>(this.#indexKey(type, name), container) || []
+    return this.getData<RegisteredConnector[]>(
+      this.#indexKey(type, name),
+      container,
+    ) || []
   }
 }

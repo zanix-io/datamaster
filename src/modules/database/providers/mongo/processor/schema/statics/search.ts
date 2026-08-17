@@ -52,7 +52,9 @@ export function buildSearchFilter(
 
   filter.$or = fields.map((field) => {
     const config = dataProtection[field]
-    if (!config) return { [field]: { $regex: escapeRegExp(query), $options: 'i' } }
+    if (!config) {
+      return { [field]: { $regex: escapeRegExp(query), $options: 'i' } }
+    }
 
     const activeConfig = config.versionConfigs[config.activeVersion] ??
       config.versionConfigs.default
@@ -73,7 +75,9 @@ export function buildSearchFilter(
     // Anchored: masking is position-keyed, so only a term starting at index 0 of the plaintext is
     // guaranteed to mask to a matching prefix of the stored value — see this function's own JSDoc.
     const maskedTerm = mask(query, activeConfig.settings, config.activeVersion)
-    return { [field]: { $regex: `^${escapeRegExp(maskedTerm)}`, $options: 'i' } }
+    return {
+      [field]: { $regex: `^${escapeRegExp(maskedTerm)}`, $options: 'i' },
+    }
   })
 
   return filter

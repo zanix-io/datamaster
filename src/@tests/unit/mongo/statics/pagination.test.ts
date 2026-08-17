@@ -2,7 +2,10 @@
 import { assert, assertEquals } from '@std/assert'
 import { paginate, paginateCursor } from 'mongo/processor/schema/statics/pagination.ts'
 
-function createMockModel(data: any[], { capturedFilters }: { capturedFilters?: any[] } = {}) {
+function createMockModel(
+  data: any[],
+  { capturedFilters }: { capturedFilters?: any[] } = {},
+) {
   return {
     find(filter: any) {
       capturedFilters?.push(filter)
@@ -55,9 +58,16 @@ function createMockModel(data: any[], { capturedFilters }: { capturedFilters?: a
     // Mocked to return a fixed, recognizable shape — this file only tests how `paginate`/
     // `paginateCursor` combine `search`'s result with `filter`, not the real search-building logic
     // (that's `buildSearchFilter`'s own functional test suite).
-    buildSearchFilter(query: string | undefined, fields: string[], conditions?: any) {
+    buildSearchFilter(
+      query: string | undefined,
+      fields: string[],
+      conditions?: any,
+    ) {
       if (!query) return { ...conditions }
-      return { ...conditions, $or: fields.map((f) => ({ [f]: { $regex: query } })) }
+      return {
+        ...conditions,
+        $or: fields.map((f) => ({ [f]: { $regex: query } })),
+      }
     },
   }
 }
@@ -188,9 +198,13 @@ Deno.test(
   'paginate: search alone (no filter) is used as-is, without extra $and nesting',
   async () => {
     const captured: any[] = []
-    const model = createMockModel([{ _id: 1, name: 'A' }], { capturedFilters: captured })
+    const model = createMockModel([{ _id: 1, name: 'A' }], {
+      capturedFilters: captured,
+    })
 
-    await paginate.call(model as any, { search: { query: 'a', fields: ['name'] } })
+    await paginate.call(model as any, {
+      search: { query: 'a', fields: ['name'] },
+    })
 
     assertEquals(captured[0], { $or: [{ name: { $regex: 'a' } }] })
   },
@@ -221,7 +235,9 @@ Deno.test(
   'paginate: an empty search query is a no-op — the plain filter is used untouched',
   async () => {
     const captured: any[] = []
-    const model = createMockModel([{ _id: 1, status: 'active' }], { capturedFilters: captured })
+    const model = createMockModel([{ _id: 1, status: 'active' }], {
+      capturedFilters: captured,
+    })
 
     await paginate.call(model as any, {
       filter: { status: 'active' },

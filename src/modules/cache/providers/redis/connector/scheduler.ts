@@ -37,7 +37,9 @@ export class RedisPipelineScheduler {
     redis: RedisClientType,
     /** Wraps a Redis command execution with the connector's retry logic. */
     private execWithRetry: (fn: () => Promise<unknown>) => Promise<unknown>,
-    { maxBatch = 200, maxDelay = 100 }: NonNullable<RedisOptions['schedulerOptions']> = {},
+    { maxBatch = 200, maxDelay = 100 }: NonNullable<
+      RedisOptions['schedulerOptions']
+    > = {},
   ) {
     this.redis = redis
     this.maxBatch = maxBatch
@@ -82,7 +84,11 @@ export class RedisPipelineScheduler {
     try {
       await this.execWithRetry(() => this.pipeline.exec())
     } catch (err) {
-      logger.error('[RedisPipelineScheduler] Pipeline flush error:', err, 'noSave')
+      logger.error(
+        '[RedisPipelineScheduler] Pipeline flush error:',
+        err,
+        'noSave',
+      )
     } finally {
       this.pipeline = this.redis.multi()
       this.counter = 0

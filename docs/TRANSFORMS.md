@@ -20,7 +20,10 @@ transformRecursively(ret, {
 })
 
 // Same, but only recurses into branches matched by `allowedPaths` ('*' matches any key at a level).
-transformDeepByPaths(ret, { allowedPaths: ['metadata.*'], transformPrimitive: (v) => v })
+transformDeepByPaths(ret, {
+  allowedPaths: ['metadata.*'],
+  transformPrimitive: (v) => v,
+})
 ```
 
 ```ts

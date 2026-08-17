@@ -51,7 +51,9 @@ export const extensionsSeeders = {
 
 const closeConnection = async (Model: any, db: any) => {
   // Drop collection
-  await Model.deleteMany({ _id: { $in: [bulk[0].id, bulk[1].id, bulk[2].id] } })
+  await Model.deleteMany({
+    _id: { $in: [bulk[0].id, bulk[1].id, bulk[2].id] },
+  })
   await DropCollection(Model, db)
   await db['close']()
 }

@@ -108,7 +108,12 @@ export function transformDeepByPaths(
      * @param key - The current key to access in the parent.
      * @param remainingKeys - Remaining keys to traverse for this path.
      */
-    const transform = (src: any, dst: any, key: string, remainingKeys: string[]) => {
+    const transform = (
+      src: any,
+      dst: any,
+      key: string,
+      remainingKeys: string[],
+    ) => {
       // Handle Mongoose document before recursion to avoid getters calling
       src = documentToPlainTransform(src, { deleteMetadata })
 
@@ -143,7 +148,9 @@ export function transformDeepByPaths(
             })
             nextDst.set(lastKey, transformed)
           }
-        } else if (typeof nextSrc === 'object' && nextSrc[lastKey] !== undefined) {
+        } else if (
+          typeof nextSrc === 'object' && nextSrc[lastKey] !== undefined
+        ) {
           nextDst[lastKey] = baseRecursiveTransform(nextSrc[lastKey], {
             transformPrimitive,
             transformNested,

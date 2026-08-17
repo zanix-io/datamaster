@@ -20,7 +20,12 @@ async function runAndSaveSeeders(this: ZanixMongoConnector, seeders: Seeders) {
 
   await this.runSeeders(seeders)
 
-  if (!Models) return ProgramModule.seeders.deleteSeeders('mongo', this.resolvedConnectorKey)
+  if (!Models) {
+    return ProgramModule.seeders.deleteSeeders(
+      'mongo',
+      this.resolvedConnectorKey,
+    )
+  }
 
   const dataToSave = ProgramModule.seeders.consumeDataToQuery(
     'save',
@@ -76,7 +81,10 @@ async function runAndSaveSeeders(this: ZanixMongoConnector, seeders: Seeders) {
  * population during development or setup.
  */
 export async function runSeedersOnStart(this: ZanixMongoConnector) {
-  const seeders = ProgramModule.seeders.getSeeders('mongo', this.resolvedConnectorKey)
+  const seeders = ProgramModule.seeders.getSeeders(
+    'mongo',
+    this.resolvedConnectorKey,
+  )
 
   if (!seeders.length) return
 
@@ -101,7 +109,12 @@ export async function runSeedersBySchema(
   // Normalize seeders
   const adaptedSeeders: Seeders = [{
     model: modelName,
-    handlers: seederAdaptation(seeders, { modelName }, 'mongo', this.resolvedConnectorKey),
+    handlers: seederAdaptation(
+      seeders,
+      { modelName },
+      'mongo',
+      this.resolvedConnectorKey,
+    ),
   }]
 
   await runAndSaveSeeders.call(this, adaptedSeeders)

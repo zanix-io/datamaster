@@ -150,6 +150,7 @@ groups the main exports by category — each links to a guide with full usage ex
 | Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject` | [Data Protection](./docs/DATA-PROTECTION.md)                            |
 | Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                                     | [Cache](./docs/CACHE.md)                                                |
 | Observability                 | `ZanixElasticsearchConnector`, `elasticsearchLogSave`                                                                                                                                                 | [Observability](./docs/OBSERVABILITY.md)                                |
+| Dead Letter Queue             | `DLQProvider`, `registerDLQModel` (distributed processing lives in `@zanix/asyncmq/dlq`)                                                                                                              | [DLQ](./docs/DLQ.md)                                                    |
 | Configuration                 | Environment variables for connections and data protection                                                                                                                                             | [Configuration](./docs/CONFIGURATION.md)                                |
 
 ```ts
@@ -267,6 +268,9 @@ await connector['close']()
   provider (`getCachedOrFetch`/`getCachedOrRevalidate`/`withLock`).
 - [Observability](./docs/OBSERVABILITY.md) — `ZanixElasticsearchConnector` and
   `elasticsearchLogSave`, the `@zanix/logger` persistence bridge to Elasticsearch/OpenSearch.
+- [DLQ](./docs/DLQ.md) — `DLQProvider`, a Mongo-backed dead letter queue for failed business
+  processes, with atomic `claim()`-based concurrency and distributed processing via
+  `@zanix/asyncmq/dlq`'s `registerDLQProcessor`.
 - [Configuration](./docs/CONFIGURATION.md) — environment variables, defaults, and versioned-key
   naming.
 

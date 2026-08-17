@@ -14,7 +14,10 @@ const schema = {
   ssn: { type: String, get: dataProtectionGetter('encrypt') },
   email: {
     type: String,
-    get: dataProtectionGetter({ strategy: 'mask', settings: { endBefore: '@' } }),
+    get: dataProtectionGetter({
+      strategy: 'mask',
+      settings: { endBefore: '@' },
+    }),
   },
 }
 ```
@@ -108,7 +111,10 @@ const schema = {
   ssn: { type: String, get: dataAccessGetter('private') },
   email: {
     type: String,
-    get: dataAccessGetter({ strategy: 'protected', settings: { virtualMask: { endBefore: '@' } } }),
+    get: dataAccessGetter({
+      strategy: 'protected',
+      settings: { virtualMask: { endBefore: '@' } },
+    }),
   },
 }
 ```
@@ -136,7 +142,10 @@ const schema = {
   email: {
     type: String,
     get: dataPoliciesGetter({
-      access: { strategy: 'protected', settings: { virtualMask: { endBefore: '@' } } },
+      access: {
+        strategy: 'protected',
+        settings: { virtualMask: { endBefore: '@' } },
+      },
       protection: { strategy: 'mask', settings: { endBefore: '@' } },
     }),
   },
@@ -215,7 +224,9 @@ This is also how you search a field that's stored masked for a **partial/regex**
 search term the same way before building the query, then match against the stored (masked) value —
 
 ```ts
-const filter = { email: { $regex: `^${Model.mask(searchTerm)}`, $options: 'i' } }
+const filter = {
+  email: { $regex: `^${Model.mask(searchTerm)}`, $options: 'i' },
+}
 ```
 
 **Anchor the regex with `^`** — masking is a deterministic, position-keyed transform, not a
@@ -238,7 +249,10 @@ plaintext, then let the normal `isNew` path (or `upsertById`) protect it fresh:
 import { transformByDataProtection } from 'jsr:@zanix/datamaster@[version]/database'
 
 const original = await Model.findById(id)
-await transformByDataProtection({ excludeHashedFields: true })(original, original)
+await transformByDataProtection({ excludeHashedFields: true })(
+  original,
+  original,
+)
 const plain = original.toJSON({ getters: false, transform: false })
 
 await new Model({ ...plain, _id: undefined }).save() // protected fresh, not a copy of the old ciphertext
@@ -306,7 +320,12 @@ query-middleware hook for `bulkWrite` at all (a driver/ODM limitation, not speci
 
 ```ts
 await User.bulkWrite(
-  [{ updateOne: { filter: { _id: id }, update: { $set: { password: 'a-new-password' } } } }],
+  [{
+    updateOne: {
+      filter: { _id: id },
+      update: { $set: { password: 'a-new-password' } },
+    },
+  }],
   { useDataPolicies: true },
 )
 ```
@@ -343,7 +362,9 @@ without calling `Model.mask(...)` by hand first:
 await Account.findOne({ accountNumber: Account.mask(number, {}, 'v1') })
 
 // Automatic, and never drifts from the field's own configured active version:
-await Account.findOne({ accountNumber: number }, null, { useDataPolicies: true })
+await Account.findOne({ accountNumber: number }, null, {
+  useDataPolicies: true,
+})
 ```
 
 `paginate`/`paginateCursor` accept the same flag directly in their options object, and apply it to
@@ -352,7 +373,10 @@ independently protects its own copy of the filter, so the two never race or doub
 other:
 
 ```ts
-await Account.paginate({ filter: { accountNumber: number }, useDataPolicies: true })
+await Account.paginate({
+  filter: { accountNumber: number },
+  useDataPolicies: true,
+})
 ```
 
 **Only a plain equality value, `$eq`, or `$in`** on a protected path are rewritten — the shapes that
@@ -392,7 +416,10 @@ rotation later doesn't require touching the field's `get`), a single `default` e
 this is the common case in practice:
 
 ```ts
-dataProtectionGetter({ activeVersion: 'v0', versionConfigs: { default: { strategy: 'mask' } } })
+dataProtectionGetter({
+  activeVersion: 'v0',
+  versionConfigs: { default: { strategy: 'mask' } },
+})
 ```
 
 This is what lets you rotate encryption/masking keys without a hard cutover: old documents keep
@@ -469,7 +496,9 @@ import {
   datamasterUnmask,
 } from 'jsr:@zanix/datamaster@[version]'
 
-const encrypted = await datamasterEncrypt('secret value', { type: 'symmetric' })
+const encrypted = await datamasterEncrypt('secret value', {
+  type: 'symmetric',
+})
 const original = await datamasterDecrypt(encrypted, { type: 'symmetric' })
 
 // Or get the value pre-wrapped with its reveal method attached:

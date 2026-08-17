@@ -48,6 +48,39 @@ export { TriggersAdminService } from 'modules/triggers/triggers.service.ts'
  */
 export { createTriggersDiscoveryProvider } from 'modules/triggers/triggers-discovery.provider.ts'
 
+/**
+ * Dead Letter Queue — a Mongo-backed registry of items that failed in some business process
+ * (payments, webhooks, jobs, ...), for auditing/debugging/manual or programmatic retry.
+ * Independent of `@zanix/asyncmq`'s own RabbitMQ-native dead-letter mechanism
+ * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/DLQ.md`.
+ */
+export { DLQProvider, ZanixCoreDLQProvider } from 'modules/dlq/dlq.provider.ts'
+/** Registers `@zanix/datamaster`'s own DLQ model — required once before `DLQProvider` resolves. */
+export {
+  DEFAULT_DLQ_MODEL,
+  defaultLeaseTtlMs,
+  DLQ_DEFAULT_LEASE_MS_ENV,
+  DLQ_ENCRYPT_PAYLOAD_ENV,
+  DLQ_MODEL_ENV,
+  dlqModelName,
+  registerDLQModel,
+} from 'modules/dlq/dlq.model.ts'
+export type { RegisterDLQModelOptions } from 'modules/dlq/dlq.model.ts'
+export type {
+  DLQClaimOptions,
+  DLQDiscardOptions,
+  DLQEntryAttrs,
+  DLQErrorHistoryEntry,
+  DLQErrorInfo,
+  DLQFailOptions,
+  DLQLeaseOptions,
+  DLQListOptions,
+  DLQPushInput,
+  DLQRequeueOptions,
+  DLQStatus,
+} from 'modules/dlq/dlq.typings.ts'
+export type { DLQPaginatedResult } from 'modules/dlq/dlq.provider.ts'
+
 // Data protection
 export {
   createDecryptableObject,

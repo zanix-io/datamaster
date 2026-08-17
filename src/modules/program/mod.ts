@@ -33,5 +33,7 @@ export class InternalProgram {
  * A frozen singleton instance of the `InternalProgram`.
  * @type {Readonly<InternalProgram>}
  */
-const ProgramModule: Readonly<InternalProgram> = Object.freeze(new InternalProgram())
+const ProgramModule: Readonly<InternalProgram> = Object.freeze(
+  new InternalProgram(),
+)
 export default ProgramModule

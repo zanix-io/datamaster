@@ -21,7 +21,10 @@ import type { Document } from 'mongoose'
  * Arrays are compared element-by-element (own reference equality would always report "changed"
  * for a fresh array produced by a partial re-assignment, even with identical contents).
  */
-export const isProtectionUnchanged = (current: unknown, original: unknown): boolean => {
+export const isProtectionUnchanged = (
+  current: unknown,
+  original: unknown,
+): boolean => {
   if (Array.isArray(current) || Array.isArray(original)) {
     return Array.isArray(current) && Array.isArray(original) &&
       current.length === original.length &&
@@ -83,7 +86,9 @@ export const dataProtectionPreSave = (
   // arbitrary (often default-generic) schemas, whose computed document shape does not
   // structurally match mongoose's own default `Document` (e.g. `_id` may resolve to
   // `unknown` instead of `ObjectId`).
-  const tranform = async function async(this: Document<any, any, any, any, any>) {
+  const tranform = async function async(
+    this: Document<any, any, any, any, any>,
+  ) {
     await transformShallowByPaths(this, {
       allowedPaths,
       transform: (value, path) => {
@@ -130,7 +135,10 @@ export const dataProtectionPreSave = (
       }
 
       await Promise.all(toProtect.map(async ({ path, current }) => {
-        this.set(path, await dataProtectionSetterDefinition(dataProtection[path], current))
+        this.set(
+          path,
+          await dataProtectionSetterDefinition(dataProtection[path], current),
+        )
       }))
 
       next()
@@ -138,18 +146,24 @@ export const dataProtectionPreSave = (
   }
 
   // upsertById custom hook, defined once
-  schema.addListener('upsertWithDataPolicy', async (Model, data, options, next) => {
-    await tranform.call(data)
-    await schema.statics.upsertById.call(Model, data, options)
-    next()
-  })
+  schema.addListener(
+    'upsertWithDataPolicy',
+    async (Model, data, options, next) => {
+      await tranform.call(data)
+      await schema.statics.upsertById.call(Model, data, options)
+      next()
+    },
+  )
 
   // upsertManyById custom hook, defined once
-  schema.addListener('upsertManyWithDataPolicy', async (Model, data, options, next) => {
-    await Promise.all(data.map((ret: Document) => tranform.call(ret)))
-    await schema.statics.upsertManyById.call(Model, data, options)
-    next()
-  })
+  schema.addListener(
+    'upsertManyWithDataPolicy',
+    async (Model, data, options, next) => {
+      await Promise.all(data.map((ret: Document) => tranform.call(ret)))
+      await schema.statics.upsertManyById.call(Model, data, options)
+      next()
+    },
+  )
 
   // Query-level: updateOne / findOneAndUpdate (this also covers `findByIdAndUpdate`, which
   // Mongoose implements as sugar over `findOneAndUpdate` — same underlying query op, same hook).

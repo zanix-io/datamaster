@@ -36,13 +36,18 @@ export const paginate: SchemaStatics['paginate'] = async function (
     search,
   } = options
   const filter = search
-    ? combineFilters(this.buildSearchFilter(search.query, search.fields), filterOption)
+    ? combineFilters(
+      this.buildSearchFilter(search.query, search.fields),
+      filterOption,
+    )
     : filterOption
   const projection = omit.length ? omit.map((f) => `-${f}`).join(' ') : ''
   const skip = (page - 1) * limit
 
   const [docs, total] = await Promise.all([
-    this.find(filter, null, { useDataPolicies }).sort(sort).skip(skip).limit(limit).select(
+    this.find(filter, null, { useDataPolicies }).sort(sort).skip(skip).limit(
+      limit,
+    ).select(
       projection,
     ),
     this.countDocuments(filter, { useDataPolicies }),
@@ -74,7 +79,10 @@ export const paginateCursor: SchemaStatics['paginateCursor'] = async function (
     search,
   } = options
   const filter = search
-    ? combineFilters(this.buildSearchFilter(search.query, search.fields), filterOption)
+    ? combineFilters(
+      this.buildSearchFilter(search.query, search.fields),
+      filterOption,
+    )
     : filterOption
   const query = { ...filter }
   const projection = omit.length ? omit.map((f) => `-${f}`).join(' ') : ''

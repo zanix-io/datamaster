@@ -94,7 +94,9 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
     const { softTtl = 45, fetcher, ...opts } = options
     const local = this.local.get(key)
 
-    if (local !== undefined && getAge(local.timestamp) < softTtl) return local.value
+    if (local !== undefined && getAge(local.timestamp) < softTtl) {
+      return local.value
+    }
 
     const cache = this[provider]
 
@@ -120,7 +122,11 @@ export class ZanixCacheCoreProvider extends ZanixCacheProvider {
             } catch (e) {
               logger.error('Cache refresh operation failed.', e, {
                 code: 'CACHE_REFRESH_FAILED',
-                meta: { key, method: 'getCachedOrRevalidate:queueMicrotask', source: 'zanix' },
+                meta: {
+                  key,
+                  method: 'getCachedOrRevalidate:queueMicrotask',
+                  source: 'zanix',
+                },
               })
             }
           })

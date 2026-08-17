@@ -26,7 +26,9 @@ Deno.test(
 )
 
 Deno.test('SearchPaginationRTO: accepts sortBy values that are already real numbers', async () => {
-  const dto = await classValidation(SearchPaginationRTO, { sortBy: { createdAt: -1 } })
+  const dto = await classValidation(SearchPaginationRTO, {
+    sortBy: { createdAt: -1 },
+  })
 
   assertEquals(dto.sortBy, { createdAt: -1 })
 })

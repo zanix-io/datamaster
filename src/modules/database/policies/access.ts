@@ -36,15 +36,18 @@ export function dataAccessGetterDefinition(
 
   if (shouldRemove) {
     if (!session) {
-      logger.warn('Data access policies are enabled, but no session was found.', {
-        code: 'DATA_ACCESS_NO_SESSION',
-        meta: {
-          suggestion:
-            "Set 'userSession' in the toJSON transform options, or enable ALS through the model configuration options if a manual session is not used.",
-          policyEnabled: true,
-          source: 'zanix',
+      logger.warn(
+        'Data access policies are enabled, but no session was found.',
+        {
+          code: 'DATA_ACCESS_NO_SESSION',
+          meta: {
+            suggestion:
+              "Set 'userSession' in the toJSON transform options, or enable ALS through the model configuration options if a manual session is not used.",
+            policyEnabled: true,
+            source: 'zanix',
+          },
         },
-      })
+      )
     }
     return
   }

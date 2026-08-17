@@ -21,7 +21,10 @@ Deno.test('RedisCache: basic set and get', async () => {
 })
 
 Deno.test('RedisCache: respects TTL expiration', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 }) // 100 ms TTL
+  const cache = new ZanixRedisConnector<string, number>({
+    ttl: 0.1,
+    maxTTLOffset: 0,
+  }) // 100 ms TTL
   await cache.set('x', 42)
   assertStrictEquals(await cache.get('x'), 42)
 
@@ -96,7 +99,10 @@ Deno.test('RedisCache: delete() removes specific item', async () => {
 })
 
 Deno.test('RedisCache: size() evicts expired items', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({
+    ttl: 0.1,
+    maxTTLOffset: 0,
+  })
   await cache.set('a', 1)
   await cache.set('b', 2)
   await cache.set('c', 3)
@@ -108,7 +114,10 @@ Deno.test('RedisCache: size() evicts expired items', async () => {
 })
 
 Deno.test('RedisCache: keys() returns valid non-expired keys', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({
+    ttl: 0.1,
+    maxTTLOffset: 0,
+  })
   await cache.set('b', 2)
   await cache.set('a', 1)
 
@@ -136,7 +145,10 @@ Deno.test('RedisCache: values() returns valid non-expired values', async () => {
 })
 
 Deno.test('RedisCache: overwriting key resets TTL', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 0.1, maxTTLOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({
+    ttl: 0.1,
+    maxTTLOffset: 0,
+  })
   await cache.set('x', 10)
 
   await new Promise((r) => setTimeout(r, 80))
@@ -150,7 +162,10 @@ Deno.test('RedisCache: overwriting key resets TTL', async () => {
 })
 
 Deno.test('RedisCache: overwriting key dont resets TTL if KEEP', async () => {
-  const cache = new ZanixRedisConnector<string, number>({ ttl: 1, maxTTLOffset: 0 })
+  const cache = new ZanixRedisConnector<string, number>({
+    ttl: 1,
+    maxTTLOffset: 0,
+  })
   await cache.set('x', 10)
 
   await new Promise((r) => setTimeout(r, 800))

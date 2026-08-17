@@ -21,7 +21,10 @@ const userSchema = new Schema({
     type: String,
     get: dataPoliciesGetter({
       access: 'protected',
-      protection: { activeVersion: 'v1', versionConfigs: { 'v1': { strategy: 'mask' } } },
+      protection: {
+        activeVersion: 'v1',
+        versionConfigs: { 'v1': { strategy: 'mask' } },
+      },
     }),
   },
   maskVersionedArr: {
@@ -30,7 +33,9 @@ const userSchema = new Schema({
       access: 'protected',
       protection: {
         activeVersion: 'v100',
-        versionConfigs: { 'v100': { strategy: 'mask', settings: { endBefore: '@' } } },
+        versionConfigs: {
+          'v100': { strategy: 'mask', settings: { endBefore: '@' } },
+        },
       },
     }),
   },
@@ -40,7 +45,9 @@ const userSchema = new Schema({
       access: 'protected',
       protection: {
         activeVersion: 'v3',
-        versionConfigs: { 'v3': { strategy: 'encrypt', settings: { type: 'symmetric' } } },
+        versionConfigs: {
+          'v3': { strategy: 'encrypt', settings: { type: 'symmetric' } },
+        },
       },
     }),
   },
@@ -50,7 +57,9 @@ const userSchema = new Schema({
       access: 'protected',
       protection: {
         activeVersion: 'v2',
-        versionConfigs: { 'v2': { strategy: 'encrypt', settings: { type: 'asymmetric' } } },
+        versionConfigs: {
+          'v2': { strategy: 'encrypt', settings: { type: 'asymmetric' } },
+        },
       },
     }),
   },
@@ -134,7 +143,10 @@ Deno.test({
     const encrypteddValueArr: DecryptableObject = userSaved.encryptedVersionedArr
 
     assert(jsonSaved.encryptedVersionedArr[0]?.startsWith('v2:'))
-    assertEquals(await encrypteddValueArr?.decrypt?.(), json.encryptedVersionedArr)
+    assertEquals(
+      await encrypteddValueArr?.decrypt?.(),
+      json.encryptedVersionedArr,
+    )
 
     await DropCollection(Model, db)
     await db['close']()

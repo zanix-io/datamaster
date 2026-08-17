@@ -65,9 +65,15 @@ Deno.test('planTriggerSync re-syncs an untouched default entry when code changed
 })
 
 Deno.test('planTriggerSync leaves a manually-edited entry untouched despite a code change', () => {
-  const seededTriggers = { post: { created: [{ custom: { name: 'seeded' } }] } }
-  const editedTriggers = { post: { created: [{ custom: { name: 'edited-by-hand' } }] } }
-  const newCodeTriggers = { post: { created: [{ custom: { name: 'new-code' } }] } }
+  const seededTriggers = {
+    post: { created: [{ custom: { name: 'seeded' } }] },
+  }
+  const editedTriggers = {
+    post: { created: [{ custom: { name: 'edited-by-hand' } }] },
+  }
+  const newCodeTriggers = {
+    post: { created: [{ custom: { name: 'new-code' } }] },
+  }
 
   const plan = planTriggerSync([['users', newCodeTriggers]], [
     {
@@ -88,7 +94,13 @@ Deno.test('planTriggerSync does nothing for an untouched default entry with unch
   const triggers = { post: { created: [{ custom: { name: 'same' } }] } }
 
   const plan = planTriggerSync([['users', triggers]], [
-    { _id: 'id-1', model: 'users', isDefault: true, triggers, lastSyncedTriggers: triggers },
+    {
+      _id: 'id-1',
+      model: 'users',
+      isDefault: true,
+      triggers,
+      lastSyncedTriggers: triggers,
+    },
   ])
 
   assertEquals(plan.toResync, [])

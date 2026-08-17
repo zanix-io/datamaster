@@ -68,7 +68,10 @@ export type BaseModel<Attrs extends object, T extends DatabaseTypes> = {
  * rather than silently binding the model to the wrong connector.
  * @param {T} [type='mongo'] - An optional parameter to specify the database type. Defaults to, and today can only be, `'mongo'`.
  */
-export type ModelDef = <Attrs extends object = any, T extends DatabaseTypes = 'mongo'>(
+export type ModelDef = <
+  Attrs extends object = any,
+  T extends DatabaseTypes = 'mongo',
+>(
   model: BaseModel<Attrs, T>,
   // deno-lint-ignore ban-types
   connector?: Function,
@@ -171,10 +174,15 @@ export type TriggersModelAttrs = {
  * (`TriggersAdminRepository.create`, `@zanix/admin`'s `TriggersAdminClient`/`CreateTriggerRTO`)
  * never hand-re-declares this field list independently of the schema it targets.
  */
-export type CreateTriggerInput = Pick<TriggersModelAttrs, 'model' | 'active' | 'triggers'>
+export type CreateTriggerInput = Pick<
+  TriggersModelAttrs,
+  'model' | 'active' | 'triggers'
+>
 
 /**
  * Fields accepted to update an existing {@link TriggersModelAttrs} entry — see
  * {@link CreateTriggerInput} for why this is derived rather than hand-declared.
  */
-export type UpdateTriggerInput = Partial<Pick<TriggersModelAttrs, 'active' | 'triggers'>>
+export type UpdateTriggerInput = Partial<
+  Pick<TriggersModelAttrs, 'active' | 'triggers'>
+>

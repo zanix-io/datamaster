@@ -53,12 +53,22 @@ export const seederBaseWrapper = (
 
   const success = (time: number, Model: unknown) => {
     onFinish('success', { name, version, duration: Date.now() - time }, Model)
-    loggerIntercepted?.success(`Seeder operation [${name}] completed successfully.`)
+    loggerIntercepted?.success(
+      `Seeder operation [${name}] completed successfully.`,
+    )
   }
 
   const onError = (time: number, error: Error, Model: unknown) => {
-    onFinish('failed', { name, version, duration: Date.now() - time, error: error.message }, Model)
-    loggerIntercepted?.warn(`An error occurred during seeder operation using [${name}].`, error)
+    onFinish('failed', {
+      name,
+      version,
+      duration: Date.now() - time,
+      error: error.message,
+    }, Model)
+    loggerIntercepted?.warn(
+      `An error occurred during seeder operation using [${name}].`,
+      error,
+    )
   }
 
   return function (Model, connector) {

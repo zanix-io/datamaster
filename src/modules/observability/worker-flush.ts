@@ -1,6 +1,6 @@
 import type { BulkIndexResult, ElasticsearchConnectorOptions } from './typings/general.ts'
 
-import { ZanixElasticsearchConnector } from './connector.ts'
+import { getConnector } from './connector.ts'
 
 /**
  * This file's own URL, passed as `metaUrl` to `WorkerManager.task(...)` so the worker thread can
@@ -21,6 +21,6 @@ export function flushBulkInWorker(
   connectorOptions: ElasticsearchConnectorOptions,
   docs: Record<string, unknown>[],
 ): Promise<BulkIndexResult> {
-  const connector = new ZanixElasticsearchConnector({ ...connectorOptions, autoInitialize: false })
+  const connector = getConnector(connectorOptions)
   return connector.bulkIndex(docs)
 }

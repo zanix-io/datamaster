@@ -84,7 +84,9 @@ Deno.test({
     // --- Connector A (default 'database' slot): seed a persisted trigger, then boot for real ---
     const setupA = await getDefaultDB(triggersModelNameA)
 
-    const SetupTriggersModelA = setupA.getModel<TriggersModelAttrs>(triggersModelNameA)
+    const SetupTriggersModelA = setupA.getModel<TriggersModelAttrs>(
+      triggersModelNameA,
+    )
     await SetupTriggersModelA.create({
       model: targetModelNameA,
       active: true,
@@ -105,18 +107,27 @@ Deno.test({
     })
 
     // B's own trigger works.
-    const ModelB = dbB.getModel<any>(targetModelNameB, new Schema({ str: String }))
+    const ModelB = dbB.getModel<any>(
+      targetModelNameB,
+      new Schema({ str: String }),
+    )
     await new ModelB({ str: 'b' }).save()
     assertEquals(calls.map((c) => c.name), ['b-job'])
 
     // A's trigger — loaded BEFORE B ever existed — must still fire. Before the fix, B's boot
     // (`resetPersistedTriggers()`, unscoped) wiped A's in-memory persisted-triggers layer.
     calls.length = 0
-    const ModelA = dbA.getModel<any>(targetModelNameA, new Schema({ str: String }))
+    const ModelA = dbA.getModel<any>(
+      targetModelNameA,
+      new Schema({ str: String }),
+    )
     await new ModelA({ str: 'a' }).save()
     assertEquals(calls.map((c) => c.name), ['a-job'])
 
-    await DropCollection(dbA.getModel<TriggersModelAttrs>(triggersModelNameA), dbA)
+    await DropCollection(
+      dbA.getModel<TriggersModelAttrs>(triggersModelNameA),
+      dbA,
+    )
     await DropCollection(ModelA, dbA)
     await DropCollection(TriggersModelB, dbB)
     await DropCollection(ModelB, dbB)

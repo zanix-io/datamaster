@@ -53,7 +53,10 @@ export class TriggersAdminRepository extends ZanixProvider<{ database: ZanixMong
     const existing = await Model.findOne({ model })
     if (existing) {
       throw new HttpError('CONFLICT', {
-        meta: { model, message: `A trigger configuration for model "${model}" already exists.` },
+        meta: {
+          model,
+          message: `A trigger configuration for model "${model}" already exists.`,
+        },
       })
     }
     return Model.create({ model, active, triggers, isDefault: false })
@@ -69,7 +72,9 @@ export class TriggersAdminRepository extends ZanixProvider<{ database: ZanixMong
     changes: UpdateTriggerInput,
   ): Promise<TriggersModelAttrs> {
     const Model = await this.model()
-    const entry = await Model.findOneAndUpdate({ model }, { $set: changes }, { new: true })
+    const entry = await Model.findOneAndUpdate({ model }, { $set: changes }, {
+      new: true,
+    })
     if (!entry) throw new HttpError('NOT_FOUND', { meta: { model } })
     return entry
   }
@@ -85,6 +90,8 @@ export class TriggersAdminRepository extends ZanixProvider<{ database: ZanixMong
   public async remove(model: string): Promise<void> {
     const Model = await this.model()
     const result = await Model.deleteOne({ model })
-    if (!result.deletedCount) throw new HttpError('NOT_FOUND', { meta: { model } })
+    if (!result.deletedCount) {
+      throw new HttpError('NOT_FOUND', { meta: { model } })
+    }
   }
 }

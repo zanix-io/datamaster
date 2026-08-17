@@ -17,7 +17,9 @@ import { ZanixQLRUConnector } from './connector.ts'
  * imports — resolves correctly. See `@zanix/auth`'s `providers/core.ts` for the full rationale.
  */
 const registerConnector = () => {
-  Connector({ slot: 'cache:local', autoInitialize: false, startMode: 'lazy' })(ZanixQLRUConnector)
+  Connector({ slot: 'cache:local', autoInitialize: false, startMode: 'lazy' })(
+    ZanixQLRUConnector,
+  )
 }
 
 // `@zanix/datamaster` owns the `'cache:local'` core-connector slot.

@@ -17,7 +17,13 @@ const buildFakeModel = (hasDataProtection = false) => {
       return Promise.resolve()
     },
     schema: {
-      emit: (event: string, _model: any, data: any, options: any, next: () => void) => {
+      emit: (
+        event: string,
+        _model: any,
+        data: any,
+        options: any,
+        next: () => void,
+      ) => {
         calls.push({ op: 'emit', event, data, options })
         next()
       },
@@ -37,7 +43,9 @@ Deno.test('upsertById performs an insert (setOnInsert) by default', async () => 
 Deno.test('upsertById performs a $set update when type is "update"', async () => {
   const model = buildFakeModel()
 
-  await upsertById.call(model as any, { id: '1', name: 'A' }, { type: 'update' })
+  await upsertById.call(model as any, { id: '1', name: 'A' }, {
+    type: 'update',
+  })
 
   assertEquals(model.calls[0].update, { $set: { name: 'A' } })
   assertEquals(model.calls[0].options, {})
@@ -48,7 +56,9 @@ Deno.test({
   fn: async () => {
     const model = buildFakeModel(true)
 
-    await upsertById.call(model as any, { id: '1', name: 'A' }, { useDataPolicies: true })
+    await upsertById.call(model as any, { id: '1', name: 'A' }, {
+      useDataPolicies: true,
+    })
 
     assertEquals(model.calls[0].op, 'emit')
     assertEquals(model.calls[0].event, 'upsertWithDataPolicy')
@@ -98,18 +108,25 @@ Deno.test({
   fn: async () => {
     const model = buildFakeModel()
 
-    await upsertManyById.call(model as any, [{ id: '1', name: 'A' }, { id: '2', name: 'B' }], {
+    await upsertManyById.call(model as any, [{ id: '1', name: 'A' }, {
+      id: '2',
+      name: 'B',
+    }], {
       type: 'update',
     })
 
     assertEquals(model.calls[0].op, 'bulkWrite')
-    assertEquals(model.calls[0].ops[0].updateOne.update, { $set: { name: 'A' } })
+    assertEquals(model.calls[0].ops[0].updateOne.update, {
+      $set: { name: 'A' },
+    })
   },
 })
 
 // --- bulkWrite retry ------------------------------------------------------------------------
 
-const buildFakeModelWithBulkWrite = (bulkWrite: (ops: any, options: any) => Promise<void>) => ({
+const buildFakeModelWithBulkWrite = (
+  bulkWrite: (ops: any, options: any) => Promise<void>,
+) => ({
   _hasDataProtection: () => false,
   bulkWrite,
 })
@@ -157,7 +174,10 @@ Deno.test('upsertManyById: gives up and rethrows after exhausting all retries', 
   try {
     await assertRejects(
       () =>
-        upsertManyById.call(model as any, [{ id: '1', name: 'A' }, { id: '2', name: 'B' }], {
+        upsertManyById.call(model as any, [{ id: '1', name: 'A' }, {
+          id: '2',
+          name: 'B',
+        }], {
           type: 'update',
         }),
       Error,
@@ -179,7 +199,10 @@ Deno.test('upsertManyById: an error with no per-op writeErrors is never retried'
 
   await assertRejects(
     () =>
-      upsertManyById.call(model as any, [{ id: '1', name: 'A' }, { id: '2', name: 'B' }], {
+      upsertManyById.call(model as any, [{ id: '1', name: 'A' }, {
+        id: '2',
+        name: 'B',
+      }], {
         type: 'update',
       }),
     Error,

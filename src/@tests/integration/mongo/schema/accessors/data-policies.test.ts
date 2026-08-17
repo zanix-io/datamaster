@@ -35,7 +35,10 @@ const userSchema = new Schema({
       emails: {
         type: [String],
         get: dataPoliciesGetter({
-          access: { strategy: 'protected', settings: { virtualMask: { endBefore: '@' } } },
+          access: {
+            strategy: 'protected',
+            settings: { virtualMask: { endBefore: '@' } },
+          },
           protection: { strategy: 'mask' },
         }),
       },
@@ -101,7 +104,10 @@ Deno.test(
 
     assert(!json.name)
     assert(!json.password)
-    assertEquals(json.data[0].emails, ['************@email.com', '********@email.com'])
+    assertEquals(json.data[0].emails, [
+      '************@email.com',
+      '********@email.com',
+    ])
 
     /** using ALS */
     ProgramModule.asyncContext.enterWith({ id: 'my id', session })
@@ -110,6 +116,9 @@ Deno.test(
 
     assert(!jsonWithALS.name)
     assert(!jsonWithALS.password)
-    assertEquals(jsonWithALS.data[0].emails, ['************@email.com', '********@email.com'])
+    assertEquals(jsonWithALS.data[0].emails, [
+      '************@email.com',
+      '********@email.com',
+    ])
   },
 )

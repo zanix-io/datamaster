@@ -28,7 +28,10 @@ Deno.test(
       schema: {
         statics: {
           _getDataProtection: () => ({
-            tags: { activeVersion: 'v1', versionConfigs: { v1: { strategy: 'mask' } } },
+            tags: {
+              activeVersion: 'v1',
+              versionConfigs: { v1: { strategy: 'mask' } },
+            },
           }),
           _getDataProtectionPaths: () => ['tags'],
         },
@@ -36,7 +39,9 @@ Deno.test(
     }
 
     const ret: { tags: string[] } = { tags: [] }
-    const result = await transformByDataProtection({ excludeHashedFields: true })(
+    const result = await transformByDataProtection({
+      excludeHashedFields: true,
+    })(
       fakeDoc as any,
       ret as any,
     )

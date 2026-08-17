@@ -67,7 +67,10 @@ const verifyFn = (hash: string, level: HashingLevels = 'medium') => (input: stri
   validateHash(input, hash, level)
 
 /** Function to append a version in encrypted/masked message */
-const appendVersion = (message: string | string[], version?: string): string | string[] => {
+const appendVersion = (
+  message: string | string[],
+  version?: string,
+): string | string[] => {
   const suffix = version ? `${version}${VERSION_SUFFIX}` : ''
   if (Array.isArray(message)) {
     // Only add the version to the first element
@@ -90,7 +93,12 @@ export const extractVersion = (messageWithVersion: string | string[]) => {
   if (Array.isArray(messageWithVersion)) {
     const lastMsg = messageWithVersion[0]
     const idx = lastMsg.indexOf(VERSION_SUFFIX)
-    if (idx === -1) return { message: messageWithVersion, version: 'v0' as DataPolicyVersion }
+    if (idx === -1) {
+      return {
+        message: messageWithVersion,
+        version: 'v0' as DataPolicyVersion,
+      }
+    }
 
     const { version, originalMessage } = extractAndRemoveVersion(lastMsg, idx)
     const message = [...messageWithVersion]
@@ -101,9 +109,14 @@ export const extractVersion = (messageWithVersion: string | string[]) => {
 
   const idx = messageWithVersion.indexOf(VERSION_SUFFIX)
 
-  if (idx === -1) return { message: messageWithVersion, version: 'v0' as DataPolicyVersion }
+  if (idx === -1) {
+    return { message: messageWithVersion, version: 'v0' as DataPolicyVersion }
+  }
 
-  const { version, originalMessage } = extractAndRemoveVersion(messageWithVersion as string, idx)
+  const { version, originalMessage } = extractAndRemoveVersion(
+    messageWithVersion as string,
+    idx,
+  )
 
   return { message: originalMessage, version }
 }

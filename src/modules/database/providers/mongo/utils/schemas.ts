@@ -13,7 +13,10 @@ import { Schema, type SchemaType } from 'mongoose'
  * @param parentPath - Internal use only. Represents the current path prefix for recursion.
  * @returns An array of objects containing each subschema and its full path.
  */
-export function getAllSubschemas(schema: Schema, parentPath = ''): SubschemaInfo[] {
+export function getAllSubschemas(
+  schema: Schema,
+  parentPath = '',
+): SubschemaInfo[] {
   const subschemas: SubschemaInfo[] = []
   const entries = Object.entries(schema.paths) as [
     string,

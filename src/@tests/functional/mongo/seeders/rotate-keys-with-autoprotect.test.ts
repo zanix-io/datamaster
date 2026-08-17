@@ -28,7 +28,10 @@ Deno.test({
       },
       extensions: {
         seeders: [
-          seedManyByIdIfMissing([{ id: '68fb00b33405a3a540d9b970', secret: 'original-secret' }]),
+          seedManyByIdIfMissing([{
+            id: '68fb00b33405a3a540d9b970',
+            secret: 'original-secret',
+          }]),
         ],
         autoProtectOnUpdate: true,
       },
@@ -47,7 +50,10 @@ Deno.test({
           type: String,
           get: dataProtectionGetter({
             activeVersion: 'v1',
-            versionConfigs: { v0: { strategy: 'mask' }, v1: { strategy: 'mask' } },
+            versionConfigs: {
+              v0: { strategy: 'mask' },
+              v1: { strategy: 'mask' },
+            },
           }),
         },
       },
@@ -79,7 +85,9 @@ Deno.test({
 
     // An untouched reassignment of the freshly-rotated value is still detected as unchanged.
     const beforeNoop = (await Model.findOne({ _id: rotated._id }).lean()) as any
-    reloadedAfterChange.secret = reloadedAfterChange.get('secret', undefined, { getters: false })
+    reloadedAfterChange.secret = reloadedAfterChange.get('secret', undefined, {
+      getters: false,
+    })
     await reloadedAfterChange.save()
     const afterNoop = (await Model.findOne({ _id: rotated._id }).lean()) as any
     assertEquals(afterNoop.secret, beforeNoop.secret)

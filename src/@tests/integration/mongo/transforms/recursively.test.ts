@@ -89,7 +89,10 @@ const exampleData = {
     metadata: {
       key1: {
         type: 'profile key1',
-        value: [{ key: 'key1', symbol: 2 }, { key: 'key2', symbol: 2 }, { key: 'key3', symbol: 3 }],
+        value: [{ key: 'key1', symbol: 2 }, { key: 'key2', symbol: 2 }, {
+          key: 'key3',
+          symbol: 3,
+        }],
       },
       key2: { type: 'profile key1', value: [{ key: 'key1', symbol: 2 }] },
     },
@@ -115,7 +118,10 @@ const wildcardValidation = (exampleDoc: any, isObject?: boolean) => {
 
   assertEquals(exampleDoc.profile.phone, exampleData.profile.phone)
   assertEquals(exampleDoc.profile.email, exampleData.profile.email)
-  assertEquals(exampleDoc.profile.addresses[0], exampleData.profile.addresses[0])
+  assertEquals(
+    exampleDoc.profile.addresses[0],
+    exampleData.profile.addresses[0],
+  )
   assertEquals(
     exampleDoc.profile.addresses[1],
     transformPrimitive(exampleData.profile.addresses[1]),
@@ -154,7 +160,8 @@ const wildcardValidation = (exampleDoc: any, isObject?: boolean) => {
     isObject
       ? exampleDoc.profile?.metadata?.get('key1')?.value[1].key
       : exampleDoc.profile?.metadata?.key1?.value[1].key,
-    exampleData.profile.metadata.key1.value[1].key + (isObject ? ' (adapted by get)' : ''),
+    exampleData.profile.metadata.key1.value[1].key +
+      (isObject ? ' (adapted by get)' : ''),
   )
   assertEquals(
     isObject
@@ -275,7 +282,10 @@ const fullProfileValidation = (exampleDoc: any, isObject?: boolean) => {
 const specifiedPathValidations = (exampleDoc: any, isObject?: boolean) => {
   assertEquals(exampleDoc.name, transformPrimitive(exampleData.name))
   assertEquals(exampleDoc.age, exampleData.age)
-  assertEquals(exampleDoc.nested.subField, transformPrimitive(exampleData.nested.subField))
+  assertEquals(
+    exampleDoc.nested.subField,
+    transformPrimitive(exampleData.nested.subField),
+  )
   assertEquals(
     isObject ? exampleDoc.metadata?.get('key1') : exampleDoc.metadata.key1,
     transformPrimitive(exampleData.metadata.get('key1')),
@@ -293,7 +303,10 @@ const specifiedPathValidations = (exampleDoc: any, isObject?: boolean) => {
 const fullPathValidations = (exampleDoc: any, isObject?: boolean) => {
   assert(!exampleDoc._id)
   assertEquals(exampleDoc.name, transformPrimitive(exampleData.name))
-  assertEquals(exampleDoc.nested.subField, transformPrimitive(exampleData.nested.subField))
+  assertEquals(
+    exampleDoc.nested.subField,
+    transformPrimitive(exampleData.nested.subField),
+  )
   assertEquals(
     isObject ? exampleDoc.metadata?.get('key1') : exampleDoc.metadata.key1,
     transformPrimitive(exampleData.metadata.get('key1')),

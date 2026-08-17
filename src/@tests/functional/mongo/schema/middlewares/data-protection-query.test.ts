@@ -32,10 +32,15 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-updateone-default-off', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-updateone-default-off',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
-    await Model.updateOne({ _id: doc._id }, { $set: { secret: 'second-secret' } })
+    await Model.updateOne({ _id: doc._id }, {
+      $set: { secret: 'second-secret' },
+    })
 
     const raw = (await Model.findOne({ _id: doc._id }).lean()) as any
     assertEquals(raw.secret, 'second-secret') // never protected without the opt-in flag
@@ -52,7 +57,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-updateone', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-updateone',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     await Model.updateOne(
@@ -82,7 +90,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-updateone-upsert', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-updateone-upsert',
+      newProtectedSchema(),
+    )
 
     const id = new Types.ObjectId()
     await Model.updateOne(
@@ -111,10 +122,15 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-fou-default-off', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-fou-default-off',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
-    await Model.findOneAndUpdate({ _id: doc._id }, { $set: { secret: 'second-secret' } })
+    await Model.findOneAndUpdate({ _id: doc._id }, {
+      $set: { secret: 'second-secret' },
+    })
 
     const raw = (await Model.findOne({ _id: doc._id }).lean()) as any
     assertEquals(raw.secret, 'second-secret') // never protected without the opt-in flag
@@ -132,7 +148,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-findoneandupdate', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-findoneandupdate',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     await Model.findOneAndUpdate(
@@ -157,10 +176,15 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-fbiu-default-off', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-fbiu-default-off',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
-    await Model.findByIdAndUpdate(doc._id, { $set: { secret: 'second-secret' } })
+    await Model.findByIdAndUpdate(doc._id, {
+      $set: { secret: 'second-secret' },
+    })
 
     const raw = (await Model.findOne({ _id: doc._id }).lean()) as any
     assertEquals(raw.secret, 'second-secret')
@@ -178,7 +202,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-findbyidandupdate', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-findbyidandupdate',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     await Model.findByIdAndUpdate(
@@ -202,11 +229,19 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-bulkwrite-default-off', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-bulkwrite-default-off',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     await Model.bulkWrite([
-      { updateOne: { filter: { _id: doc._id }, update: { $set: { secret: 'second-secret' } } } },
+      {
+        updateOne: {
+          filter: { _id: doc._id },
+          update: { $set: { secret: 'second-secret' } },
+        },
+      },
     ])
 
     const raw = (await Model.findOne({ _id: doc._id }).lean()) as any
@@ -224,12 +259,20 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-bulkwrite', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-bulkwrite',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     await Model.bulkWrite(
       [
-        { updateOne: { filter: { _id: doc._id }, update: { $set: { secret: 'second-secret' } } } },
+        {
+          updateOne: {
+            filter: { _id: doc._id },
+            update: { $set: { secret: 'second-secret' } },
+          },
+        },
       ],
       { useDataPolicies: true },
     )
@@ -255,11 +298,16 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-bulkwrite-insert', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-bulkwrite-insert',
+      newProtectedSchema(),
+    )
 
     const id = new Types.ObjectId()
     await Model.bulkWrite(
-      [{ insertOne: { document: { _id: id, str: 'a', secret: 'fresh-secret' } } }],
+      [{
+        insertOne: { document: { _id: id, str: 'a', secret: 'fresh-secret' } },
+      }],
       { useDataPolicies: true },
     )
 
@@ -283,7 +331,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-findone-default-off', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-findone-default-off',
+      newProtectedSchema(),
+    )
 
     await new Model({ str: 'a', secret: 'a-secret' }).save()
     const found = await Model.findOne({ secret: 'a-secret' })
@@ -301,10 +352,15 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-findone', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-findone',
+      newProtectedSchema(),
+    )
 
     await new Model({ str: 'a', secret: 'a-secret' }).save()
-    const found = await Model.findOne({ secret: 'a-secret' }, null, { useDataPolicies: true })
+    const found = await Model.findOne({ secret: 'a-secret' }, null, {
+      useDataPolicies: true,
+    })
 
     assert(found)
     const masked: UnmaskableObject = found.secret as any
@@ -322,7 +378,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-find-in', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-find-in',
+      newProtectedSchema(),
+    )
 
     await new Model({ str: 'a', secret: 'secret-one' }).save()
     await new Model({ str: 'b', secret: 'secret-two' }).save()
@@ -349,7 +408,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-find-or', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-find-or',
+      newProtectedSchema(),
+    )
 
     await new Model({ str: 'a', secret: 'secret-one' }).save()
     await new Model({ str: 'no-match', secret: 'other' }).save()
@@ -376,10 +438,15 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-findone-unsupported-op', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-findone-unsupported-op',
+      newProtectedSchema(),
+    )
 
     await assertRejects(() =>
-      Model.findOne({ secret: { $regex: 'a' } } as any, null, { useDataPolicies: true }).exec()
+      Model.findOne({ secret: { $regex: 'a' } } as any, null, {
+        useDataPolicies: true,
+      }).exec()
     )
 
     Deno.env.delete('DATA_SECRET_KEY')
@@ -395,10 +462,14 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-findone-hash-strategy', newHashProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-findone-hash-strategy',
+      newHashProtectedSchema(),
+    )
 
     await assertRejects(() =>
-      Model.findOne({ secret: 'a-secret' }, null, { useDataPolicies: true }).exec()
+      Model.findOne({ secret: 'a-secret' }, null, { useDataPolicies: true })
+        .exec()
     )
 
     Deno.env.delete('DATA_SECRET_KEY')
@@ -413,10 +484,15 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-paginate-default-off', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-paginate-default-off',
+      newProtectedSchema(),
+    )
 
     await new Model({ str: 'a', secret: 'a-secret' }).save()
-    const { docs, total } = await Model.paginate({ filter: { secret: 'a-secret' } })
+    const { docs, total } = await Model.paginate({
+      filter: { secret: 'a-secret' },
+    })
 
     assertEquals(docs.length, 0)
     assertEquals(total, 0)
@@ -434,7 +510,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-paginate', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-paginate',
+      newProtectedSchema(),
+    )
 
     await new Model({ str: 'a', secret: 'shared-secret' }).save()
     await new Model({ str: 'b', secret: 'shared-secret' }).save()
@@ -463,7 +542,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-query-protect-paginate-cursor', newProtectedSchema())
+    const Model = db.getModel(
+      'test-query-protect-paginate-cursor',
+      newProtectedSchema(),
+    )
 
     await new Model({ str: 'a', secret: 'shared-secret' }).save()
     await new Model({ str: 'b', secret: 'shared-secret' }).save()

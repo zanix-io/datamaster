@@ -38,21 +38,35 @@ Deno.test({
       definition: { value: String },
     })
     registerModel(
-      { name: 'multi-connector-secondary-model', definition: { value: String } },
+      {
+        name: 'multi-connector-secondary-model',
+        definition: { value: String },
+      },
       SecondaryMongo,
     )
 
     const dbDefault = await getDB()
     const dbSecondary = await getSecondaryDB()
 
-    const DefaultModel = dbDefault.getModel<any>('multi-connector-default-model')
-    const SecondaryModel = dbSecondary.getModel<any>('multi-connector-secondary-model')
+    const DefaultModel = dbDefault.getModel<any>(
+      'multi-connector-default-model',
+    )
+    const SecondaryModel = dbSecondary.getModel<any>(
+      'multi-connector-secondary-model',
+    )
 
     const defaultDoc = await new DefaultModel({ value: 'from-default' }).save()
-    const secondaryDoc = await new SecondaryModel({ value: 'from-secondary' }).save()
+    const secondaryDoc = await new SecondaryModel({ value: 'from-secondary' })
+      .save()
 
-    assertEquals((await DefaultModel.findById(defaultDoc.id))?.value, 'from-default')
-    assertEquals((await SecondaryModel.findById(secondaryDoc.id))?.value, 'from-secondary')
+    assertEquals(
+      (await DefaultModel.findById(defaultDoc.id))?.value,
+      'from-default',
+    )
+    assertEquals(
+      (await SecondaryModel.findById(secondaryDoc.id))?.value,
+      'from-secondary',
+    )
 
     // Each connector only ever bound the model registered for it — isolation, not just presence.
     assertThrows(() => dbDefault.getModel('multi-connector-secondary-model'))

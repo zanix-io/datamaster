@@ -47,7 +47,10 @@ const user = new UserModel({
 })
 
 Deno.test('Validate data access getter - internal', () => {
-  ProgramModule.asyncContext.enterWith({ id: 'id-authenticated', session: { type: 'user' } })
+  ProgramModule.asyncContext.enterWith({
+    id: 'id-authenticated',
+    session: { type: 'user' },
+  })
 
   const obj = user.toObject({ getters: false })
   const password = user.password
@@ -56,7 +59,10 @@ Deno.test('Validate data access getter - internal', () => {
 })
 
 Deno.test('Validate data access getter - private with authenticated user', () => {
-  ProgramModule.asyncContext.enterWith({ id: 'id-authenticated', session: { type: 'user' } })
+  ProgramModule.asyncContext.enterWith({
+    id: 'id-authenticated',
+    session: { type: 'user' },
+  })
 
   const obj = user.toObject({ getters: false })
   const name = user.name
@@ -71,7 +77,10 @@ Deno.test('Validate data access getter - private with anonymous user and no sess
 
     assert(!name && obj.name)
   }
-  ProgramModule.asyncContext.enterWith({ id: 'id-authenticated', session: { type: 'anonymous' } })
+  ProgramModule.asyncContext.enterWith({
+    id: 'id-authenticated',
+    session: { type: 'anonymous' },
+  })
   validation()
 
   ProgramModule.asyncContext.enterWith({ id: 'id-authenticated' })
@@ -88,17 +97,26 @@ Deno.test('Validate data access getter - protected with no session', () => {
 })
 
 Deno.test('Validate data access getter - protected with anonymous', () => {
-  ProgramModule.asyncContext.enterWith({ id: 'id-authenticated', session: { type: 'anonymous' } })
+  ProgramModule.asyncContext.enterWith({
+    id: 'id-authenticated',
+    session: { type: 'anonymous' },
+  })
 
   const obj = user.toObject({ getters: false })
   const phones = user.data[0].phones
 
   assertEquals(phones, ['5c*****************5', '5c*****************4'])
-  assertEquals(obj.data[0].phones, ['5c4b1e47505544524c15', '5c4b1e47505544524c14'])
+  assertEquals(obj.data[0].phones, [
+    '5c4b1e47505544524c15',
+    '5c4b1e47505544524c14',
+  ])
 })
 
 Deno.test('Validate data access getter - protected with authenticated user', () => {
-  ProgramModule.asyncContext.enterWith({ id: 'id-authenticated', session: { type: 'user' } })
+  ProgramModule.asyncContext.enterWith({
+    id: 'id-authenticated',
+    session: { type: 'user' },
+  })
 
   const obj = user.toObject({ getters: false })
   const phones = user.data[0].phones

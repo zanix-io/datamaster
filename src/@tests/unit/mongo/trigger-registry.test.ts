@@ -11,7 +11,9 @@ import {
 } from 'mongo/processor/triggers/registry.ts'
 
 // deno-lint-ignore no-explicit-any
-const fakeModel = (entries: any[]) => ({ find: () => ({ lean: () => Promise.resolve(entries) }) })
+const fakeModel = (entries: any[]) => ({
+  find: () => ({ lean: () => Promise.resolve(entries) }),
+})
 
 const CK = 'test-connector'
 
@@ -24,8 +26,14 @@ Deno.test('mergeTriggers concatenates action arrays per timing x event', () => {
 
   const merged = mergeTriggers(base, extra)
 
-  assertEquals(merged.post?.created?.map((a) => (a.custom as { name: string }).name), ['a', 'b'])
-  assertEquals(merged.pre?.deleted?.map((a) => (a.custom as { name: string }).name), ['c'])
+  assertEquals(
+    merged.post?.created?.map((a) => (a.custom as { name: string }).name),
+    ['a', 'b'],
+  )
+  assertEquals(
+    merged.pre?.deleted?.map((a) => (a.custom as { name: string }).name),
+    ['c'],
+  )
 })
 
 Deno.test('mergeTriggers omits empty timing/event slots', () => {
@@ -116,7 +124,10 @@ Deno.test('reset + a fresh set fully replaces the prior persisted load', () => {
 })
 
 Deno.test('getTriggers returns undefined for a model with nothing registered', () => {
-  assertEquals(getTriggers(CK, 'registry-test-model-never-registered'), undefined)
+  assertEquals(
+    getTriggers(CK, 'registry-test-model-never-registered'),
+    undefined,
+  )
 })
 
 Deno.test('setStaticTriggers registers nothing when called with undefined the first time', () => {
@@ -125,7 +136,9 @@ Deno.test('setStaticTriggers registers nothing when called with undefined the fi
 })
 
 Deno.test('setStaticTriggers clears a prior registration when re-called with undefined', () => {
-  setStaticTriggers(CK, 'registry-test-model-h', { post: { created: [{ custom: { name: 'x' } }] } })
+  setStaticTriggers(CK, 'registry-test-model-h', {
+    post: { created: [{ custom: { name: 'x' } }] },
+  })
   assertEquals(getTriggers(CK, 'registry-test-model-h'), {
     post: { created: [{ custom: { name: 'x' } }] },
   })
@@ -171,14 +184,21 @@ Deno.test('a suppressed model with an inactive default entry dispatches nothing 
   setDefaultSuppressed(CK, 'registry-test-model-suppressed-off')
   // No setPersistedTriggers call — the default entry exists but is currently inactive.
 
-  assertEquals(getTriggers(CK, 'registry-test-model-suppressed-off'), undefined)
+  assertEquals(
+    getTriggers(CK, 'registry-test-model-suppressed-off'),
+    undefined,
+  )
 })
 
 Deno.test('refreshPersistedTriggers repopulates the persisted layer', async () => {
   const triggers = { post: { created: [{ custom: { name: 'refreshed' } }] } }
   await refreshPersistedTriggers(
     CK,
-    fakeModel([{ model: 'registry-test-model-refresh', active: true, triggers }]),
+    fakeModel([{
+      model: 'registry-test-model-refresh',
+      active: true,
+      triggers,
+    }]),
   )
 
   assertEquals(getTriggers(CK, 'registry-test-model-refresh'), triggers)
@@ -206,7 +226,10 @@ Deno.test('refreshPersistedTriggers skips an inactive entry', async () => {
     }]),
   )
 
-  assertEquals(getTriggers(CK, 'registry-test-model-refresh-inactive'), undefined)
+  assertEquals(
+    getTriggers(CK, 'registry-test-model-refresh-inactive'),
+    undefined,
+  )
 })
 
 Deno.test('refreshPersistedTriggers marks a default entry as suppressing static', async () => {
@@ -284,7 +307,10 @@ Deno.test("getStaticTriggerEntries/getTriggers never see another connector's reg
     post: { created: [{ custom: { name: 'x' } }] },
   })
 
-  assertEquals(getTriggers('connector-y', 'registry-test-model-x-only'), undefined)
+  assertEquals(
+    getTriggers('connector-y', 'registry-test-model-x-only'),
+    undefined,
+  )
   assertEquals(
     getStaticTriggerEntries('connector-y').some(([name]) => name === 'registry-test-model-x-only'),
     false,

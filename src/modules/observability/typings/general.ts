@@ -10,6 +10,74 @@ export type ElasticsearchAuth =
   | { apiKey: string }
 
 /**
+ * Configuration options used when creating an Elasticsearch/OpenSearch index.
+ *
+ * These options are passed directly to the index creation API (`PUT /{index}`).
+ * Settings such as shard count must be defined at creation time because some index
+ * settings cannot be modified after the index already exists.
+ *
+ * `mappings` defines how OpenSearch should interpret document fields, including
+ * field types used for indexing, searching, sorting, and aggregations.
+ *
+ * @example
+ * ```ts
+ * {
+ *   settings: {
+ *     number_of_shards: 1,
+ *     number_of_replicas: 0,
+ *   },
+ *   mappings: {
+ *     properties: {
+ *       "@timestamp": {
+ *         type: "date",
+ *       },
+ *       level: {
+ *         type: "keyword",
+ *       },
+ *       message: {
+ *         type: "text",
+ *       },
+ *     },
+ *   },
+ * }
+ * ```
+ */
+export interface ElasticsearchIndexOptions {
+  /**
+   * Index name or per-document resolver used when a call does not specify an explicit index.
+   */
+  name?: string | ((doc: Record<string, unknown>) => string)
+  /**
+   * OpenSearch index settings applied when the index is created.
+   *
+   * Common settings include shard and replica configuration. Additional
+   * OpenSearch index settings can be provided through arbitrary keys.
+   */
+  settings?: {
+    /** Number of primary shards created for the index. */
+    // deno-lint-ignore camelcase
+    number_of_shards?: number
+
+    /** Number of replica shards allocated for each primary shard. */
+    // deno-lint-ignore camelcase
+    number_of_replicas?: number
+
+    [key: string]: unknown
+  }
+  /**
+   * OpenSearch field mappings defining the schema of indexed documents.
+   *
+   * Mappings control how fields are stored and indexed. For example,
+   * `keyword` fields are optimized for exact matches and aggregations, while
+   * `text` fields are analyzed for full-text search.
+   */
+  mappings?: {
+    properties?: Record<string, unknown>
+    [key: string]: unknown
+  }
+}
+
+/**
  * Elasticsearch/OpenSearch connector options.
  */
 export type ElasticsearchConnectorOptions = ConnectorOptions & {
@@ -20,8 +88,13 @@ export type ElasticsearchConnectorOptions = ConnectorOptions & {
    * `MONGO_URI`/`REDIS_URI` already follow elsewhere in this package.
    */
   node?: string
-  /** Default index name (or a per-document name resolver) used when a call doesn't specify one. */
-  index?: string | ((doc: Record<string, unknown>) => string)
+  /**
+   * Index configuration.
+   *
+   * Defines the target index, optional automatic initialization behavior, and the settings/mappings
+   * used when creating the index if it does not exist.
+   */
+  index?: ElasticsearchIndexOptions
   /**
    * Basic-auth or API-key credentials, sent as request headers.
    *
@@ -34,10 +107,8 @@ export type ElasticsearchConnectorOptions = ConnectorOptions & {
   auth?: ElasticsearchAuth
 }
 
-/** Options for `elasticsearchLogSave`, DataMaster's `SaveDataFunction` factory for `@zanix/logger`. */
-export type ElasticsearchLogSaveOptions = ElasticsearchConnectorOptions & {
-  /** Reuse an already-constructed connector instead of building one from `node`/`auth`/env. */
-  connector?: ZanixElasticsearchConnector
+/** Shared base options between `ElasticsearchLogSaveOptions`'s `useWorker: true`/`false` variants. */
+export type ElasticsearchLogSaveOptionsBase = ElasticsearchConnectorOptions & {
   /** Buffer flush policy — whichever threshold is reached first triggers a `_bulk` write. */
   bulk?: {
     /** Max buffered documents before an immediate flush. Defaults to `100`. */
@@ -53,11 +124,76 @@ export type ElasticsearchLogSaveOptions = ElasticsearchConnectorOptions & {
    */
   addTimestampField?: boolean
   /**
-   * Runs the periodic bulk flush (not each individual log call) in a `WorkerManager` worker
-   * thread, same as `@zanix/logger`'s own file-storage `useWorker` option. Defaults to `false`.
+   * Enables automatic initialization of the target index before writing documents.
+   *
+   * When enabled, the index will be created or initialized automatically if needed.
+   * The index can also be initialized manually by calling `ensureIndex()`.
+   *
+   * Defaults to `false`.
    */
-  useWorker?: boolean
+  indexInitialize?: boolean
 }
+
+/** Options for `elasticsearchLogSave`, DataMaster's `SaveDataFunction` factory for `@zanix/logger`. */
+export type ElasticsearchLogSaveOptions =
+  | (ElasticsearchLogSaveOptionsBase & {
+    /**
+     * Reuse an already-constructed connector instead of building one from `node`/`auth`/env.
+     *
+     * Note: `connector` is only available in non-worker mode. When `useWorker = true`,
+     * this option is ignored/not supported.
+     */
+    connector?: ZanixElasticsearchConnector
+    /**
+     * Executes bulk flush operations in a `WorkerManager` worker instead of the main thread.
+     *
+     * - `'one-time'`: Creates a new worker for each flush and disposes of it after the operation
+     *   finishes. This matches the behavior of `@zanix/logger`'s file-storage `useWorker` option.
+     * - `'persisted'`: Reuses a single long-lived worker across multiple flushes, avoiding worker
+     *   startup overhead. This mode is only supported within the Zanix Core ecosystem, where worker
+     *   lifecycle management is coordinated by the shared runtime. If persistent workers are
+     *   unavailable, flush operations automatically fall back to the `'one-time'` strategy.
+     *
+     * This option only applies to bulk flushes. Individual log calls are never executed in workers;
+     * they only enqueue documents into the internal buffer.
+     *
+     * When a worker is used, it creates its own Search connector instance. The Search connector
+     * provided by the Zanix Core dependency injection container is not reused, since connectors
+     * cannot be shared across worker threads.
+     *
+     * By default, this option is `undefined`, meaning flushes are executed on the main thread.
+     */
+    useWorker?: never
+  })
+  | (ElasticsearchLogSaveOptionsBase & {
+    /**
+     * Executes bulk flush operations in a `WorkerManager` worker instead of the main thread.
+     *
+     * - `'one-time'`: Creates a new worker for each flush and disposes of it after the operation
+     *   finishes. This matches the behavior of `@zanix/logger`'s file-storage `useWorker` option.
+     * - `'persisted'`: Reuses a single long-lived worker across multiple flushes, avoiding worker
+     *   startup overhead. This mode is only supported within the Zanix Core ecosystem, where worker
+     *   lifecycle management is coordinated by the shared runtime. If persistent workers are
+     *   unavailable, flush operations automatically fall back to the `'one-time'` strategy.
+     *
+     * This option only applies to bulk flushes. Individual log calls are never executed in workers;
+     * they only enqueue documents into the internal buffer.
+     *
+     * When a worker is used, it creates its own Search connector instance. The Search connector
+     * provided by the Zanix Core dependency injection container is not reused, since connectors
+     * cannot be shared across worker threads.
+     *
+     * By default, this option is `undefined`, meaning flushes are executed on the main thread.
+     */
+    useWorker?: 'one-time' | 'persisted'
+
+    /**
+     * Reuse an already-constructed connector instead of building one from `node`/`auth`/env.
+     *
+     * Note: `connector` is not supported when `useWorker = true`.
+     */
+    connector?: never
+  })
 
 /**
  * The `SaveDataFunction` `elasticsearchLogSave` returns, with a `flush()` escape hatch attached —

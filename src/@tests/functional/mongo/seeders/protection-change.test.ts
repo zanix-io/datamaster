@@ -33,7 +33,10 @@ const checkOriginal = async ([seeder1, seeder2]: any) => {
     await seeder1.metadata.get('emails').value.decrypt(),
     ['pepito.perez@email.com', 'pepito12.perez@email.com'],
   )
-  assertEquals(seeder1.hashedValue.toString(), '9YRYkb9M9N2l0bID4W9m7I4qhUHEgGifFRd2baDNJ0c=')
+  assertEquals(
+    seeder1.hashedValue.toString(),
+    '9YRYkb9M9N2l0bID4W9m7I4qhUHEgGifFRd2baDNJ0c=',
+  )
   assertEquals(await seeder2.name.decrypt(), 'Ismael 2')
   assertEquals(seeder2.email.unmask(), 'pepito2@email.com')
   assertEquals(
@@ -69,13 +72,19 @@ Deno.test({
           of: new Schema({
             value: {
               type: [String],
-              get: dataProtectionGetter({ strategy: 'encrypt', settings: { type: 'asymmetric' } }),
+              get: dataProtectionGetter({
+                strategy: 'encrypt',
+                settings: { type: 'asymmetric' },
+              }),
             },
           }),
         },
         hashedValue: {
           type: String,
-          get: dataProtectionGetter({ strategy: 'hash', settings: { useSalt: false } }),
+          get: dataProtectionGetter({
+            strategy: 'hash',
+            settings: { useSalt: false },
+          }),
         },
       },
       options: {
@@ -165,7 +174,10 @@ Deno.test({
         },
         hashedValue: {
           type: String,
-          get: dataProtectionGetter({ strategy: 'hash', settings: { useSalt: false } }),
+          get: dataProtectionGetter({
+            strategy: 'hash',
+            settings: { useSalt: false },
+          }),
         },
       },
       options: {

@@ -16,9 +16,12 @@ function envTest(name: string, fn: () => void): void {
   })
 }
 
-envTest('isTriggersModelDisabled: false when TRIGGERS_MODEL_NAME is unset', () => {
-  assertEquals(isTriggersModelDisabled(), false)
-})
+envTest(
+  'isTriggersModelDisabled: false when TRIGGERS_MODEL_NAME is unset',
+  () => {
+    assertEquals(isTriggersModelDisabled(), false)
+  },
+)
 
 envTest(
   'isTriggersModelDisabled: true only when TRIGGERS_MODEL_NAME is the literal "false"',
@@ -28,14 +31,20 @@ envTest(
   },
 )
 
-envTest('isTriggersModelDisabled: false when TRIGGERS_MODEL_NAME is a real name', () => {
-  Deno.env.set(TRIGGERS_MODEL_ENV, 'my-triggers')
-  assertEquals(isTriggersModelDisabled(), false)
-})
+envTest(
+  'isTriggersModelDisabled: false when TRIGGERS_MODEL_NAME is a real name',
+  () => {
+    Deno.env.set(TRIGGERS_MODEL_ENV, 'my-triggers')
+    assertEquals(isTriggersModelDisabled(), false)
+  },
+)
 
-envTest('triggersModelName: defaults to DEFAULT_TRIGGERS_MODEL when unset', () => {
-  assertEquals(triggersModelName(), DEFAULT_TRIGGERS_MODEL)
-})
+envTest(
+  'triggersModelName: defaults to DEFAULT_TRIGGERS_MODEL when unset',
+  () => {
+    assertEquals(triggersModelName(), DEFAULT_TRIGGERS_MODEL)
+  },
+)
 
 envTest('triggersModelName: uses TRIGGERS_MODEL_NAME when set', () => {
   Deno.env.set(TRIGGERS_MODEL_ENV, 'my-triggers')

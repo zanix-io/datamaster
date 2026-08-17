@@ -98,7 +98,9 @@ Deno.test('QuickLRU: works with mixed types (string, object, array, number)', ()
 
 Deno.test('QuickLRU: complex nested objects as values', () => {
   // deno-lint-ignore no-explicit-any
-  const cache = new ZanixQLRUConnector<string, Record<string, any>>({ capacity: 2 })
+  const cache = new ZanixQLRUConnector<string, Record<string, any>>({
+    capacity: 2,
+  })
 
   const data = {
     user: { id: 1, profile: { age: 30, name: 'Alice' } },

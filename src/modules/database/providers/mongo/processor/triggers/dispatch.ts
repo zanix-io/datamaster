@@ -73,7 +73,9 @@ const dispatchAction = async <T extends TriggerActionType>(
   // one deliberate exception — it gets its own query-string-aware interpolation (see
   // `interpolateUrl`) instead of the generic pass, so an array/object whole-value placeholder in a
   // query param expands correctly.
-  const { url: rawUrl, ...restFields } = actionFields as { url?: string } & Record<string, any>
+  const { url: rawUrl, ...restFields } = actionFields as
+    & { url?: string }
+    & Record<string, any>
   const modelInterpolatedFields: any = interpolate(restFields, currentData)
   if (rawUrl !== undefined) {
     modelInterpolatedFields.url = interpolateUrl(rawUrl, currentData)
@@ -121,7 +123,11 @@ const dispatchAction = async <T extends TriggerActionType>(
   // decide whether an optional external service is available (e.g. `REDIS_URI` for the Redis
   // connector, `mongo/connector/core.ts`'s `MONGO_URI` check).
   if (Deno.env.has('AMQP_URI')) {
-    await worker.runJob(jobName, { contextId, args, settings: { priority: priority || 'low' } })
+    await worker.runJob(jobName, {
+      contextId,
+      args,
+      settings: { priority: priority || 'low' },
+    })
   } else {
     worker.runTask(jobName, { contextId, args, timeout: _timeout ?? 20_000 })
   }
@@ -161,14 +167,21 @@ const dispatchAction = async <T extends TriggerActionType>(
  * as `_oldData` and stripped from the current-data payload.
  * @param trigger - The set of actions configured for this event.
  */
-export const handleTrigger = async (data: any, trigger: Partial<TriggerActions>): Promise<void> => {
+export const handleTrigger = async (
+  data: any,
+  trigger: Partial<TriggerActions>,
+): Promise<void> => {
   const types = Object.keys(trigger) as TriggerActionType[]
 
   await Promise.all(
     types.map((type) => {
       const action = trigger[type]
       if (!action) return
-      return dispatchAction(type, action as TriggerActionConfig<typeof type>, data)
+      return dispatchAction(
+        type,
+        action as TriggerActionConfig<typeof type>,
+        data,
+      )
     }),
   )
 }

@@ -53,7 +53,10 @@ Deno.test({
   fn: async () => {
     reset()
 
-    registerTriggerActionJob('mail', { name: 'custom-mail-job', handler: () => {} })
+    registerTriggerActionJob('mail', {
+      name: 'custom-mail-job',
+      handler: () => {},
+    })
 
     try {
       await handleTrigger({ id: '1' }, {
@@ -219,7 +222,12 @@ Deno.test('handleTrigger forwards an explicit priority', async () => {
   reset()
 
   await handleTrigger({ id: '1' }, {
-    request: { url: 'http://localhost.com', method: 'GET', headers: {}, priority: 'high' },
+    request: {
+      url: 'http://localhost.com',
+      method: 'GET',
+      headers: {},
+      priority: 'high',
+    },
   })
 
   assertEquals(calls[0].options.args.priority, 'high')
@@ -241,7 +249,11 @@ Deno.test('handleTrigger interpolates {{field}} placeholders against the record'
   reset()
 
   await handleTrigger({ id: '1', email: 'a@b.com', name: 'Ann' }, {
-    mail: { to: '{{email}}', subject: 'Welcome {{name}}', body: { template: 'welcome' } },
+    mail: {
+      to: '{{email}}',
+      subject: 'Welcome {{name}}',
+      body: { template: 'welcome' },
+    },
   })
 
   assertEquals(calls[0].options.args.to, 'a@b.com')
@@ -260,7 +272,9 @@ Deno.test('handleTrigger interpolates nested fields like headers/body values', a
     },
   })
 
-  assertEquals(calls[0].options.args.headers, { authorization: 'Bearer secret-key' })
+  assertEquals(calls[0].options.args.headers, {
+    authorization: 'Bearer secret-key',
+  })
   assertEquals(calls[0].options.args.body, { id: '1' })
 })
 
@@ -276,7 +290,11 @@ Deno.test("handleTrigger preserves the record's real data type, not just strings
     },
   })
 
-  assertEquals(calls[0].options.args.body, { amount: 42, active: true, tags: ['a', 'b'] })
+  assertEquals(calls[0].options.args.body, {
+    amount: 42,
+    active: true,
+    tags: ['a', 'b'],
+  })
 })
 
 Deno.test('handleTrigger stringifies a non-string field mixed into a larger string', async () => {
@@ -323,7 +341,12 @@ Deno.test('handleTrigger converts body into query params for DELETE too', async 
   reset()
 
   await handleTrigger({ id: '1' }, {
-    request: { url: 'http://localhost.com', method: 'DELETE', headers: {}, body: { id: '{{id}}' } },
+    request: {
+      url: 'http://localhost.com',
+      method: 'DELETE',
+      headers: {},
+      body: { id: '{{id}}' },
+    },
   })
 
   assertEquals('body' in calls[0].options.args, false)
@@ -334,7 +357,12 @@ Deno.test('handleTrigger converts body into query params for HEAD too', async ()
   reset()
 
   await handleTrigger({ id: '1' }, {
-    request: { url: 'http://localhost.com', method: 'HEAD', headers: {}, body: { id: '{{id}}' } },
+    request: {
+      url: 'http://localhost.com',
+      method: 'HEAD',
+      headers: {},
+      body: { id: '{{id}}' },
+    },
   })
 
   assertEquals('body' in calls[0].options.args, false)
@@ -345,7 +373,12 @@ Deno.test('handleTrigger keeps body as a real fetch body for POST', async () => 
   reset()
 
   await handleTrigger({ id: '1' }, {
-    request: { url: 'http://localhost.com', method: 'POST', headers: {}, body: { id: '{{id}}' } },
+    request: {
+      url: 'http://localhost.com',
+      method: 'POST',
+      headers: {},
+      body: { id: '{{id}}' },
+    },
   })
 
   assertEquals(calls[0].options.args.body, { id: '1' })
@@ -356,7 +389,12 @@ Deno.test('handleTrigger keeps body as a real fetch body for PUT', async () => {
   reset()
 
   await handleTrigger({ id: '1' }, {
-    request: { url: 'http://localhost.com', method: 'PUT', headers: {}, body: { id: '{{id}}' } },
+    request: {
+      url: 'http://localhost.com',
+      method: 'PUT',
+      headers: {},
+      body: { id: '{{id}}' },
+    },
   })
 
   assertEquals(calls[0].options.args.body, { id: '1' })
@@ -367,7 +405,12 @@ Deno.test('handleTrigger keeps body as a real fetch body for PATCH', async () =>
   reset()
 
   await handleTrigger({ id: '1' }, {
-    request: { url: 'http://localhost.com', method: 'PATCH', headers: {}, body: { id: '{{id}}' } },
+    request: {
+      url: 'http://localhost.com',
+      method: 'PATCH',
+      headers: {},
+      body: { id: '{{id}}' },
+    },
   })
 
   assertEquals(calls[0].options.args.body, { id: '1' })
@@ -422,7 +465,12 @@ Deno.test('handleTrigger dispatches via runJob when AMQP_URI is configured', asy
 
   try {
     await handleTrigger({ id: '1' }, {
-      request: { url: 'http://localhost.com', method: 'GET', headers: {}, priority: 'high' },
+      request: {
+        url: 'http://localhost.com',
+        method: 'GET',
+        headers: {},
+        priority: 'high',
+      },
     })
 
     assertEquals(calls[0].via, 'runJob')
@@ -445,7 +493,9 @@ Deno.test('handleTrigger resolves a ${{ENV_VAR}} placeholder against an existing
       },
     })
 
-    assertEquals(calls[0].options.args.headers, { authorization: 'Bearer 123' })
+    assertEquals(calls[0].options.args.headers, {
+      authorization: 'Bearer 123',
+    })
   } finally {
     Deno.env.delete('TEST_API_TOKEN')
   }
@@ -463,7 +513,9 @@ Deno.test('handleTrigger resolves ${{ENV_VAR}} to "undefined" when the var is un
     },
   })
 
-  assertEquals(calls[0].options.args.headers, { authorization: 'Bearer undefined' })
+  assertEquals(calls[0].options.args.headers, {
+    authorization: 'Bearer undefined',
+  })
 })
 
 Deno.test('handleTrigger resolves ${{ENV_VAR}} in the url, after model interpolation', async () => {
@@ -479,7 +531,10 @@ Deno.test('handleTrigger resolves ${{ENV_VAR}} in the url, after model interpola
       },
     })
 
-    assertEquals(calls[0].options.args.url, 'https://hooks.example.com/user-updated?name=Ann')
+    assertEquals(
+      calls[0].options.args.url,
+      'https://hooks.example.com/user-updated?name=Ann',
+    )
   } finally {
     Deno.env.delete('TEST_WEBHOOK_URL')
   }
@@ -499,7 +554,9 @@ Deno.test('handleTrigger resolves ${{ENV_VAR}} inside nested body/data fields', 
       },
     })
 
-    assertEquals(calls[0].options.args.body, { apiUrl: 'https://api.example.com' })
+    assertEquals(calls[0].options.args.body, {
+      apiUrl: 'https://api.example.com',
+    })
   } finally {
     Deno.env.delete('TEST_API_URL')
   }
@@ -519,7 +576,9 @@ Deno.test('handleTrigger keeps {{field}} and ${{ENV_VAR}} independent in one tri
       },
     })
 
-    assertEquals(calls[0].options.args.headers, { authorization: 'Bearer secret-token' })
+    assertEquals(calls[0].options.args.headers, {
+      authorization: 'Bearer secret-token',
+    })
     assertEquals(calls[0].options.args.body, { email: 'a@b.com' })
   } finally {
     Deno.env.delete('TEST_WEBHOOK_TOKEN')

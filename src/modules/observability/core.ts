@@ -7,6 +7,8 @@
  * \_____/ \__,_||_| |_||_|/_/\_\
  */
 
+import type { ElasticsearchConnectorOptions } from './typings/general.ts'
+
 import {
   ELASTICSEARCH_URL_ENV,
   OPENSEARCH_URL_ENV,
@@ -16,10 +18,16 @@ import { Connector, registerCoreConnectorSlot, ZanixSearchConnector } from '@zan
 
 /** Connector DSL definition */
 const registerConnector = () => {
-  if (!Deno.env.has(ELASTICSEARCH_URL_ENV) && !Deno.env.has(OPENSEARCH_URL_ENV)) return
+  if (
+    !Deno.env.has(ELASTICSEARCH_URL_ENV) && !Deno.env.has(OPENSEARCH_URL_ENV)
+  ) return
 
-  @Connector('search')
-  class _ZanixElasticsearchCoreConnector extends ZanixElasticsearchConnector {}
+  @Connector({ slot: 'search', autoInitialize: false })
+  class _ZanixElasticsearchCoreConnector extends ZanixElasticsearchConnector {
+    constructor(options: ElasticsearchConnectorOptions = {}) {
+      super({ ...options, index: { ...options.index } })
+    }
+  }
 }
 
 // `@zanix/datamaster` owns the `'search'` core-connector slot — registered unconditionally,

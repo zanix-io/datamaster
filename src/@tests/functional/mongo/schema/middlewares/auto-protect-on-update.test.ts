@@ -25,7 +25,10 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-default-on', newProtectedSchema())
+    const Model = db.getModel(
+      'test-autoprotect-default-on',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     doc.secret = 'second-secret'
@@ -46,9 +49,13 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-explicit-false-no-env', newProtectedSchema(), {
-      extensions: { autoProtectOnUpdate: false },
-    })
+    const Model = db.getModel(
+      'test-autoprotect-explicit-false-no-env',
+      newProtectedSchema(),
+      {
+        extensions: { autoProtectOnUpdate: false },
+      },
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     doc.secret = 'second-secret'
@@ -70,9 +77,13 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-new-value', newProtectedSchema(), {
-      extensions: { autoProtectOnUpdate: true },
-    })
+    const Model = db.getModel(
+      'test-autoprotect-new-value',
+      newProtectedSchema(),
+      {
+        extensions: { autoProtectOnUpdate: true },
+      },
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     doc.secret = 'second-secret'
@@ -99,9 +110,13 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-noop-reassign', newProtectedSchema(), {
-      extensions: { autoProtectOnUpdate: true },
-    })
+    const Model = db.getModel(
+      'test-autoprotect-noop-reassign',
+      newProtectedSchema(),
+      {
+        extensions: { autoProtectOnUpdate: true },
+      },
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     const rawBefore = (await Model.findOne({ _id: doc._id }).lean()) as any
@@ -127,9 +142,13 @@ Deno.test({
     'autoProtectOnUpdate: true — an untouched hashed array field is never re-hashed on an unrelated update',
   fn: async () => {
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-hash-untouched', newProtectedSchema(), {
-      extensions: { autoProtectOnUpdate: true },
-    })
+    const Model = db.getModel(
+      'test-autoprotect-hash-untouched',
+      newProtectedSchema(),
+      {
+        extensions: { autoProtectOnUpdate: true },
+      },
+    )
 
     const doc = await new Model({ str: 'a', phones: ['+15551234567'] }).save()
     const rawBefore = (await Model.findOne({ _id: doc._id }).lean()) as any
@@ -156,9 +175,13 @@ Deno.test({
     'autoProtectOnUpdate: true — a genuinely new value in a hashed array field gets hashed fresh',
   fn: async () => {
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-hash-new-value', newProtectedSchema(), {
-      extensions: { autoProtectOnUpdate: true },
-    })
+    const Model = db.getModel(
+      'test-autoprotect-hash-new-value',
+      newProtectedSchema(),
+      {
+        extensions: { autoProtectOnUpdate: true },
+      },
+    )
 
     const doc = await new Model({ str: 'a', phones: ['+15551234567'] }).save()
     doc.phones = ['+15559876543']
@@ -183,7 +206,10 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     Deno.env.set('AUTO_PROTECT_ON_DB_UPDATE', 'false')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-env-var-false', newProtectedSchema())
+    const Model = db.getModel(
+      'test-autoprotect-env-var-false',
+      newProtectedSchema(),
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     doc.secret = 'second-secret'
@@ -207,9 +233,13 @@ Deno.test({
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     Deno.env.set('AUTO_PROTECT_ON_DB_UPDATE', 'true')
     const db = await getDB()
-    const Model = db.getModel('test-autoprotect-explicit-override', newProtectedSchema(), {
-      extensions: { autoProtectOnUpdate: false },
-    })
+    const Model = db.getModel(
+      'test-autoprotect-explicit-override',
+      newProtectedSchema(),
+      {
+        extensions: { autoProtectOnUpdate: false },
+      },
+    )
 
     const doc = await new Model({ str: 'a', secret: 'first-secret' }).save()
     doc.secret = 'second-secret'
@@ -235,7 +265,10 @@ Deno.test({
     const schema = new Schema({
       ssn: {
         type: String,
-        get: dataProtectionGetter({ strategy: 'encrypt', settings: { type: 'symmetric' } }),
+        get: dataProtectionGetter({
+          strategy: 'encrypt',
+          settings: { type: 'symmetric' },
+        }),
       },
     })
     const Model = db.getModel('test-autoprotect-encrypt', schema, {

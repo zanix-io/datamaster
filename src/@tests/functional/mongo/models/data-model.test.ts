@@ -13,7 +13,10 @@ const modelValidation = async (Model: any, db: any) => {
   assertEquals(Model.schema.methods.myMethod(), 'my value')
 
   // Save and find data
-  const instance = await new Model({ description: 'my description', name: 'my name' }).save()
+  const instance = await new Model({
+    description: 'my description',
+    name: 'my name',
+  }).save()
 
   const data = await Model.findById(instance.id)
 
@@ -120,7 +123,12 @@ Deno.test({
       name: 'zanix-related-database-test:test-user-related-model',
       definition: { name: String },
       extensions: {
-        seeders: [seedByIdIfMissing({ id: '6920b48c72b6b185da32823b', name: 'my user name' })],
+        seeders: [
+          seedByIdIfMissing({
+            id: '6920b48c72b6b185da32823b',
+            name: 'my user name',
+          }),
+        ],
       },
     })
 
@@ -145,7 +153,9 @@ Deno.test({
     const db = await getDB()
     let Model = db.getModel('test-basic-related-model')
 
-    let user = await Model.findById('6920b48c72b6b185da32823c').populate('related') // query populate
+    let user = await Model.findById('6920b48c72b6b185da32823c').populate(
+      'related',
+    ) // query populate
 
     assertEquals(user?.related.name, 'my user name')
 

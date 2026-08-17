@@ -6,7 +6,10 @@ import type { Document } from 'mongoose'
  * Reads all documents into memory using `.find()`.
  * Fast, but memory-heavy.
  */
-export async function readFind<T extends Document>(this: AdaptedModel, options: ReadContext<T>) {
+export async function readFind<T extends Document>(
+  this: AdaptedModel,
+  options: ReadContext<T>,
+) {
   const { filter = {}, limit = 0, useLean = true, onDocument } = options
 
   let query = this.find(filter)
@@ -23,7 +26,10 @@ export async function readFind<T extends Document>(this: AdaptedModel, options: 
  * Streams documents one by one using a Mongoose cursor.
  * Most memory-efficient option.
  */
-export async function readCursor<T extends Document>(this: AdaptedModel, options: ReadContext<T>) {
+export async function readCursor<T extends Document>(
+  this: AdaptedModel,
+  options: ReadContext<T>,
+) {
   const { filter = {}, limit = 0, useLean = true, onDocument } = options
 
   let query = this.find(filter)
@@ -43,8 +49,17 @@ export async function readCursor<T extends Document>(this: AdaptedModel, options
  * Reads documents in batches using skip/limit pagination.
  * Useful for chunked processing or parallelization.
  */
-export async function readBatch<T extends Document>(this: AdaptedModel, options: ReadContext<T>) {
-  const { filter = {}, limit = 0, useLean = true, onDocument, batchSize = 1000 } = options
+export async function readBatch<T extends Document>(
+  this: AdaptedModel,
+  options: ReadContext<T>,
+) {
+  const {
+    filter = {},
+    limit = 0,
+    useLean = true,
+    onDocument,
+    batchSize = 1000,
+  } = options
 
   // Streaming / batch read
   let query = this.find(filter)

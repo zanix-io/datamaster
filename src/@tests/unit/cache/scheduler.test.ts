@@ -59,7 +59,10 @@ Deno.test('flush logs and swallows an error instead of throwing', async () => {
   try {
     await scheduler.flush()
     assertEquals(errors.length, 1)
-    assertEquals((errors[0] as unknown[])[0], '[RedisPipelineScheduler] Pipeline flush error:')
+    assertEquals(
+      (errors[0] as unknown[])[0],
+      '[RedisPipelineScheduler] Pipeline flush error:',
+    )
   } finally {
     logger.error = originalError
   }
@@ -101,7 +104,9 @@ Deno.test('addSet triggers an immediate flush once maxBatch is reached', async (
     return Promise.resolve()
   })
 
-  const scheduler = new RedisPipelineScheduler(client as any, (fn) => fn(), { maxBatch: 1 })
+  const scheduler = new RedisPipelineScheduler(client as any, (fn) => fn(), {
+    maxBatch: 1,
+  })
   scheduler.addSet('key', 'value')
 
   // The triggered flush() is fire-and-forget (`void this.flush()`) — give it a tick to run.

@@ -41,7 +41,10 @@ export const mergeTriggers = (base: Triggers, extra: Triggers): Triggers => {
 
     const mergedTypes: NonNullable<Triggers[typeof timing]> = {}
     for (const event of EVENTS) {
-      const actions = [...(baseTypes?.[event] ?? []), ...(extraTypes?.[event] ?? [])]
+      const actions = [
+        ...(baseTypes?.[event] ?? []),
+        ...(extraTypes?.[event] ?? []),
+      ]
       if (actions.length) mergedTypes[event] = actions
     }
     merged[timing] = mergedTypes
@@ -83,7 +86,9 @@ export const setStaticTriggers = (
  * and that layer's triggers — used at connector startup to decide which models still need a
  * default persisted entry seeded for them (see `loadPersistedTriggersOnStart`).
  */
-export const getStaticTriggerEntries = (connectorKey: string): Array<[string, Triggers]> => [
+export const getStaticTriggerEntries = (
+  connectorKey: string,
+): Array<[string, Triggers]> => [
   ...(staticStore.get(connectorKey)?.entries() ?? []),
 ]
 
@@ -115,7 +120,10 @@ export const setPersistedTriggers = (
  * entry is disabled; inferring suppression from {@link setPersistedTriggers} having been called
  * wouldn't work, since that only happens for currently-`active` entries.
  */
-export const setDefaultSuppressed = (connectorKey: string, modelName: string): void => {
+export const setDefaultSuppressed = (
+  connectorKey: string,
+  modelName: string,
+): void => {
   let suppressed = defaultSuppressed.get(connectorKey)
   if (!suppressed) defaultSuppressed.set(connectorKey, suppressed = new Set())
   suppressed.add(modelName)
@@ -151,9 +159,14 @@ export const resetPersistedTriggers = (connectorKey: string): void => {
  * invocation, not a snapshot taken at schema-build time, so either layer changing later (within
  * the rules above) takes effect without re-registering hooks.
  */
-export const getTriggers = (connectorKey: string, modelName: string): Triggers | undefined => {
+export const getTriggers = (
+  connectorKey: string,
+  modelName: string,
+): Triggers | undefined => {
   const persistedTriggers = persistedStore.get(connectorKey)?.get(modelName)
-  if (defaultSuppressed.get(connectorKey)?.has(modelName)) return persistedTriggers
+  if (defaultSuppressed.get(connectorKey)?.has(modelName)) {
+    return persistedTriggers
+  }
 
   const staticTriggers = staticStore.get(connectorKey)?.get(modelName)
   if (!staticTriggers) return persistedTriggers
@@ -164,7 +177,9 @@ export const getTriggers = (connectorKey: string, modelName: string): Triggers |
 
 /** The minimal shape needed to re-read the persisted triggers collection. */
 type TriggersModelLike = {
-  find(filter: Record<string, never>): { lean(): Promise<TriggersModelAttrs[]> }
+  find(
+    filter: Record<string, never>,
+  ): { lean(): Promise<TriggersModelAttrs[]> }
 }
 
 /**
@@ -191,7 +206,9 @@ export const refreshPersistedTriggers = async (
 
   resetPersistedTriggers(connectorKey)
   for (const entry of entries) {
-    if (entry.active) setPersistedTriggers(connectorKey, entry.model, entry.triggers)
+    if (entry.active) {
+      setPersistedTriggers(connectorKey, entry.model, entry.triggers)
+    }
     if (entry.isDefault) setDefaultSuppressed(connectorKey, entry.model)
   }
 }

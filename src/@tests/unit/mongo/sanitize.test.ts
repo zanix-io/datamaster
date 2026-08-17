@@ -27,7 +27,12 @@ Deno.test('sanitizeModel removes the srvHost from the srv poller when present', 
           },
         },
         s: {
-          options: { hosts: ['a'], credentials: {}, srvHost: 'x', replicaSet: 'rs0' },
+          options: {
+            hosts: ['a'],
+            credentials: {},
+            srvHost: 'x',
+            replicaSet: 'rs0',
+          },
           url: 'mongodb://user:pass@localhost',
         },
       },

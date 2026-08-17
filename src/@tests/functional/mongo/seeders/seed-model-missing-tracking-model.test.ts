@@ -52,7 +52,12 @@ Deno.test({
     // `defineSeedModelOnce` never binds a tracking model for it. This forces the `!Model`
     // guard in `runAndSaveSeeders` (seeders.ts) without relying on a real data race.
     ProgramModule.seeders.addDataToQuery({
-      data: { name: 'ghost:seeder', status: 'success', version: '0.0.0', duration: 0 },
+      data: {
+        name: 'ghost:seeder',
+        status: 'success',
+        version: '0.0.0',
+        duration: 0,
+      },
       action: 'save',
       database: 'phantom-db',
       connectorKey: DEFAULT_CONNECTOR_KEY,
@@ -72,7 +77,10 @@ Deno.test({
     const call = errors.find((args) =>
       (args as [string])[0].includes(`'${TrackedMongo.name}' class`)
     ) as [string, any] | undefined
-    assert(call, 'expected the "no seed-tracking model bound" error to be logged')
+    assert(
+      call,
+      'expected the "no seed-tracking model bound" error to be logged',
+    )
     assertEquals(call[1].code, 'MONGO_SEEDER_MODEL_NOT_BOUND')
     assertEquals(call[1].meta.database, 'phantom-db')
 

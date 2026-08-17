@@ -10,7 +10,11 @@ export class AccessorsContainer extends ProgramContainer {
   #dataAccessKey = 'db-accessor-data-access'
 
   /** Associate data with an accessor */
-  private setAccessorData<R>(accessor: (...args: unknown[]) => R, data: object, key: string) {
+  private setAccessorData<R>(
+    accessor: (...args: unknown[]) => R,
+    data: object,
+    key: string,
+  ) {
     this.setData(key, data, accessor)
   }
 
@@ -27,7 +31,10 @@ export class AccessorsContainer extends ProgramContainer {
   /**
    * Associate data proteccion method with an accessor
    */
-  public setDataProtection<R>(accessor: (...args: unknown[]) => R, data: DataProtection) {
+  public setDataProtection<R>(
+    accessor: (...args: unknown[]) => R,
+    data: DataProtection,
+  ) {
     this.setAccessorData(accessor, data, this.#dataProtectionKey)
   }
 
@@ -44,7 +51,10 @@ export class AccessorsContainer extends ProgramContainer {
   /**
    * Associate data access with an accessor
    */
-  public setDataAccess<R>(accessor: (...args: unknown[]) => R, data: DataAccessConfig) {
+  public setDataAccess<R>(
+    accessor: (...args: unknown[]) => R,
+    data: DataAccessConfig,
+  ) {
     this.setAccessorData(accessor, data, this.#dataAccessKey)
   }
 
@@ -52,6 +62,9 @@ export class AccessorsContainer extends ProgramContainer {
    * get accessor data access info and delete it
    */
   public consumeDataAccess<R>(accessor: (...args: unknown[]) => R) {
-    return this.consumeAccessorData<R, DataAccessConfig>(accessor, this.#dataAccessKey)
+    return this.consumeAccessorData<R, DataAccessConfig>(
+      accessor,
+      this.#dataAccessKey,
+    )
   }
 }

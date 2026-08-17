@@ -38,7 +38,11 @@ export function findPathsWithAccessorsDeep(
 
     // If the current path is an embedded subdocument, recurse into it
     if ('schema' in pathObj && pathObj.schema) {
-      findPathsWithAccessorsDeep(pathObj.schema, fullPath, { getters, setters } as never)
+      findPathsWithAccessorsDeep(
+        pathObj.schema,
+        fullPath,
+        { getters, setters } as never,
+      )
     }
   }
 

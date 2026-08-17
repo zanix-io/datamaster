@@ -29,7 +29,11 @@ Deno.test('isHealthy returns false when the connection was never established', a
 
 Deno.test('isHealthy returns false when the ping command throws', async () => {
   const originalConnect = Mongoose.prototype.connect
-  Mongoose.prototype.connect = async function (this: Mongoose, uri: string, options: unknown) {
+  Mongoose.prototype.connect = async function (
+    this: Mongoose,
+    uri: string,
+    options: unknown,
+  ) {
     const result = await originalConnect.call(this, uri, options as never)
     const db = this.connection.db as NonNullable<typeof this.connection.db>
     db.command = () => Promise.reject(new Error('ping failed'))

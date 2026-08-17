@@ -49,7 +49,10 @@ Deno.test('RedisCache basic operations', async () => {
 })
 
 Deno.test('RedisCache TTL expiration', async () => {
-  const cache = new ZanixRedisConnector<string, string>({ ttl: 0.1, maxTTLOffset: 0 }) // TTL 100ms
+  const cache = new ZanixRedisConnector<string, string>({
+    ttl: 0.1,
+    maxTTLOffset: 0,
+  }) // TTL 100ms
   await cache.isReady
 
   await cache.clear()
@@ -102,7 +105,9 @@ Deno.test('execWithRetry fails after maxRetries', async () => {
 
   // Should be intented 3 times at least
   if (attempts !== cache['maxCommandRetries']) {
-    throw new Error(`Expected ${cache['maxCommandRetries']} attempts, got ${attempts}`)
+    throw new Error(
+      `Expected ${cache['maxCommandRetries']} attempts, got ${attempts}`,
+    )
   }
 
   cache['connected'] = true

@@ -89,7 +89,9 @@ export const triggersMiddleware = (
       if (isCreated) {
         matches = this.isNew
       } else {
-        this._old = await forDispatch(await this.constructor.findById(this._id))
+        this._old = await forDispatch(
+          await this.constructor.findById(this._id),
+        )
         matches = !this.isNew
       }
       this._wasNew = this.isNew
@@ -133,18 +135,24 @@ export const triggersMiddleware = (
     // Query-level: updateOne / findOneAndUpdate
     const updateOptions = { document: false, query: true } as const
 
-    schema.pre(['updateOne', 'findOneAndUpdate'], updateOptions, async function (this: any, next) {
-      const preActions = current()?.pre?.[event]
-      if (!preActions?.length) return next()
+    schema.pre(
+      ['updateOne', 'findOneAndUpdate'],
+      updateOptions,
+      async function (this: any, next) {
+        const preActions = current()?.pre?.[event]
+        if (!preActions?.length) return next()
 
-      this._old = await forDispatch(await this.model.findOne(this.getQuery()))
+        this._old = await forDispatch(
+          await this.model.findOne(this.getQuery()),
+        )
 
-      const { $set, $setOnInsert: _omit, ...rest } = this.getUpdate() ?? {}
-      const data = { ...rest, ...$set, _old: this._old }
+        const { $set, $setOnInsert: _omit, ...rest } = this.getUpdate() ?? {}
+        const data = { ...rest, ...$set, _old: this._old }
 
-      await dispatchAll(preActions, data)
-      next()
-    })
+        await dispatchAll(preActions, data)
+        next()
+      },
+    )
 
     // Query-level post: `findOneAndUpdate` already returns the updated document; `updateOne`
     // doesn't return one at all, so it's re-fetched the same way — both converge on the same
@@ -166,7 +174,9 @@ export const triggersMiddleware = (
       updateOptions,
       async function (this: any, _result, next) {
         if (!current()?.post?.[event]?.length) return next()
-        this._doc = await forDispatch(await this.model.findOne(this.getQuery()))
+        this._doc = await forDispatch(
+          await this.model.findOne(this.getQuery()),
+        )
         next()
       },
     )
@@ -191,15 +201,21 @@ export const triggersMiddleware = (
   const stash = '_documentToDelete'
   const deleteOptions = { document: false, query: true } as const
 
-  schema.pre(['deleteOne', 'findOneAndDelete'], deleteOptions, async function (this: any, next) {
-    const preActions = current()?.pre?.deleted
-    const document = await forDispatch(await this.model.findOne(this.getQuery()))
-    this[stash] = document
+  schema.pre(
+    ['deleteOne', 'findOneAndDelete'],
+    deleteOptions,
+    async function (this: any, next) {
+      const preActions = current()?.pre?.deleted
+      const document = await forDispatch(
+        await this.model.findOne(this.getQuery()),
+      )
+      this[stash] = document
 
-    if (document) await dispatchAll(preActions, document)
+      if (document) await dispatchAll(preActions, document)
 
-    next()
-  })
+      next()
+    },
+  )
 
   schema.post(
     ['deleteOne', 'findOneAndDelete'],

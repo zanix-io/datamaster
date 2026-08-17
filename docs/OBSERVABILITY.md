@@ -11,7 +11,10 @@ import { Logger } from 'jsr:@zanix/utils@[version]/logger'
 
 const logger = new Logger({
   storage: {
-    save: elasticsearchLogSave({ node: 'https://es.internal:9200', index: 'app-logs' }),
+    save: elasticsearchLogSave({
+      node: 'https://es.internal:9200',
+      index: { name: 'app-logs' },
+    }),
   },
 })
 ```
@@ -29,7 +32,11 @@ import { ZanixElasticsearchConnector } from 'jsr:@zanix/datamaster@[version]/obs
 
 const es = new ZanixElasticsearchConnector({
   node: Deno.env.get('ELASTICSEARCH_URL'), // falls back to ELASTICSEARCH_URL, then OPENSEARCH_URL, then http://localhost:9200
-  index: 'app-logs', // or a per-document resolver: (doc) => `app-logs-${doc.level}`
+  index: {
+    name: 'app-logs', // or a per-document resolver: (doc) => `app-logs-${doc.level}`
+    settings: { number_of_shards: 1, number_of_replicas: 0 }, // used by ensureIndex(), see below
+    mappings: { properties: { level: { type: 'keyword' } } },
+  },
   auth: { username: 'elastic', password: '...' }, // or { apiKey: '...' }
 })
 
@@ -63,6 +70,35 @@ There's no `isHealthy()` override: `RestClient`'s own `isHealthy()` is synchrono
 client has no persistent connection state to check), so a real network probe can't be expressed
 through that signature. `checkClusterHealth()` is a separate, explicitly-awaited method for callers
 who want to verify the cluster is actually reachable.
+
+### Creating an index with `ensureIndex()`
+
+By default, Elasticsearch/OpenSearch auto-creates an index the first time a document is written to
+it, with whatever dynamic mapping it infers from that document — fine for quick prototyping, but
+some settings (shard count, for example) can only be set at creation time, so relying on auto-create
+locks in defaults you may not want. `ensureIndex()` lets you control that explicitly:
+
+```ts
+await es.ensureIndex('app-logs') // HEAD /app-logs — creates it via PUT only if missing, else a no-op
+await es.ensureIndex('app-logs', {
+  settings: { number_of_shards: 3 }, // overrides the connector-level index.settings for this call
+  mappings: { properties: { level: { type: 'keyword' } } },
+})
+await es.ensureIndex(['app-logs-error', 'app-logs-info']) // checks/creates each, deduped
+```
+
+It's a `HEAD` existence check followed by a `PUT` (with `settings`/`mappings` from the
+connector-level `index` option, or the per-call `opts` override) only when the index is missing — an
+existing index is never touched, so this never overwrites settings/mappings on one that's already
+there. Pass an array to check/create several indexes at once (e.g. every index a per-document
+resolver might produce) — repeated names are deduped before checking.
+
+Rather than calling `ensureIndex()` by hand before the first write, set `index.name` to a **static**
+string and pass `indexInitialize: true` to `elasticsearchLogSave` (see below) to have every
+`index()`/`bulkIndex()`/`refresh()` call await it automatically — each such call re-runs
+`ensureIndex`'s `HEAD` check (a `PUT` only ever happens once the index genuinely doesn't exist yet),
+so this trades a small, ongoing per-call `HEAD` request for never having to reason about ordering
+the first write after index creation yourself.
 
 ### Querying with `search()`
 
@@ -118,11 +154,12 @@ for the general pattern this follows.
 ```ts
 const save = elasticsearchLogSave({
   node: 'https://es.internal:9200',
-  index: 'app-logs',
+  index: { name: 'app-logs' },
   bulk: { maxSize: 100, flushIntervalMs: 5000 }, // defaults shown
   addTimestampField: true, // default; see "Timestamp handling" below
-  useWorker: false, // default; see "Offloading the flush to a worker" below
-  connector: undefined, // pass an existing ZanixElasticsearchConnector to reuse it instead
+  indexInitialize: false, // default; see "Creating an index with ensureIndex()" above
+  useWorker: undefined, // default (main thread); 'one-time' | 'persisted', see below
+  connector: undefined, // reuse an existing ZanixElasticsearchConnector — main thread only
 })
 
 const logger = new Logger({ storage: { save } })
@@ -130,6 +167,12 @@ const logger = new Logger({ storage: { save } })
 // In a graceful-shutdown hook, to send whatever's currently buffered ahead of schedule:
 await save.flush()
 ```
+
+`connector`/`useWorker` are mutually exclusive by type, not just by convention:
+`ElasticsearchLogSaveOptions` is a discriminated union on `useWorker`, and either worker variant
+(`'one-time'`/`'persisted'`) types `connector` as `never` — reusing a live connector instance across
+the `postMessage` boundary a worker thread requires isn't possible (see "Offloading the flush to a
+worker" below), so passing both is a compile-time error, not just a runtime one.
 
 A log call resolves as soon as its formatted document is buffered, not once it's actually sent — the
 same fire-and-forget contract Logger's own `SaveDataFunction` already has. Buffered-but-unflushed
@@ -163,12 +206,29 @@ equivalent field) instead of `@timestamp`.
 
 ### Offloading the flush to a worker
 
-`useWorker: true` dispatches each periodic `bulkIndex` call to a real `WorkerManager` worker thread
-instead of running it inline on the main thread. This only ever applies to the batched flush, never
-to an individual log call — applying it per-log would defeat buffering entirely (every dispatch
-would spin up a worker with no shared state). The worker reconstructs a throwaway connector from
-plain, structured-cloneable connection options (never a live connector instance, which can't cross
+`useWorker: 'one-time' | 'persisted'` dispatches each periodic `bulkIndex` call to a `WorkerManager`
+worker thread instead of running it inline on the main thread. This only ever applies to the batched
+flush, never to an individual log call — applying it per-log would defeat buffering entirely (every
+dispatch would spin up a worker with no shared state). Either mode reconstructs a throwaway
+connector inside the worker from plain, structured-cloneable connection options (never a live
+connector instance, and never the app's own DI-registered `'search'` connector — neither can cross
 the `postMessage` boundary).
+
+- **`'one-time'`**: spins up a fresh worker for each flush and closes it once the flush completes —
+  the same one-time-worker behavior `@zanix/logger`'s own file-storage `useWorker` option uses.
+- **`'persisted'`**: reuses a single long-lived worker pool across flushes instead of paying worker
+  startup cost on every one, via `@zanix/server`'s `'worker'` core provider
+  (`ZanixWorkerProvider#executeGeneralTask`) — available only inside a booted Zanix Core
+  application. Outside one (that provider isn't registered), it transparently falls back to the
+  `'one-time'` behavior instead of throwing, so `'persisted'` is always safe to set regardless of
+  runtime.
+
+```ts
+const save = elasticsearchLogSave({
+  node: 'https://es.internal:9200',
+  useWorker: 'persisted', // falls back to 'one-time' outside a Zanix Core app
+})
+```
 
 ## Zero-config registration
 
@@ -177,6 +237,14 @@ Importing `jsr:@zanix/datamaster@[version]/core` auto-registers a default
 `OPENSEARCH_URL` being set — mirroring how the Mongo/Redis/SQLite core connectors register
 themselves. It registers under `@zanix/server`'s `'search'` core connector type, backed by the
 `ZanixSearchConnector` abstract base `ZanixElasticsearchConnector` extends.
+
+When neither an explicit `connector` nor `node`/`auth` override tells it otherwise,
+`elasticsearchLogSave` reuses that same DI-registered `'search'` connector instead of constructing a
+second one — so a single call to `Deno.env.set('ELASTICSEARCH_URL', ...)` (or the equivalent env var
+in your deployment) is enough for both the app's own DI-injected connector and its logger to share
+one underlying client. If no core connector is registered (or the app hasn't booted far enough to
+resolve it yet), it falls back to building a fresh connector from whatever options
+`elasticsearchLogSave` was given, exactly as before.
 
 ## Testing against a real local cluster
 

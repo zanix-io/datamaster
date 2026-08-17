@@ -24,24 +24,31 @@ import { InternalError } from '@zanix/errors'
  * registerModel<Attrs>(MyModel);
  *
  * @example
- * // Example usage with MyModel specification
+ * // Example usage with MyModel specification — `access`/`protection` are NOT plain field options;
+ * // they're applied as Mongoose `get`/`set` functions via `dataAccessGetter`/`dataProtectionGetter`
+ * // (both re-exported from `database/mod.ts`). See `docs/DATA-PROTECTION.md` for every strategy.
+ * import { dataAccessGetter, dataProtectionGetter, registerModel } from '@zanix/datamaster/database'
+ *
  * registerModel({
  *   name: 'test', // supports multi-DB notation: 'database:test' (also valid in population refs)
  *   definition: {
  *     name: {
  *       type: String,
  *       unique: true,
- *       access: { type: 'internal' },
- *       protection: { type: 'asym-encrypt' },
+ *       get: dataAccessGetter({ strategy: 'internal' }),
  *     },
  *     description: {
- *       access: 'private',
  *       type: String,
+ *       get: dataAccessGetter({ strategy: 'private' }),
  *     },
- *     createdAt: { type: Date, default: Date.now },
- *     updatedAt: { type: Date, default: Date.now },
+ *     ssn: {
+ *       type: String,
+ *       get: dataProtectionGetter({ strategy: 'encrypt', settings: { type: 'asymmetric' } }),
+ *     },
  *   },
- *   options: {...},
+ *   options: {
+ *     timestamps: true, // adds `createdAt`/`updatedAt` — prefer this over declaring them by hand
+ *   },
  *   callback: (schema) => {
  *     // Additional schema customizations or logic
  *     return schema;
@@ -54,7 +61,11 @@ import { InternalError } from '@zanix/errors'
  *
  * registerModel({ name: 'test', definition: {...} }, OtherMongoConnector);
  */
-export const registerModel: ModelDef = ({ extensions = {}, ...model }, connector, type): void => {
+export const registerModel: ModelDef = (
+  { extensions = {}, ...model },
+  connector,
+  type,
+): void => {
   if (!type) type = 'mongo' as never
 
   const connectorKey = connector ? getConnectorKey(connector) : DEFAULT_CONNECTOR_KEY
@@ -62,14 +73,21 @@ export const registerModel: ModelDef = ({ extensions = {}, ...model }, connector
     throw new InternalError(
       `Cannot register model "${model.name}" for connector "${connector.name}": it hasn't been ` +
         `decorated with @Connector yet. Import/decorate it before calling registerModel with it.`,
-      { meta: { source: 'zanix', model: model.name, connector: connector.name } },
+      {
+        meta: { source: 'zanix', model: model.name, connector: connector.name },
+      },
     )
   }
   const connectorName = connector?.name ?? DEFAULT_CONNECTOR_KEY
 
   const { seeders = [], ...exts } = extensions
 
-  ProgramModule.models.addModel({ ...model, extensions: exts }, type, connectorKey, connectorName)
+  ProgramModule.models.addModel(
+    { ...model, extensions: exts },
+    type,
+    connectorKey,
+    connectorName,
+  )
 
   if (!seeders.length || Deno.env.get(DATABASE_SEEDERS_ENV) === 'false') return
 

@@ -7,6 +7,98 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-17
+
+### Added
+
+- `DLQProvider`: a Mongo-backed Dead Letter Queue for items that failed in some business process
+  (payments, webhooks, jobs, ...) — `push`/`get`/`list`/`claim`/`release`/`complete`/`fail`/
+  `requeue`/`discard`/`remove`. Registered under the `'dlq'` core-provider slot, resolvable via
+  `this.providers.get(DLQProvider)`/`this.providers.get('dlq')`. Independent of `@zanix/asyncmq`'s
+  own RabbitMQ-native `ZanixAsyncMQProvider.requeueDeadLetters`. See [DLQ](docs/DLQ.md).
+- `registerDLQModel(options?, connector?)`: registers the DLQ collection (`zanix-dlq` by default, or
+  `DLQ_MODEL_NAME`/`options.modelName`), mirroring `registerModel`'s own `connector` parameter for
+  multi-connector apps. `payload` is a native, queryable `Mixed` field by default
+  (`DLQProvider.list()`'s new `filter` passthrough can query into it, e.g.
+  `{'payload.orderId': 'x'}`) — `options.encryptPayload` (or the `DLQ_ENCRYPT_PAYLOAD` env var,
+  which always wins when set) switches it to an encrypted, no-longer-queryable string instead, via
+  the existing `encrypt` data-protection strategy. `options.payloadFields` (takes priority over
+  `encryptPayload`) declares `payload`'s own field shape instead — the same
+  `{ field: { type, get, ... } }` shape `registerModel`'s `definition` uses — so individual leaves
+  can be protected in place while the rest stays queryable. See
+  [DLQ: Protecting the payload](docs/DLQ.md#protecting-the-payload). `options.defaultLeaseMs` sets
+  the default `claim()` lease duration (`DLQ_DEFAULT_LEASE_MS` always wins when set; a per-call
+  `claim({ leaseTtlMs })` always wins over both).
+- `DLQProvider.claim(options)`: atomically reserves one eligible entry via `findOneAndUpdate` —
+  concurrency-safe across multiple app instances with no static worker/slot partitioning and no
+  external lock service. Reclaims abandoned entries (`'claimed'` with an expired lease)
+  automatically. See [DLQ: Concurrency](docs/DLQ.md#concurrency-claim-not-static-worker-slots).
+- `DLQ_MODEL_NAME`, `DLQ_ENCRYPT_PAYLOAD`, `DLQ_DEFAULT_LEASE_MS` env vars — see
+  [Configuration](docs/CONFIGURATION.md).
+
+  Distributed DLQ reprocessing (`registerDLQProcessor`) is **`@zanix/asyncmq/dlq`'s** own addition,
+  not this package's — `@zanix/datamaster` never imports `@zanix/asyncmq`. See
+  [DLQ: Distributed processing](docs/DLQ.md#distributed-processing--zanixasyncmqdlq) for why it
+  lives there (a short-lived earlier revision hosted an open registry here instead, mirroring
+  `registerTriggerActionJob`; removed once it became clear the lateral-dependency problem that
+  pattern solves doesn't apply to DLQ processors, which are normally app-registered, not owned by a
+  peer Zanix package).
+
+- `ZanixElasticsearchConnector.ensureIndex(index, opts?)`: creates an index via a `HEAD`-then-`PUT`
+  check if it doesn't already exist yet, using `settings`/`mappings` from the connector-level
+  `index` option (or a per-call override); an already-existing index is left untouched. Accepts a
+  single index name or an array (deduped before checking). See
+  [Observability: Creating an index with `ensureIndex()`](docs/OBSERVABILITY.md#creating-an-index-with-ensureindex).
+- `indexInitialize` option on `elasticsearchLogSave`: when `true`, every `index()`/`bulkIndex()`/
+  `refresh()` call automatically awaits `ensureIndex()` first, so the target index is guaranteed to
+  exist (with the configured settings/mappings) before the first write, without calling
+  `ensureIndex()` by hand.
+- `elasticsearchLogSave` now reuses the app's DI-registered core `'search'` connector (from
+  `jsr:@zanix/datamaster/core`) when one is available, instead of always constructing a fresh
+  connector from its own options. See
+  [Observability: Zero-config registration](docs/OBSERVABILITY.md#zero-config-registration).
+- `ElasticsearchIndexOptions`/`ElasticsearchLogSaveOptionsBase` types, exported from the
+  `./observability` entrypoint alongside the existing `Elasticsearch*` types.
+- `useWorker: 'persisted'` on `elasticsearchLogSave`: reuses a single long-lived worker pool across
+  flushes (via `@zanix/server`'s `'worker'` core provider,
+  `ZanixWorkerProvider#executeGeneralTask`), instead of spinning up and tearing down a fresh worker
+  per flush like `'one-time'` does. Falls back to `'one-time'` behavior transparently when that
+  provider isn't registered (i.e. outside a booted Zanix Core application), so it's always safe to
+  set regardless of runtime. See
+  [Observability: Offloading the flush to a worker](docs/OBSERVABILITY.md#offloading-the-flush-to-a-worker).
+
+### Changed
+
+- **Breaking**: `ElasticsearchConnectorOptions.index` (and `elasticsearchLogSave`'s own `index`
+  option) changed shape from `string | ((doc) => string)` to `ElasticsearchIndexOptions`, an object:
+  `{ name, settings, mappings }`. `name` carries what used to be the whole option (a static string
+  or a per-document resolver function); `settings`/`mappings` are new, consumed by `ensureIndex()`.
+  Update `index: 'my-index'` to `index: { name: 'my-index' }`.
+- **Breaking**: `elasticsearchLogSave`'s `useWorker` option changed from `boolean` to
+  `'one-time' | 'persisted' | undefined` — update `useWorker: true` to `useWorker: 'one-time'` for
+  the previous (spin-up-per-flush) behavior; `useWorker: false` is now simply omitting the option.
+- `ElasticsearchLogSaveOptions` is now a discriminated union on `useWorker`: passing `connector`
+  together with a `useWorker` value is now a **compile-time** error (previously silently unsupported
+  at runtime) — a live connector instance can't cross a worker's `postMessage` boundary.
+- Zero-config registration (`core.ts`'s `@Connector({ slot: 'search', autoInitialize: false })`) now
+  forwards the registering app's `index` option to the connector it constructs, instead of dropping
+  it.
+- **Requires `@zanix/server@3.2.0` or later**: the `'one-time'`/`'persisted'` worker-flush dispatch
+  above is now implemented via `@zanix/server`'s new shared `dispatchWorkerTask` helper (added in
+  that version), replacing the hand-rolled `WorkerManager`/DI-resolution logic this package used to
+  carry itself. No observable behavior change from this internal refactor alone.
+
+### Fixed
+
+- `ensureIndex()` was a silent no-op whenever it received an array of index names — exactly what
+  `bulkIndex()` always passes it when `indexInitialize: true` — because the internal check that
+  collects which indexes to verify/create only matched a plain string. The array branch therefore
+  never populated anything, yet `ensureIndex()` still logged "Index Initialized Successfully" and
+  returned `true`. In practice, `indexInitialize: true` never actually created or verified any index
+  on the bulk-flush path — the one `elasticsearchLogSave` uses for both its inline and worker flush
+  modes — only a direct single-document `.index()` call was unaffected. Fixed by handling both a
+  single index and an array (deduping repeated names before checking).
+
 ## [1.2.1] - 2026-08-03
 
 ### Added

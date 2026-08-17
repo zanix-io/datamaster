@@ -43,7 +43,11 @@ export interface NotCondition {
 /**
  * A condition which can be a single comparison or a composite logical condition.
  */
-export type Condition = SingleCondition | AndCondition | OrCondition | NotCondition
+export type Condition =
+  | SingleCondition
+  | AndCondition
+  | OrCondition
+  | NotCondition
 
 /**
  * Common properties for trigger actions.

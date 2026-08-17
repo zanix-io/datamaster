@@ -36,8 +36,12 @@ export type {
   ElasticsearchAuth,
   /** `ZanixElasticsearchConnector` constructor options. */
   ElasticsearchConnectorOptions,
+  /** Index name/settings/mappings configuration, e.g. `ElasticsearchConnectorOptions.index`. */
+  ElasticsearchIndexOptions,
   /** The `SaveDataFunction` `elasticsearchLogSave` returns, with a `flush()` escape hatch. */
   ElasticsearchLogSaveFunction,
   /** Options for `elasticsearchLogSave`. */
   ElasticsearchLogSaveOptions,
+  /** Shared base of `ElasticsearchLogSaveOptions`'s `useWorker: true`/`false` variants. */
+  ElasticsearchLogSaveOptionsBase,
 } from './typings/general.ts'

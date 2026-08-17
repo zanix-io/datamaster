@@ -64,7 +64,10 @@ export const dataPoliciesGetter = (
       return dataAccessGetterDefinition(dataAccess, processedValue)
     }
 
-    const processedValue = dataProtectionGetterDefinition(dataProtection, value)
+    const processedValue = dataProtectionGetterDefinition(
+      dataProtection,
+      value,
+    )
     return baseGetter(processedValue, options)
   }
 

@@ -32,7 +32,7 @@ Deno.test({
     const { calls, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
     try {
       const result = await flushBulkInWorker(
-        { node: 'http://localhost:9200', index: 'worker-logs' },
+        { node: 'http://localhost:9200', index: { name: 'worker-logs' } },
         [{ message: 'from worker' }],
       )
       assertEquals(result, { errors: false, failedCount: 0 })
@@ -45,10 +45,15 @@ Deno.test({
 
 Deno.test('flushBulkInWorker surfaces bulk partial failures to its caller', async () => {
   const { restore } = mockFetch(() =>
-    jsonResponse({ errors: true, items: [{ index: { status: 400, error: {} } }] })
+    jsonResponse({
+      errors: true,
+      items: [{ index: { status: 400, error: {} } }],
+    })
   )
   try {
-    const result = await flushBulkInWorker({ node: 'http://localhost:9200' }, [{ a: 1 }])
+    const result = await flushBulkInWorker({ node: 'http://localhost:9200' }, [{
+      a: 1,
+    }])
     assertEquals(result, { errors: true, failedCount: 1 })
   } finally {
     restore()

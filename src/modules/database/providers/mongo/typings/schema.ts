@@ -43,7 +43,9 @@ export type SchemaModelInitOptions<S extends Schema> = {
   /**
    * Models to explicitly bind and populate.
    */
-  relatedModels?: { [modelName: string]: { schema: S; options?: SchemaModelInitOptions<S> } }
+  relatedModels?: {
+    [modelName: string]: { schema: S; options?: SchemaModelInitOptions<S> }
+  }
   /**
    * Notified once this model's seeders (from `extensions.seeders`) have settled — either after
    * they all resolve (`msg` is `'seeders executed'`) or as soon as one rejects (`msg` is that

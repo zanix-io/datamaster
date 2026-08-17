@@ -19,7 +19,10 @@ import { Schema } from 'mongoose'
  * Finally, it clears the 'models' metadata to avoid redefinition.
  */
 export function defineModels(this: ZanixMongoConnector) {
-  const models = ProgramModule.models.getModels('mongo', this.resolvedConnectorKey)
+  const models = ProgramModule.models.getModels(
+    'mongo',
+    this.resolvedConnectorKey,
+  )
 
   for (const model of models) {
     const schema = new Schema(model.definition, model.options)
@@ -60,7 +63,12 @@ export function defineModelBySchema<S extends DefaultSchema>(
   // Run seeders
   runSeedersBySchema.call(this, seeders, modelName)
     .then(() => onSeedersDone(AdaptedModel, 'seeders executed'))
-    .catch((e) => onSeedersDone(AdaptedModel, e.message || 'an error ocurred running seeders'))
+    .catch((e) =>
+      onSeedersDone(
+        AdaptedModel,
+        e.message || 'an error ocurred running seeders',
+      )
+    )
 
   return AdaptedModel
 }
@@ -92,7 +100,10 @@ export async function defineSeedModelOnce(this: ZanixMongoConnector) {
     Object.entries(dataToFind).map(async ([db, data]) => {
       Models[db] = this.getModel(seedModelName(db))
 
-      const seeders = await Models[db].find({ $or: data as never }, { name: 1, version: 1 }).lean()
+      const seeders = await Models[db].find({ $or: data as never }, {
+        name: 1,
+        version: 1,
+      }).lean()
 
       for (const doc of seeders) {
         ProgramModule.seeders.existInDB.add(

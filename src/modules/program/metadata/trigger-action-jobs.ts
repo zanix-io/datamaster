@@ -42,7 +42,10 @@ export class TriggerActionJobsContainer extends ProgramContainer {
    *
    * @throws `InternalError` if `actionKind` is already registered.
    */
-  public register(actionKind: string, descriptor: TriggerActionJobDescriptor): void {
+  public register(
+    actionKind: string,
+    descriptor: TriggerActionJobDescriptor,
+  ): void {
     const registry = this.getData<Record<string, TriggerActionJobDescriptor>>(this.#key) || {}
 
     if (registry[actionKind]) {
@@ -61,7 +64,8 @@ export class TriggerActionJobsContainer extends ProgramContainer {
 
   /** Resolves the job descriptor registered for `actionKind`, if any. */
   public resolve(actionKind: string): TriggerActionJobDescriptor | undefined {
-    return this.getData<Record<string, TriggerActionJobDescriptor>>(this.#key)?.[actionKind]
+    return this.getData<Record<string, TriggerActionJobDescriptor>>(this.#key)
+      ?.[actionKind]
   }
 
   /** Every registered `{ actionKind, ...descriptor }` entry, in registration order. */

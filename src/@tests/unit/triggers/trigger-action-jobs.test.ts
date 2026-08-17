@@ -15,7 +15,11 @@ Deno.test('registerTriggerActionJob registers a descriptor, resolvable by action
   reset()
 
   const handler = () => {}
-  registerTriggerActionJob('mail', { name: 'custom-mail-job', processingQueue: 'soft', handler })
+  registerTriggerActionJob('mail', {
+    name: 'custom-mail-job',
+    processingQueue: 'soft',
+    handler,
+  })
 
   const resolved = ProgramModule.triggerActionJobs.resolve('mail')
   assertEquals(resolved?.name, 'custom-mail-job')
@@ -31,7 +35,11 @@ Deno.test('registerTriggerActionJob throws when actionKind is already registered
   registerTriggerActionJob('mail', { name: 'first-job', handler: () => {} })
 
   assertThrows(
-    () => registerTriggerActionJob('mail', { name: 'second-job', handler: () => {} }),
+    () =>
+      registerTriggerActionJob('mail', {
+        name: 'second-job',
+        handler: () => {},
+      }),
     Error,
     'already mapped to job "first-job"',
   )
@@ -43,7 +51,10 @@ Deno.test('getRegisteredTriggerActionJobs returns every registered descriptor', 
   reset()
 
   registerTriggerActionJob('mail', { name: 'mail-job', handler: () => {} })
-  registerTriggerActionJob('request', { name: 'request-job', handler: () => {} })
+  registerTriggerActionJob('request', {
+    name: 'request-job',
+    handler: () => {},
+  })
 
   const all = getRegisteredTriggerActionJobs()
   assertEquals(all.length, 2)

@@ -18,7 +18,11 @@ export const seederAdaptation = (
   connectorKey: string = DEFAULT_CONNECTOR_KEY,
 ) => {
   const processor = seedProcessor[type]?.(connectorKey)
-  if (!processor) throw new Error(`Not implemented: no seed processor for database type "${type}"`)
+  if (!processor) {
+    throw new Error(
+      `Not implemented: no seed processor for database type "${type}"`,
+    )
+  }
 
   const baseVersion = '0.0.0'
 
@@ -28,10 +32,16 @@ export const seederAdaptation = (
     if (typeof seed === 'function') {
       const name = seed.name
       processor.prepare?.(baseVersion, name, model)
-      return seederBaseWrapper(seed, processor, { version: baseVersion, name: seed.name })
+      return seederBaseWrapper(seed, processor, {
+        version: baseVersion,
+        name: seed.name,
+      })
     }
 
-    const { handler, options: { version = baseVersion, name = handler.name, ...ops } = {} } = seed
+    const {
+      handler,
+      options: { version = baseVersion, name = handler.name, ...ops } = {},
+    } = seed
 
     processor.prepare?.(version, name, model)
     return seederBaseWrapper(handler, processor, { version, name, ...ops })

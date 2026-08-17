@@ -20,7 +20,12 @@ export function seederProcessor(
     prepare: (version, name, Model) => {
       const { database, model } = getDbAndModel(modelName(Model))
       const toFind = { name: getName(model, name), status: 'success', version }
-      ProgramModule.seeders.addDataToQuery({ data: toFind, action: 'find', database, connectorKey })
+      ProgramModule.seeders.addDataToQuery({
+        data: toFind,
+        action: 'find',
+        database,
+        connectorKey,
+      })
     },
     avoidRun: (version, name, Model) => {
       const { model } = getDbAndModel(modelName(Model))
@@ -33,7 +38,12 @@ export function seederProcessor(
       const { database, model } = getDbAndModel(modelName(Model))
       const toSave = { name: getName(model, name), status, version, duration }
 
-      ProgramModule.seeders.addDataToQuery({ data: toSave, action: 'save', database, connectorKey })
+      ProgramModule.seeders.addDataToQuery({
+        data: toSave,
+        action: 'save',
+        database,
+        connectorKey,
+      })
     },
   }
 }

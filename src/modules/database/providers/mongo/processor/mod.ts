@@ -78,12 +78,17 @@ export const preprocessSchema = <T extends BaseCustomSchema>(
   const dataAccess: Record<string, DataAccessConfig> = {}
 
   // Associate an accessor function with its corresponding path
-  processInternalAccessors(accessorsInfo.getterEntries, ({ path, function: fn }) => {
-    const dataAccessInfo = ProgramModule.accessors.consumeDataAccess(fn)
-    const dataProtectionInfo = ProgramModule.accessors.consumeDataProtection(fn)
-    if (dataProtectionInfo) dataProtection[path] = dataProtectionInfo
-    if (dataAccessInfo) dataAccess[path] = dataAccessInfo
-  })
+  processInternalAccessors(
+    accessorsInfo.getterEntries,
+    ({ path, function: fn }) => {
+      const dataAccessInfo = ProgramModule.accessors.consumeDataAccess(fn)
+      const dataProtectionInfo = ProgramModule.accessors.consumeDataProtection(
+        fn,
+      )
+      if (dataProtectionInfo) dataProtection[path] = dataProtectionInfo
+      if (dataAccessInfo) dataAccess[path] = dataAccessInfo
+    },
+  )
 
   // virtuals
   mainVirtuals(schema)
@@ -99,7 +104,13 @@ export const preprocessSchema = <T extends BaseCustomSchema>(
   baseTransformations(schema)
 
   // hooks (data protection, triggers)
-  hooks(schema, modelName, connectorKey, extensions.triggers, extensions.autoProtectOnUpdate)
+  hooks(
+    schema,
+    modelName,
+    connectorKey,
+    extensions.triggers,
+    extensions.autoProtectOnUpdate,
+  )
 
   // return adapted schema
   return schema

@@ -27,7 +27,9 @@ const registerProvider = () => {
 
 // `@zanix/datamaster` owns the `'cache'` core-provider slot — registered unconditionally here,
 // mirroring `@zanix/auth`'s own `'auth'` slot registration (`auth/src/modules/providers/core.ts`).
-registerCoreProviderSlot('cache', ZanixCacheProvider, { sourcePackage: '@zanix/datamaster/core' })
+registerCoreProviderSlot('cache', ZanixCacheProvider, {
+  sourcePackage: '@zanix/datamaster/core',
+})
 
 /**
  * Core cache provider loader for Zanix.

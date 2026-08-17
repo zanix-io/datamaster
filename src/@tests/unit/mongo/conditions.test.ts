@@ -8,32 +8,69 @@ Deno.test('validateConditions returns true for an empty condition set', () => {
 })
 
 Deno.test('validateConditions evaluates "=" correctly', () => {
-  assertEquals(validateConditions({ bool: true }, [{ field: 'bool', op: '=', value: true }]), true)
   assertEquals(
-    validateConditions({ bool: false }, [{ field: 'bool', op: '=', value: true }]),
+    validateConditions({ bool: true }, [{
+      field: 'bool',
+      op: '=',
+      value: true,
+    }]),
+    true,
+  )
+  assertEquals(
+    validateConditions({ bool: false }, [{
+      field: 'bool',
+      op: '=',
+      value: true,
+    }]),
     false,
   )
 })
 
 Deno.test('validateConditions evaluates "!=" correctly', () => {
-  assertEquals(validateConditions({ num: 3 }, [{ field: 'num', op: '!=', value: 4 }]), true)
-  assertEquals(validateConditions({ num: 4 }, [{ field: 'num', op: '!=', value: 4 }]), false)
+  assertEquals(
+    validateConditions({ num: 3 }, [{ field: 'num', op: '!=', value: 4 }]),
+    true,
+  )
+  assertEquals(
+    validateConditions({ num: 4 }, [{ field: 'num', op: '!=', value: 4 }]),
+    false,
+  )
 })
 
 Deno.test('validateConditions evaluates numeric comparisons', () => {
-  assertEquals(validateConditions({ num: 5 }, [{ field: 'num', op: '<', value: 10 }]), true)
-  assertEquals(validateConditions({ num: 5 }, [{ field: 'num', op: '>', value: 10 }]), false)
-  assertEquals(validateConditions({ num: 5 }, [{ field: 'num', op: '<=', value: 5 }]), true)
-  assertEquals(validateConditions({ num: 5 }, [{ field: 'num', op: '>=', value: 5 }]), true)
+  assertEquals(
+    validateConditions({ num: 5 }, [{ field: 'num', op: '<', value: 10 }]),
+    true,
+  )
+  assertEquals(
+    validateConditions({ num: 5 }, [{ field: 'num', op: '>', value: 10 }]),
+    false,
+  )
+  assertEquals(
+    validateConditions({ num: 5 }, [{ field: 'num', op: '<=', value: 5 }]),
+    true,
+  )
+  assertEquals(
+    validateConditions({ num: 5 }, [{ field: 'num', op: '>=', value: 5 }]),
+    true,
+  )
 })
 
 Deno.test('validateConditions evaluates "includes" against an array field', () => {
   assertEquals(
-    validateConditions({ tags: ['a', 'b'] }, [{ field: 'tags', op: 'includes', value: 'a' }]),
+    validateConditions({ tags: ['a', 'b'] }, [{
+      field: 'tags',
+      op: 'includes',
+      value: 'a',
+    }]),
     true,
   )
   assertEquals(
-    validateConditions({ tags: ['a', 'b'] }, [{ field: 'tags', op: 'includes', value: 'c' }]),
+    validateConditions({ tags: ['a', 'b'] }, [{
+      field: 'tags',
+      op: 'includes',
+      value: 'c',
+    }]),
     false,
   )
 })
@@ -71,15 +108,24 @@ Deno.test('validateConditions evaluates a nested "or" group', () => {
 })
 
 Deno.test('validateConditions evaluates a "not" group', () => {
-  const conditions = [{ not: [{ field: 'bool', op: '=' as const, value: true }] }]
+  const conditions = [{
+    not: [{ field: 'bool', op: '=' as const, value: true }],
+  }]
   assertEquals(validateConditions({ bool: false }, conditions), true)
   assertEquals(validateConditions({ bool: true }, conditions), false)
 })
 
 Deno.test('validateConditions "!$undefined" sentinel compares a field against undefined', () => {
-  assertEquals(validateConditions({}, [{ field: 'bool', op: '=', value: '!$undefined' }]), true)
   assertEquals(
-    validateConditions({ bool: false }, [{ field: 'bool', op: '=', value: '!$undefined' }]),
+    validateConditions({}, [{ field: 'bool', op: '=', value: '!$undefined' }]),
+    true,
+  )
+  assertEquals(
+    validateConditions({ bool: false }, [{
+      field: 'bool',
+      op: '=',
+      value: '!$undefined',
+    }]),
     false,
   )
 })

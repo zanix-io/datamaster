@@ -260,7 +260,11 @@ the action to dispatch. Conditions can also nest logical groups:
 
 ```ts
 const orGroup = {
-  or: [{ field: 'role', op: '=', value: 'admin' }, { field: 'role', op: '=', value: 'owner' }],
+  or: [{ field: 'role', op: '=', value: 'admin' }, {
+    field: 'role',
+    op: '=',
+    value: 'owner',
+  }],
 }
 const andGroup = { and: [/* ... */] }
 const notGroup = { not: [/* ... */] }
@@ -297,7 +301,9 @@ const args = {
   priority,
   delay,
   data: {
-    _data: {/* the document's current fields (the deleted record, for a `deleted` trigger) */},
+    _data: {
+      /* the document's current fields (the deleted record, for a `deleted` trigger) */
+    },
     _oldData: {/* the pre-change document, only present for updated/deleted */},
     ...actionData, // whatever the action's own `data` option (from TriggerActionCommons) set
   },

@@ -6,10 +6,12 @@ import {
   dataProtectionSetterDefinition,
 } from 'modules/database/policies/protection.ts'
 import { keys } from '../../../../(setup)/keys.ts'
-import { assert, assertEquals } from '@std/assert'
+import { assert, assertEquals, assertThrows } from '@std/assert'
 import { model, Schema } from 'mongoose'
 import { preprocessSchema } from 'mongo/processor/mod.ts'
 import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
+
+console.error = () => {}
 
 const userSchema = new Schema({
   name: String,
@@ -38,7 +40,10 @@ const userSchema = new Schema({
     of: new Schema({
       value: {
         type: String,
-        get: dataProtectionGetter({ strategy: 'encrypt', settings: { type: 'asymmetric' } }),
+        get: dataProtectionGetter({
+          strategy: 'encrypt',
+          settings: { type: 'asymmetric' },
+        }),
       },
     }),
   },
@@ -69,7 +74,10 @@ Deno.test('Validate data protection getter - hashing', async () => {
 
   assert(
     password &&
-      await UserModel.validateHash('My secret passwoRd', password.toString()) ===
+      await UserModel.validateHash(
+          'My secret passwoRd',
+          password.toString(),
+        ) ===
         // deno-lint-ignore no-non-null-assertion no-extra-non-null-assertion no-non-null-asserted-optional-chain
         await password?.verify!('My secret passwoRd'),
   )
@@ -124,4 +132,23 @@ Deno.test('Validate data protection setter - masking', async () => {
   assert(user.data[0].phones[0] !== data[0])
 
   Deno.env.delete('DATA_SECRET_KEY')
+})
+
+Deno.test('uses active version config', () => {
+  const settings = { preserveLength: true }
+
+  const configs = {
+    activeVersion: 'v2',
+    versionConfigs: {
+      undefined: {
+        strategy: 'masking',
+        settings,
+      },
+    },
+  } as never
+
+  assertThrows(
+    () => dataProtectionSetterDefinition(configs, 'value'),
+    Error,
+  )
 })

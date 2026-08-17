@@ -61,9 +61,16 @@ export class SeedersContainer extends ProgramContainer {
       connectorKey = DEFAULT_CONNECTOR_KEY,
     } = options
     const key = this.#keyData(type, connectorKey, action)
-    const seeders = this.consumeDataToQuery(action, type, connectorKey, container)
+    const seeders = this.consumeDataToQuery(
+      action,
+      type,
+      connectorKey,
+      container,
+    )
 
-    if (database !== 'default') Object.assign(data, { 'executedBy': readConfig().name })
+    if (database !== 'default') {
+      Object.assign(data, { 'executedBy': readConfig().name })
+    }
 
     seeders[database] = [...(seeders[database] || []), data]
     this.setData(key, seeders, container)

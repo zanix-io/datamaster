@@ -98,7 +98,10 @@ export function seedRotateProtectionKeys(
       ...options,
       useLean: false,
       onDocument: async (doc: Document) => {
-        await transformByDataProtection({ excludeHashedFields: true })(doc, doc)
+        await transformByDataProtection({ excludeHashedFields: true })(
+          doc,
+          doc,
+        )
         const response = doc.toJSON({ getters: false, transform: false })
         delete response.updatedAt
         delete response._id
@@ -106,7 +109,10 @@ export function seedRotateProtectionKeys(
       },
     })
 
-    await Model.upsertManyById(documents, { useDataPolicies: true, type: 'update' })
+    await Model.upsertManyById(documents, {
+      useDataPolicies: true,
+      type: 'update',
+    })
   }
 }
 
@@ -170,7 +176,9 @@ export async function checkProtectionRotationStatus(
   if (!checkablePaths.length) return {}
 
   const status: ProtectionRotationStatus = {}
-  for (const path of checkablePaths) status[path] = { total: 0, current: 0, outdated: 0 }
+  for (const path of checkablePaths) {
+    status[path] = { total: 0, current: 0, outdated: 0 }
+  }
 
   await Model.readDocuments({
     ...options,
@@ -183,8 +191,9 @@ export async function checkProtectionRotationStatus(
         status[path].total++
         const { version } = extractVersion(raw)
 
-        if (version === dataProtection[path].activeVersion) status[path].current++
-        else status[path].outdated++
+        if (version === dataProtection[path].activeVersion) {
+          status[path].current++
+        } else status[path].outdated++
       }
     },
   })

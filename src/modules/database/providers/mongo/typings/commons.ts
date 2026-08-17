@@ -33,7 +33,9 @@ export type SchemaMethods<Attrs extends BaseAttributes = any> = {
    * Choose the approach that best fits your performance requirements.
    */
   toJSON<T = FlattenMaps<Attrs>>(
-    options: Omit<ToObjectOptions, 'getters'> & { userSession?: { type?: Session['type'] } },
+    options: Omit<ToObjectOptions, 'getters'> & {
+      userSession?: { type?: Session['type'] }
+    },
   ): T
 }
 
@@ -43,15 +45,17 @@ export type SchemaMethods<Attrs extends BaseAttributes = any> = {
  * @template Attrs - The attribute types extending BaseAttributes (default is any).
  * @template S - The schema type, defaults to DefaultSchema<Attrs>.
  */
-export type Model<Attrs extends BaseAttributes = any, S extends Schema = DefaultSchema<Attrs>> =
-  MongoModel<
-    Attrs,
-    {},
-    SchemaMethods<Attrs>,
-    {},
-    HydratedDocument<Attrs, SchemaMethods<Attrs>, {}, {}>,
-    S
-  >
+export type Model<
+  Attrs extends BaseAttributes = any,
+  S extends Schema = DefaultSchema<Attrs>,
+> = MongoModel<
+  Attrs,
+  {},
+  SchemaMethods<Attrs>,
+  {},
+  HydratedDocument<Attrs, SchemaMethods<Attrs>, {}, {}>,
+  S
+>
 
 /**
  * Represents the default schema type, with attributes extending BaseAttributes.
@@ -107,10 +111,16 @@ export interface ReadDocumentsOptions<T> {
   filter?: FilterQuery<T & Record<string, any>>
 
   /** Callback executed for each document (streamed or batched) */
-  onDocument: (doc: T & Record<string, any>, index: number) => Promise<void> | void
+  onDocument: (
+    doc: T & Record<string, any>,
+    index: number,
+  ) => Promise<void> | void
 }
 
 /**
  * Common parameters passed to internal strategy functions.
  */
-export type ReadContext<T extends Document> = Omit<ReadDocumentsOptions<T>, 'mode'>
+export type ReadContext<T extends Document> = Omit<
+  ReadDocumentsOptions<T>,
+  'mode'
+>

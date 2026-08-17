@@ -14,7 +14,10 @@ const userSchema = new Schema({
   },
   email: {
     type: String,
-    get: dataProtectionGetter({ strategy: 'mask', settings: { endBefore: '@' } }),
+    get: dataProtectionGetter({
+      strategy: 'mask',
+      settings: { endBefore: '@' },
+    }),
   },
   secret: {
     type: String,
@@ -33,7 +36,10 @@ const userSchema = new Schema({
     of: new Schema({
       value: {
         type: String,
-        get: dataProtectionGetter({ strategy: 'encrypt', settings: { type: 'asymmetric' } }),
+        get: dataProtectionGetter({
+          strategy: 'encrypt',
+          settings: { type: 'asymmetric' },
+        }),
       },
     }),
   },
@@ -79,7 +85,10 @@ Deno.test({
 
     const maskedEmail: UnmaskableObject = userSaved.email
 
-    assertEquals(maskedEmail?.toString(), '16z7b7a6e787dxZx1d1c5d1a110c@email.com')
+    assertEquals(
+      maskedEmail?.toString(),
+      '16z7b7a6e787dxZx1d1c5d1a110c@email.com',
+    )
     assertEquals(json.email, 'v0:16z7b7a6e787dxZx1d1c5d1a110c@email.com')
     assertEquals(maskedEmail?.unmask?.(), 'pepito@email.com')
 
@@ -94,7 +103,8 @@ Deno.test({
     const email: DecryptableObject = userSaved.metadata?.get('emails')?.value
     assertEquals(await email?.decrypt?.(), 'pepito.perez@email.com')
     assert(
-      json.metadata?.emails.value && (json.metadata?.emails.value !== 'pepito.perez@email.com'),
+      json.metadata?.emails.value &&
+        (json.metadata?.emails.value !== 'pepito.perez@email.com'),
     )
 
     const secret: DecryptableObject = userSaved.secret

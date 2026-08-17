@@ -1,7 +1,7 @@
 import { DropCollection, getDB, ignore, sanitize } from '../../../(setup)/mongo/connector.ts'
 import { aesKey } from '../../../(setup)/keys.ts'
 import { assert, assertEquals, assertNotEquals } from '@std/assert'
-import { mask, unmask } from 'utils/protection.ts'
+import { decrypt, encrypt, mask, unmask } from 'utils/protection.ts'
 import { generateHash, validateHash } from '@zanix/helpers'
 import { Schema } from 'mongoose'
 
@@ -55,18 +55,30 @@ Deno.test({
 
     if (Model.isReplicaSet()) {
       const { session, commit } = await Model.startTransaction()
-      await Model.create({ description: 'datamaster-transaction' }, { session })
-      await new Model({ description: 'datamaster-transaction-2' }).save({ session })
-      const dataSaved = await Model.findOne({ description: 'datamaster-transaction' }).exec()
-      const dataSaved2 = await Model.findOne({ description: 'datamaster-transaction-2' }).exec()
+      await Model.create({ description: 'datamaster-transaction' }, {
+        session,
+      })
+      await new Model({ description: 'datamaster-transaction-2' }).save({
+        session,
+      })
+      const dataSaved = await Model.findOne({
+        description: 'datamaster-transaction',
+      }).exec()
+      const dataSaved2 = await Model.findOne({
+        description: 'datamaster-transaction-2',
+      }).exec()
 
       assert(!dataSaved)
       assert(!dataSaved2)
 
       await commit()
 
-      const dataSavedT = await Model.findOne({ description: 'datamaster-transaction' }).exec()
-      const dataSavedT2 = await Model.findOne({ description: 'datamaster-transaction-2' }).exec()
+      const dataSavedT = await Model.findOne({
+        description: 'datamaster-transaction',
+      }).exec()
+      const dataSavedT2 = await Model.findOne({
+        description: 'datamaster-transaction-2',
+      }).exec()
 
       assertEquals(dataSavedT?.description, 'datamaster-transaction')
       assertEquals(dataSavedT2?.description, 'datamaster-transaction-2')
@@ -96,11 +108,19 @@ Deno.test({
 
     if (Model.isReplicaSet()) {
       const { session, commit, abort } = await Model.startTransaction()
-      await Model.create({ description: 'datamaster-transaction-aborted' }, { session })
-      await new Model({ description: 'datamaster-transaction-2-aborted' }).save({ session })
-      const dataSaved = await Model.findOne({ description: 'datamaster-transaction-aborted' })
+      await Model.create({ description: 'datamaster-transaction-aborted' }, {
+        session,
+      })
+      await new Model({ description: 'datamaster-transaction-2-aborted' }).save(
+        { session },
+      )
+      const dataSaved = await Model.findOne({
+        description: 'datamaster-transaction-aborted',
+      })
         .exec()
-      const dataSaved2 = await Model.findOne({ description: 'datamaster-transaction-2-aborted' })
+      const dataSaved2 = await Model.findOne({
+        description: 'datamaster-transaction-2-aborted',
+      })
         .exec()
 
       assert(!dataSaved)
@@ -110,9 +130,13 @@ Deno.test({
       assert(session.hasEnded)
       await commit() // This does nothing; the sesion ended error has already been caught.
 
-      const dataSavedT = await Model.findOne({ description: 'datamaster-transaction-aborted' })
+      const dataSavedT = await Model.findOne({
+        description: 'datamaster-transaction-aborted',
+      })
         .exec()
-      const dataSavedT2 = await Model.findOne({ description: 'datamaster-transaction-2-aborted' })
+      const dataSavedT2 = await Model.findOne({
+        description: 'datamaster-transaction-2-aborted',
+      })
         .exec()
 
       assert(!dataSavedT)
@@ -132,4 +156,49 @@ Deno.test({
     await db['close']()
   },
   ignore,
+})
+
+Deno.test({
+  name: 'encrypt/decrypt - returns original value when baseEncrypt/baseDecrypt throws',
+  fn: async () => {
+    const input = 'masked'
+
+    const decrypted = await decrypt(input, {}, '2' as never)
+
+    assertEquals(decrypted, input)
+
+    const encrypted = await encrypt(input, {}, '2' as never)
+    assertEquals(encrypted, input)
+  },
+})
+
+Deno.test('encrypt/decrypt - returns original value when is empty array', async () => {
+  const encrypted = await encrypt([], {}, '2' as never)
+
+  assertEquals(encrypted, [])
+
+  const decrypted = await decrypt([], {}, '2' as never)
+
+  assertEquals(decrypted, [])
+})
+
+Deno.test('mask/unmask - returns original value when baseMask/baseUnmask throws', () => {
+  const input = 'masked'
+
+  const unmasked = unmask(input, { startAfter: 2 }, '2' as never)
+
+  assertEquals(unmasked, input)
+
+  const masked = mask(input, { startAfter: 2 }, '2' as never)
+  assertEquals(masked, input)
+})
+
+Deno.test('mask/unmask - returns original value when is empty array', () => {
+  const unmasked = unmask([], { startAfter: 2 }, '2' as never)
+
+  assertEquals(unmasked, [])
+
+  const masked = unmask([], { startAfter: 2 }, '2' as never)
+
+  assertEquals(masked, [])
 })

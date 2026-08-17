@@ -33,13 +33,23 @@ function fakeThis(entries: Record<string, any>[]) {
 const repo = TriggersAdminRepository.prototype
 
 Deno.test('TriggersAdminRepository.list returns every persisted entry', async () => {
-  const entries = [{ model: 'users', active: true, triggers: {}, isDefault: false }]
+  const entries = [{
+    model: 'users',
+    active: true,
+    triggers: {},
+    isDefault: false,
+  }]
   const result = await repo.list.call(fakeThis(entries) as never)
   assertEquals(result, entries)
 })
 
 Deno.test('TriggersAdminRepository.get returns the matching entry', async () => {
-  const entries = [{ model: 'users', active: true, triggers: {}, isDefault: false }]
+  const entries = [{
+    model: 'users',
+    active: true,
+    triggers: {},
+    isDefault: false,
+  }]
   const result = await repo.get.call(fakeThis(entries) as never, 'users')
   assertEquals(result.model, 'users')
 })
@@ -52,10 +62,19 @@ Deno.test('TriggersAdminRepository.get throws NOT_FOUND when missing', async () 
 })
 
 Deno.test('TriggersAdminRepository.create rejects a duplicate model', async () => {
-  const entries = [{ model: 'users', active: true, triggers: {}, isDefault: false }]
+  const entries = [{
+    model: 'users',
+    active: true,
+    triggers: {},
+    isDefault: false,
+  }]
   await assertRejects(
     () =>
-      repo.create.call(fakeThis(entries) as never, { model: 'users', active: true, triggers: {} }),
+      repo.create.call(fakeThis(entries) as never, {
+        model: 'users',
+        active: true,
+        triggers: {},
+      }),
     HttpError,
   )
 })
@@ -78,8 +97,15 @@ Deno.test('TriggersAdminRepository.update throws NOT_FOUND when missing', async 
 })
 
 Deno.test('TriggersAdminRepository.update applies partial changes', async () => {
-  const entries = [{ model: 'users', active: true, triggers: {}, isDefault: false }]
-  const updated = await repo.update.call(fakeThis(entries) as never, 'users', { active: false })
+  const entries = [{
+    model: 'users',
+    active: true,
+    triggers: {},
+    isDefault: false,
+  }]
+  const updated = await repo.update.call(fakeThis(entries) as never, 'users', {
+    active: false,
+  })
   assertEquals(updated.active, false)
 })
 
@@ -91,7 +117,12 @@ Deno.test('TriggersAdminRepository.remove throws NOT_FOUND when missing', async 
 })
 
 Deno.test('TriggersAdminRepository.remove deletes an existing entry', async () => {
-  const entries = [{ model: 'users', active: true, triggers: {}, isDefault: false }]
+  const entries = [{
+    model: 'users',
+    active: true,
+    triggers: {},
+    isDefault: false,
+  }]
   await repo.remove.call(fakeThis(entries) as never, 'users')
   assertEquals(entries.length, 0)
 })

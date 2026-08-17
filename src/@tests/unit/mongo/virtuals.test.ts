@@ -11,7 +11,10 @@ Deno.test('mainVirtuals adds an "id" virtual setter that assigns _id', () => {
   mainVirtuals(schema as never)
 
   const doc: { _id?: unknown } = {}
-  ;(schema.virtuals as Record<string, { applySetters: (v: unknown, doc: unknown) => void }>)['id']
+  ;(schema.virtuals as Record<
+    string,
+    { applySetters: (v: unknown, doc: unknown) => void }
+  >)['id']
     .applySetters('custom-id', doc)
 
   assertEquals(doc._id, 'custom-id')

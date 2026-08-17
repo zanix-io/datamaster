@@ -99,7 +99,8 @@ Deno.test({
     const db = await getDB()
     const Model = db.getModel('test-search-masked-mid-value', newSchema())
 
-    await new Model({ name: 'irrelevant', taxId: '222-findable-by-tax' }).save()
+    await new Model({ name: 'irrelevant', taxId: '222-findable-by-tax' })
+      .save()
 
     const filter = Model.buildSearchFilter('findable', ['taxId'])
     const docs = await Model.find(filter)
@@ -122,7 +123,9 @@ Deno.test({
     await new Model({ name: 'Acme Corp', status: 'active' }).save()
     await new Model({ name: 'Acme Branch', status: 'inactive' }).save()
 
-    const filter = Model.buildSearchFilter('acme', ['name'], { status: 'active' })
+    const filter = Model.buildSearchFilter('acme', ['name'], {
+      status: 'active',
+    })
     const docs = await Model.find(filter)
 
     assertEquals(docs.length, 1)
@@ -140,9 +143,12 @@ Deno.test({
     const db = await getDB()
     const Model = db.getModel('test-search-empty-query', newSchema())
 
-    assertEquals(Model.buildSearchFilter(undefined, ['name'], { status: 'active' }), {
-      status: 'active',
-    })
+    assertEquals(
+      Model.buildSearchFilter(undefined, ['name'], { status: 'active' }),
+      {
+        status: 'active',
+      },
+    )
     assertEquals(Model.buildSearchFilter('', ['name']), {})
 
     await DropCollection(Model, db)

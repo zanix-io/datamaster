@@ -61,7 +61,9 @@ const attach = (isReplicaSet: boolean, session: any) => {
   transactions(schema)
   return {
     model,
-    startTransaction: (model.statics as any).startTransaction as (...a: any[]) => any,
+    startTransaction: (model.statics as any).startTransaction as (
+      ...a: any[]
+    ) => any,
   }
 }
 

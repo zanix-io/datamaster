@@ -68,14 +68,19 @@ export async function loadPersistedTriggersOnStart(this: ZanixMongoConnector) {
   const staticEntries = getStaticTriggerEntries(this.resolvedConnectorKey)
   const existing = await Model.find({}).lean()
 
-  const { toDelete, toResync, toSeed } = planTriggerSync(staticEntries, existing)
+  const { toDelete, toResync, toSeed } = planTriggerSync(
+    staticEntries,
+    existing,
+  )
 
   if (toDelete.length) await Model.deleteMany({ _id: { $in: toDelete } })
 
   if (toResync.length) {
     await Promise.all(
       toResync.map(({ _id, triggers }) =>
-        Model.updateOne({ _id }, { $set: { triggers, lastSyncedTriggers: triggers } })
+        Model.updateOne({ _id }, {
+          $set: { triggers, lastSyncedTriggers: triggers },
+        })
       ),
     )
   }
@@ -127,7 +132,13 @@ function startTriggersPolling(
 
   const tick = () => {
     refreshPersistedTriggers(connectorKey, Model)
-      .catch((e) => logger.error('Failed to poll the persisted triggers collection', e, 'noSave'))
+      .catch((e) =>
+        logger.error(
+          'Failed to poll the persisted triggers collection',
+          e,
+          'noSave',
+        )
+      )
       .finally(() => {
         if (this.triggersPoll.stopped) return
         this.triggersPoll.timer = setTimeout(tick, interval)
@@ -170,7 +181,11 @@ function startTriggersChangeStream(
       'change',
       () =>
         void refreshPersistedTriggers(connectorKey, Model).catch((e) =>
-          logger.error('Failed to refresh persisted triggers from change stream', e, 'noSave')
+          logger.error(
+            'Failed to refresh persisted triggers from change stream',
+            e,
+            'noSave',
+          )
         ),
     )
     stream.on(

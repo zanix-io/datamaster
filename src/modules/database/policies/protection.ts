@@ -30,7 +30,10 @@ export const normalizeDataProtection = (
   dataProtection: DataProtectionOptions,
 ): DataProtection => {
   const protection: DataProtectionBase<DataProtectionMethods> = (typeof dataProtection === 'string')
-    ? { activeVersion: 'v0', versionConfigs: { 'default': { strategy: dataProtection } } }
+    ? {
+      activeVersion: 'v0',
+      versionConfigs: { 'default': { strategy: dataProtection } },
+    }
     : 'activeVersion' in dataProtection
     ? dataProtection
     : { activeVersion: 'v0', versionConfigs: { 'default': dataProtection } }
@@ -59,7 +62,8 @@ export const dataProtectionGetterDefinition = (
   if (!value || (Array.isArray(value) && value.length === 0)) return
   const { message, version } = extractVersion(value)
 
-  const variants = config.versionConfigs[version] || config.versionConfigs['default']
+  const variants = config.versionConfigs[version] ||
+    config.versionConfigs['default']
 
   if (!variants) return value
 
@@ -101,7 +105,8 @@ export const dataProtectionSetterDefinition = (
 
   const version = configs.activeVersion // Always ensure that data policies are applied using the latest version.
 
-  const config = configs.versionConfigs[version] || configs.versionConfigs['default']
+  const config = configs.versionConfigs[version] ||
+    configs.versionConfigs['default']
   if (!config) {
     throw new InternalError('An error occurred during data processing', {
       cause: `Data protection version config is not defined for version '${version}'`,
@@ -247,7 +252,10 @@ export function dataProtectionGetter(
   const dataProtection = normalizeDataProtection(protection)
 
   const accessor: SchemaAccessor = (value, options) => {
-    const processedValue = dataProtectionGetterDefinition(dataProtection, value)
+    const processedValue = dataProtectionGetterDefinition(
+      dataProtection,
+      value,
+    )
 
     return baseGetter(processedValue, options)
   }

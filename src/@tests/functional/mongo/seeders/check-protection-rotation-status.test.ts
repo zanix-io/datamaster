@@ -17,7 +17,11 @@ Deno.test({
   fn: async () => {
     Deno.env.set('DATA_SECRET_KEY', 'my-secret-key')
     const modelName = 'test-check-rotation-status'
-    const ids = ['68fb00b33405a3a540d9b981', '68fb00b33405a3a540d9b982', '68fb00b33405a3a540d9b983']
+    const ids = [
+      '68fb00b33405a3a540d9b981',
+      '68fb00b33405a3a540d9b982',
+      '68fb00b33405a3a540d9b983',
+    ]
 
     registerModel({
       name: modelName,
@@ -27,7 +31,9 @@ Deno.test({
       },
       extensions: {
         seeders: [
-          seedManyByIdIfMissing(ids.map((id) => ({ id, secret: 'a-secret', hashedValue: 'x' }))),
+          seedManyByIdIfMissing(
+            ids.map((id) => ({ id, secret: 'a-secret', hashedValue: 'x' })),
+          ),
         ],
       },
     })
@@ -46,14 +52,19 @@ Deno.test({
           type: String,
           get: dataProtectionGetter({
             activeVersion: 'v1',
-            versionConfigs: { v0: { strategy: 'mask' }, v1: { strategy: 'mask' } },
+            versionConfigs: {
+              v0: { strategy: 'mask' },
+              v1: { strategy: 'mask' },
+            },
           }),
         },
         hashedValue: { type: String, get: dataProtectionGetter('hash') },
       },
       extensions: {
         seeders: [
-          seedRotateProtectionKeys({ filter: { _id: { $in: ids.slice(0, 2) } } }),
+          seedRotateProtectionKeys({
+            filter: { _id: { $in: ids.slice(0, 2) } },
+          }),
         ],
       },
     })

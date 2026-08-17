@@ -24,7 +24,10 @@ const applyTransformations = (
   // structurally match the document type mongoose expects back in `schema.set(...)`. Both
   // sides are effectively "any document" in practice, so `Transform` reconciles them.
   // `transform` may also be a plain `boolean` per mongoose's own `ToObjectOptions`.
-  const existingTransform: { toJSON?: Transform | boolean; toObject?: Transform | boolean } = {
+  const existingTransform: {
+    toJSON?: Transform | boolean
+    toObject?: Transform | boolean
+  } = {
     toJSON: schema.get('toJSON')?.transform,
     toObject: schema.get('toObject')?.transform,
   }

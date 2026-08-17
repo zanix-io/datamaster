@@ -51,7 +51,10 @@ export async function execWithRetry<T, K extends string, V>(
     return await command
   } catch (err) {
     const error = err as InternalError
-    if (attempt >= this.maxCommandRetries - 1 || error.code === 'REDIS_CONNECTION_TIMEOUT') {
+    if (
+      attempt >= this.maxCommandRetries - 1 ||
+      error.code === 'REDIS_CONNECTION_TIMEOUT'
+    ) {
       throw error
     }
     return await new Promise<T>((resolve) =>

@@ -111,9 +111,17 @@ export type SeederOptions = {
 /** Seeder processor to execute actions on handler. */
 export type SeederProcessor = {
   /** Registers the seeder's expected version and name before it runs, so it can later be tracked. */
-  prepare?: (version: SeederOptions['version'], name: string, model: any) => void
+  prepare?: (
+    version: SeederOptions['version'],
+    name: string,
+    model: any,
+  ) => void
   /** Determines whether a seeder run should be skipped (e.g. because it already ran at this version). */
-  avoidRun: (version: SeederOptions['version'], name: string, model: any) => boolean
+  avoidRun: (
+    version: SeederOptions['version'],
+    name: string,
+    model: any,
+  ) => boolean
   /** Called after a seeder finishes, reporting whether it succeeded or failed. */
   onFinish: (
     status: 'success' | 'failed',

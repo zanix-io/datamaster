@@ -11,7 +11,10 @@ import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
  * @param name  - Seed Model Name
  * @param connectorKey - The connector's own resolved key. Defaults to the default connector's key.
  */
-export const registerSeedModel = (name: string, connectorKey: string = DEFAULT_CONNECTOR_KEY) => {
+export const registerSeedModel = (
+  name: string,
+  connectorKey: string = DEFAULT_CONNECTOR_KEY,
+) => {
   ProgramModule.models.addModel(
     {
       name,

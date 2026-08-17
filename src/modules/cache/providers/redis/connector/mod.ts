@@ -98,7 +98,13 @@ export class ZanixRedisConnector<K extends string = string, V = any>
       minTTLForOffset,
     } = options
 
-    super({ contextId, ttl, maxOffsetSeconds: maxTTLOffset, minTTLForOffset, autoInitialize })
+    super({
+      contextId,
+      ttl,
+      maxOffsetSeconds: maxTTLOffset,
+      minTTLForOffset,
+      autoInitialize,
+    })
 
     this.#uri = redisUrl
     const targetName = this.constructor.name
@@ -131,7 +137,9 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     let timeInit = Date.now()
 
     this.#client.on('ready', () => {
-      logger.success(`Redis Connected Successfully through '${this.name}' class`)
+      logger.success(
+        `Redis Connected Successfully through '${this.name}' class`,
+      )
       clearTimeouts()
       this.connected = true
     })
@@ -164,7 +172,11 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     })
 
     this.#client.on('error', (err) => {
-      logger.error('An error ocurred. Retry to connect to Redis...', err, 'noSave')
+      logger.error(
+        'An error ocurred. Retry to connect to Redis...',
+        err,
+        'noSave',
+      )
     })
 
     // Promise that resolves when the client is ready
@@ -180,7 +192,11 @@ export class ZanixRedisConnector<K extends string = string, V = any>
   }
 
   /** Stores a value under the given key, optionally scheduling the write and applying a TTL. */
-  public async set(key: K, value: V, options: CacheSetOptions = {}): Promise<void> {
+  public async set(
+    key: K,
+    value: V,
+    options: CacheSetOptions = {},
+  ): Promise<void> {
     const { exp, schedule, maxTTLOffset, minTTLForOffset } = options
     const ttlValue = exp ?? this.ttl
     const valueToSave = JSON.stringify(value)
@@ -188,7 +204,8 @@ export class ZanixRedisConnector<K extends string = string, V = any>
       expiration: ttlValue === 'KEEPTTL' ? ttlValue : ttlValue > 0
         ? {
           type: 'PX' as const,
-          value: this.getTTLWithOffset(ttlValue, maxTTLOffset, minTTLForOffset) * 1000,
+          value: this.getTTLWithOffset(ttlValue, maxTTLOffset, minTTLForOffset) *
+            1000,
         }
         : undefined,
     }
@@ -254,7 +271,11 @@ export class ZanixRedisConnector<K extends string = string, V = any>
         this.#client.destroy()
       }
     } catch (e) {
-      logger.error(`Failed to close Redis in '${this.name}' class`, e, 'noSave')
+      logger.error(
+        `Failed to close Redis in '${this.name}' class`,
+        e,
+        'noSave',
+      )
     }
   }
 

@@ -22,11 +22,19 @@ import logger from '@zanix/logger'
  * pattern `seederProcessor` uses for its own connector-scoped hooks.
  */
 const makeRefreshAfterSave = (connectorKey: string) =>
-  async function refreshAfterSave(this: any, _doc: unknown, next: () => void): Promise<void> {
+  async function refreshAfterSave(
+    this: any,
+    _doc: unknown,
+    next: () => void,
+  ): Promise<void> {
     try {
       await refreshPersistedTriggers(connectorKey, this.constructor)
     } catch (e) {
-      logger.error('Failed to refresh persisted triggers after a write', e, 'noSave')
+      logger.error(
+        'Failed to refresh persisted triggers after a write',
+        e,
+        'noSave',
+      )
     }
     next()
   }
@@ -34,11 +42,19 @@ const makeRefreshAfterSave = (connectorKey: string) =>
 /** Query-level counterpart of {@link makeRefreshAfterSave} — see its doc for why `next` is
  * explicit and why this is a factory. */
 const makeRefreshAfterQuery = (connectorKey: string) =>
-  async function refreshAfterQuery(this: any, _result: unknown, next: () => void): Promise<void> {
+  async function refreshAfterQuery(
+    this: any,
+    _result: unknown,
+    next: () => void,
+  ): Promise<void> {
     try {
       await refreshPersistedTriggers(connectorKey, this.model)
     } catch (e) {
-      logger.error('Failed to refresh persisted triggers after a write', e, 'noSave')
+      logger.error(
+        'Failed to refresh persisted triggers after a write',
+        e,
+        'noSave',
+      )
     }
     next()
   }

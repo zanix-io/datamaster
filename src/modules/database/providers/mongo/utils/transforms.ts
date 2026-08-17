@@ -10,7 +10,13 @@ export function documentToPlainTransform(
 ) {
   if (!(data instanceof Document)) return data
 
-  const { deleteMetadata, transform = false, virtuals = true, getters = false, ...opts } = options
+  const {
+    deleteMetadata,
+    transform = false,
+    virtuals = true,
+    getters = false,
+    ...opts
+  } = options
   // Convert document to plain object
   const obj = data.toObject({ transform, virtuals, getters, ...opts })
   if (deleteMetadata) transformClearIdMetadata(obj as never, obj)
@@ -30,7 +36,11 @@ export function baseRecursiveTransform(
   } = {},
 ): object {
   // Default transforms to no-op functions
-  const { deleteMetadata, transformPrimitive = (v) => v, transformNested = (v) => v } = transforms
+  const {
+    deleteMetadata,
+    transformPrimitive = (v) => v,
+    transformNested = (v) => v,
+  } = transforms
 
   if (data === null || data === undefined) return data // Return null or undefined as is (no transformation needed)
 

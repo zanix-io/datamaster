@@ -56,7 +56,10 @@ registerCoreConnectorSlot(DEFAULT_CONNECTOR_KEY, ZanixDatabaseConnector, {
  * literal string `'false'` disables it — the same convention `DATABASE_SEEDERS` already uses
  * elsewhere in this package for an on-by-default feature. Any other string is used as the name.
  */
-const modelNameFromEnv = (envName: string, defaultName: string): string | false => {
+const modelNameFromEnv = (
+  envName: string,
+  defaultName: string,
+): string | false => {
   const value = Deno.env.get(envName)
   if (value === undefined) return defaultName
   return value === 'false' ? false : value
@@ -170,14 +173,19 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    *   `close()` runs would otherwise schedule one more timer *after* `clearTimeout` already ran,
    *   leaking a poll that fires against an already-closed connection.
    */
-  protected triggersPoll: { timer?: ReturnType<typeof setTimeout>; stopped: boolean } = {
+  protected triggersPoll: {
+    timer?: ReturnType<typeof setTimeout>
+    stopped: boolean
+  } = {
     stopped: false,
   }
   /**
    * The active triggers Change Stream watcher, if one was successfully started — set by
    * `loadPersistedTriggersOnStart`, closed by `close()`.
    */
-  protected triggersChangeStreamHandle: { close: () => Promise<void> } | undefined
+  protected triggersChangeStreamHandle:
+    | { close: () => Promise<void> }
+    | undefined
   /** Defines and binds a model initialized directly by a schema, bound as an instance method. */
   private defineModelBySchema = defineModelBySchema
 
@@ -204,14 +212,18 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     super()
 
     const targetName = this.constructor.name
-    this.#uri = options?.uri || Deno.env.get('MONGO_URI') || 'mongodb://localhost'
+    this.#uri = options?.uri || Deno.env.get('MONGO_URI') ||
+      'mongodb://localhost'
     this.name = targetName.startsWith('_Zanix') ? 'database core' : targetName
-    this.isReplicaSet = this.#uri?.includes('replicaSet=') || this.#uri?.includes('mongodb+srv://')
+    this.isReplicaSet = this.#uri?.includes('replicaSet=') ||
+      this.#uri?.includes('mongodb+srv://')
     this.#config = options.config
-    this.seederModel = options.seedModel ?? modelNameFromEnv(SEED_MODEL_ENV, 'zanix-seeders')
+    this.seederModel = options.seedModel ??
+      modelNameFromEnv(SEED_MODEL_ENV, 'zanix-seeders')
     this.triggersModel = options.triggersModel ??
       modelNameFromEnv(TRIGGERS_MODEL_ENV, DEFAULT_TRIGGERS_MODEL)
-    this.triggersPollInterval = options.triggersPollInterval ?? pollIntervalFromEnv()
+    this.triggersPollInterval = options.triggersPollInterval ??
+      pollIntervalFromEnv()
     this.triggersChangeStream = options.triggersChangeStream ??
       Deno.env.get(TRIGGERS_CHANGE_STREAM_ENV) === 'true'
 
@@ -232,6 +244,12 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   ): Model {
     const baseSchema = schema as BaseCustomSchema
     baseSchema.statics.isReplicaSet = () => this.isReplicaSet
+
+    const existingModel = this.#database.models[name]
+
+    if (existingModel) {
+      return existingModel
+    }
 
     return this.#database.model(
       name,
@@ -299,7 +317,10 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
    *
    * @returns {AdaptedModel<Attrs, Opts>} The corresponding model with schema available.
    */
-  public getModel<Attrs extends BaseAttributes, Opts extends SchemaOptions = SchemaOptions>(
+  public getModel<
+    Attrs extends BaseAttributes,
+    Opts extends SchemaOptions = SchemaOptions,
+  >(
     name: string,
     options?: GetModelOptions,
   ): AdaptedModel<Attrs, Opts>
@@ -310,7 +331,8 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     options: GetModelOptions & SchemaModelInitOptions<S> = {},
   ): Model<Attrs> | AdaptedModelBySchema<S> {
     const hasSchema = entity instanceof Schema
-    const hasDefinition = !hasSchema && !!entity && typeof entity === 'object' &&
+    const hasDefinition = !hasSchema && !!entity &&
+      typeof entity === 'object' &&
       'definition' in entity
 
     // extending the ALS session for Model use
@@ -346,7 +368,10 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     }
 
     if (!hasSchema) {
-      const registeredFor = ProgramModule.models.findRegisteredConnectors('mongo', name)
+      const registeredFor = ProgramModule.models.findRegisteredConnectors(
+        'mongo',
+        name,
+      )
         .filter((entry) => entry.key !== this.resolvedConnectorKey)
 
       if (registeredFor.length) {
@@ -415,7 +440,9 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
       const connected = this.#database.connection.readyState === 1
 
       if (connected) {
-        logger.success(`MongoDB Connected Successfully through '${this.name}' class`)
+        logger.success(
+          `MongoDB Connected Successfully through '${this.name}' class`,
+        )
       } else {
         logger.error(`Failed to connect to MongoDB in '${this.name}' class`, {
           code: 'MONGODB_CONNECTION_FAILED',

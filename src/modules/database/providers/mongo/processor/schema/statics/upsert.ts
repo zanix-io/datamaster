@@ -167,5 +167,8 @@ export async function upsertManyById(
 
   const ops = data.map((obj) => ({ updateOne: updateOne(obj) }))
 
-  await bulkWriteWithRetry(this, ops, { ordered: false, writeConcern: { w: 'majority' } })
+  await bulkWriteWithRetry(this, ops, {
+    ordered: false,
+    writeConcern: { w: 'majority' },
+  })
 }

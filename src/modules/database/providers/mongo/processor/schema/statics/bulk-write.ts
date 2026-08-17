@@ -64,6 +64,8 @@ export function protectedBulkWrite(
   const dataProtection = this._getDataProtection()
   const allowedPaths = this._getDataProtectionPaths()
 
-  return Promise.all(writes.map((op) => protectOp(op, dataProtection, allowedPaths)))
+  return Promise.all(
+    writes.map((op) => protectOp(op, dataProtection, allowedPaths)),
+  )
     .then(() => MongooseModel.bulkWrite.call(this, writes, writeOptions))
 }

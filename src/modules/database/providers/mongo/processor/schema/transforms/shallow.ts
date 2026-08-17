@@ -102,7 +102,14 @@ export function transformShallowByPaths(
           for (const k of entries) {
             const kidx = i + 1
             const lenVal = kidx < keys.length
-            const nextDst = defineNextDst({ keys, kidx, dst, idx: k, isDstMap, lenVal })
+            const nextDst = defineNextDst({
+              keys,
+              kidx,
+              dst,
+              idx: k,
+              isDstMap,
+              lenVal,
+            })
             const nextSrc = isSrcMap ? src.get(k) : src[k]
             traverse(nextSrc, nextDst, i + 1)
           }
@@ -165,14 +172,26 @@ const objTValidation = (resp: any, idx: any, dst: Record<string, unknown>) => {
 }
 
 /** validate a transformation response */
-const responseValidation = (resp: any, idx: any, dst: any, isDstMap: boolean) => {
+const responseValidation = (
+  resp: any,
+  idx: any,
+  dst: any,
+  isDstMap: boolean,
+) => {
   if (isDstMap) mapTValidation(resp, idx, dst)
   else objTValidation(resp, idx, dst)
 }
 
 /** define next destiny */
 const defineNextDst = (
-  opts: { keys: any; kidx: any; idx: any; isDstMap: boolean; dst: any; lenVal?: boolean },
+  opts: {
+    keys: any
+    kidx: any
+    idx: any
+    isDstMap: boolean
+    dst: any
+    lenVal?: boolean
+  },
 ) => {
   const { keys, idx, kidx, isDstMap, dst, lenVal } = opts
   const nextIsIndex = detectNumericIndex(keys[kidx], lenVal)

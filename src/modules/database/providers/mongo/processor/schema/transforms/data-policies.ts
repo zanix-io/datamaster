@@ -107,8 +107,11 @@ export const transformByDataProtection = (
       deleteMetadata,
       allowedPaths,
       transform: (value, path) => {
-        // deno-lint-ignore ban-types
-        const decodedValue = dataProtectionGetterDefinition(dataProtection[path], value) as String
+        const decodedValue = dataProtectionGetterDefinition(
+          dataProtection[path],
+          value,
+          // deno-lint-ignore ban-types
+        ) as String
 
         // `dataProtectionGetterDefinition` returns nothing when there's no value to reverse (e.g.
         // an empty array a Mongoose `[String]` path defaults to) — pass the original value through

@@ -1,25 +1,30 @@
+import logger from '@zanix/logger'
 import type {
   BulkIndexResult,
   ElasticsearchAuth,
   ElasticsearchConnectorOptions,
+  ElasticsearchIndexOptions,
 } from './typings/general.ts'
 
-import { ZanixSearchConnector } from '@zanix/server'
+import { ProgramModule, ZanixSearchConnector } from '@zanix/server'
 
 const DEFAULT_NODE = 'http://localhost:9200'
 const DEFAULT_INDEX = 'zanix-logs'
 const NDJSON_CONTENT_HEADER = { 'Content-Type': 'application/x-ndjson' }
 
-/** Env var names for the cluster URL — exported so other packages (e.g. a general config
- * bootstrap) can read/gate on them without redefining the literal strings. */
+/** Env var name for the Elasticsearch cluster URL — exported so other packages (e.g. a general
+ * config bootstrap) can read/gate on it without redefining the literal string. */
 export const ELASTICSEARCH_URL_ENV = 'ELASTICSEARCH_URL'
+/** Env var name for the OpenSearch cluster URL — same rationale as {@link ELASTICSEARCH_URL_ENV}. */
 export const OPENSEARCH_URL_ENV = 'OPENSEARCH_URL'
 
 /** Builds the `Authorization`/`ApiKey` header pair for a given set of Elasticsearch credentials. */
 const authHeaders = (auth?: ElasticsearchAuth): Record<string, string> => {
   if (!auth) return {}
   if ('apiKey' in auth) return { Authorization: `ApiKey ${auth.apiKey}` }
-  return { Authorization: `Basic ${btoa(`${auth.username}:${auth.password}`)}` }
+  return {
+    Authorization: `Basic ${btoa(`${auth.username}:${auth.password}`)}`,
+  }
 }
 
 /**
@@ -34,16 +39,20 @@ const authHeaders = (auth?: ElasticsearchAuth): Record<string, string> => {
  * API-key case, which a URL has no syntax for.
  */
 const resolveNode = (node?: string): string =>
-  node || Deno.env.get(ELASTICSEARCH_URL_ENV) || Deno.env.get(OPENSEARCH_URL_ENV) || DEFAULT_NODE
+  node || Deno.env.get(ELASTICSEARCH_URL_ENV) ||
+  Deno.env.get(OPENSEARCH_URL_ENV) || DEFAULT_NODE
 
 /**
  * Resolves auth credentials: the explicit `auth` option always wins; otherwise falls back to an
  * API key from `ELASTICSEARCH_API_KEY`, then `OPENSEARCH_API_KEY`. Basic auth has no env var
  * counterpart here — embed it in the URL instead (see `resolveNode` above).
  */
-const resolveAuth = (auth?: ElasticsearchAuth): ElasticsearchAuth | undefined => {
+const resolveAuth = (
+  auth?: ElasticsearchAuth,
+): ElasticsearchAuth | undefined => {
   if (auth) return auth
-  const apiKey = Deno.env.get('ELASTICSEARCH_API_KEY') || Deno.env.get('OPENSEARCH_API_KEY')
+  const apiKey = Deno.env.get('ELASTICSEARCH_API_KEY') ||
+    Deno.env.get('OPENSEARCH_API_KEY')
   return apiKey ? { apiKey } : undefined
 }
 
@@ -67,6 +76,24 @@ const resolveAuth = (auth?: ElasticsearchAuth): ElasticsearchAuth | undefined =>
 export class ZanixElasticsearchConnector extends ZanixSearchConnector {
   /** Default index name (or per-document resolver) used when a call doesn't specify one. */
   #defaultIndex: string | ((doc: Record<string, unknown>) => string)
+  /** Default index options for initialization */
+  #defaultIndexOptions?: ElasticsearchIndexOptions
+  /** Display name used in connection/disconnection log messages. */
+  private name: string
+
+  #indexInitialized = (_: string | string[]) => Promise.resolve(true)
+
+  /** Indicates whether `ensureIndex` has already completed before a bulk write. */
+  public set indexInitialized(
+    indexInitialized: (index: string | string[]) => Promise<boolean>,
+  ) {
+    this.#indexInitialized = indexInitialized
+  }
+  public get indexInitialized(): (
+    index: string | string[],
+  ) => Promise<boolean> {
+    return this.#indexInitialized
+  }
 
   /**
    * Creates the connector, resolving the cluster URL/auth (option, then env var, then default —
@@ -76,13 +103,16 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
    * (`contextId`, `autoInitialize`) `RestClient` already accepts.
    */
   constructor(options: ElasticsearchConnectorOptions = {}) {
-    const { node, index, auth, ...connectorOptions } = options
+    const { node, index = {}, auth, ...connectorOptions } = options
     super({
       ...connectorOptions,
       baseUrl: resolveNode(node),
       headers: authHeaders(resolveAuth(auth)),
     })
-    this.#defaultIndex = index ?? DEFAULT_INDEX
+    this.#defaultIndex = index.name ?? DEFAULT_INDEX
+    this.#defaultIndexOptions = index
+    const targetName = this.constructor.name
+    this.name = targetName.startsWith('_Zanix') ? 'elastic search core' : targetName
   }
 
   /** Resolves the target index name for a given document, per the `index` option/argument. */
@@ -108,9 +138,62 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
     doc: Record<string, unknown>,
     opts: { index?: string } = {},
   ): Promise<void> {
-    await this.http.post(`${this.#indexFor(doc, opts.index)}/_doc`, {
+    const index = this.#indexFor(doc, opts.index)
+    await this.indexInitialized(index)
+    await this.http.post(`${index}/_doc`, {
       body: JSON.stringify(doc),
     })
+  }
+
+  /**
+   * Ensures that the configured static index exists, creating it with the provided settings and
+   * mappings when necessary.
+   *
+   * Uses `HEAD /{index}` as a lightweight existence check before creating the index with
+   * `PUT /{index}`. If the index already exists, this method is a no-op and does not attempt to
+   * modify its settings or mappings.
+   *
+   * This method is intended to run before the first indexing operation when callers need control
+   * over index creation parameters such as shard count, replicas, or field mappings. OpenSearch
+   * only allows certain settings to be configured at index creation time (for example,
+   * `number_of_shards`), so relying on automatic index creation may lock in undesired defaults.
+   *
+   * The default index must be a static string value. Dynamic index resolvers are supported for
+   * document indexing through `index()`/`bulkIndex()`, but cannot be resolved here because there
+   * is no document available to evaluate the resolver function against.
+   *
+   * @param options - Index creation options including OpenSearch settings and mappings.
+   * @throws If the configured default index is not a static index name.
+   */
+  public async ensureIndex(
+    index: string | string[],
+    opts: Omit<ElasticsearchIndexOptions, 'name'> = {},
+  ): Promise<boolean> {
+    const options = { ...this.#defaultIndexOptions, ...opts }
+
+    const indexes = [...new Set(typeof index === 'string' ? [index] : index)]
+
+    const promises: Promise<Response>[] = []
+    for (const idx of indexes) {
+      promises.push(
+        this.http.head(idx).catch(() => {
+          return this.http.put(idx, {
+            body: JSON.stringify({
+              settings: options.settings,
+              mappings: options.mappings,
+            }),
+          })
+        }),
+      )
+    }
+
+    await Promise.all(promises)
+
+    logger.success(
+      `ElasticSearch Index Initialized Successfully through '${this.name}' class`,
+    )
+
+    return true
   }
 
   /**
@@ -129,11 +212,17 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
     if (!docs.length) return { errors: false, failedCount: 0 }
 
     const lines: string[] = []
+    const indexes: string[] = []
     for (const doc of docs) {
-      lines.push(JSON.stringify({ index: { _index: this.#indexFor(doc, opts.index) } }))
+      const index = this.#indexFor(doc, opts.index)
+      indexes.push(index)
+      lines.push(
+        JSON.stringify({ index: { _index: index } }),
+      )
       lines.push(JSON.stringify(doc))
     }
     const body = lines.join('\n') + '\n'
+    await this.indexInitialized(indexes)
 
     const response = await this.http.post<
       { errors: boolean; items: Array<Record<string, { error?: unknown }>> }
@@ -188,6 +277,7 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
    */
   public async refresh(opts: { index?: string } = {}): Promise<void> {
     const index = this.#broadIndexFor(opts.index)
+    if (index) await this.indexInitialized(index)
     await this.http.post(index ? `${index}/_refresh` : '_refresh')
   }
 
@@ -207,4 +297,28 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
       return false
     }
   }
+}
+
+export const getConnector = (
+  { indexInitialize, ...connectorOptions }: ElasticsearchConnectorOptions & {
+    indexInitialize?: boolean
+  },
+) => {
+  const connector = (() => {
+    try {
+      return ProgramModule.getConnectors(undefined, false).get<
+        ZanixElasticsearchConnector
+      >(
+        'search',
+      )
+    } catch {
+      return new ZanixElasticsearchConnector(connectorOptions)
+    }
+  })()
+
+  if (indexInitialize) {
+    connector.indexInitialized = (index) => connector.ensureIndex(index, connectorOptions.index)
+  }
+
+  return connector
 }

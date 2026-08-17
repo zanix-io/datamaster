@@ -10,10 +10,14 @@ import { planCodeSync } from '@zanix/helpers'
  */
 export const deepEqual = (a: unknown, b: unknown): boolean => {
   if (a === b) return true
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (
+    typeof a !== 'object' || typeof b !== 'object' || a === null || b === null
+  ) return false
 
   if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      return false
+    }
     return a.every((item, index) => deepEqual(item, b[index]))
   }
 
@@ -90,7 +94,10 @@ export const planTriggerSync = (
 
   return {
     toDelete: plan.toOrphan.map((entry) => entry._id),
-    toResync: plan.toResync.map((entry) => ({ _id: entry._id, triggers: entry.value })),
+    toResync: plan.toResync.map((entry) => ({
+      _id: entry._id,
+      triggers: entry.value,
+    })),
     toSeed: staticEntries
       .filter(([model]) => !allExistingModels.has(model))
       .map(([model, triggers]) => ({ model, triggers })),

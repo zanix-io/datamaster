@@ -66,7 +66,9 @@ export class SearchPaginationRTO extends BaseRTO {
     transform: (value: unknown) => {
       if (typeof value !== 'object' || value === null) return value
       return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([key, v]) => [key, Number(v)]),
+        Object.entries(value as Record<string, unknown>).map((
+          [key, v],
+        ) => [key, Number(v)]),
       )
     },
   })

@@ -144,7 +144,9 @@ Deno.test('Nested transformations over predefined paths', () => {
         allowedPaths: ['name', 'arrayObject.0.value', 'mapObject.*.value'],
         transform: (value) => {
           calls++
-          if (Array.isArray(value)) return value.map((v) => v + ' (by transform)')
+          if (Array.isArray(value)) {
+            return value.map((v) => v + ' (by transform)')
+          }
           return value + ' (by transform)'
         },
       })
@@ -192,7 +194,10 @@ Deno.test('Nested transformations over predefined paths', () => {
     ],
     mapObject: {
       key1: {
-        value: ['map value 1 (by transform) (by transform)', 'd (by transform) (by transform)'],
+        value: [
+          'map value 1 (by transform) (by transform)',
+          'd (by transform) (by transform)',
+        ],
       },
       key2: { value: ['map value 2 (by transform) (by transform)'] },
     },
@@ -216,7 +221,9 @@ Deno.test('Nested transformations async', async () => {
         transform: async function (value) {
           calls++
           await new Promise((resolve) => setTimeout(resolve, 300))
-          if (Array.isArray(value)) return value.map((v) => v + ' (by transform)')
+          if (Array.isArray(value)) {
+            return value.map((v) => v + ' (by transform)')
+          }
 
           return value + ' (by transform)'
         },

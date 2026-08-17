@@ -16,7 +16,9 @@ import { TriggersAdminRepository } from './triggers.repository.ts'
  * to whenever this factory itself happens to run during composition, before the underlying Mongo
  * connector is necessarily ready.
  */
-export function createTriggersDiscoveryProvider(): DiscoveryProvider<TriggersModelAttrs> {
+export function createTriggersDiscoveryProvider(): DiscoveryProvider<
+  TriggersModelAttrs
+> {
   return {
     snapshot: () => ProgramModule.providers.get(TriggersAdminRepository).list(),
   }

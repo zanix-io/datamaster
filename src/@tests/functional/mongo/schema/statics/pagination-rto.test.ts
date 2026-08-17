@@ -14,8 +14,10 @@ Deno.test({
     const db = await getDB()
     const Model = db.getModel('test-pagination-rto-sort', newSchema())
 
-    await new Model({ name: 'first', createdAt: new Date('2024-01-01') }).save()
-    await new Model({ name: 'second', createdAt: new Date('2024-02-01') }).save()
+    await new Model({ name: 'first', createdAt: new Date('2024-01-01') })
+      .save()
+    await new Model({ name: 'second', createdAt: new Date('2024-02-01') })
+      .save()
 
     // Simulates what actually arrives from an HTTP query string: every value is a string,
     // e.g. `?sortBy[createdAt]=-1` — this is exactly the shape that used to throw
@@ -26,7 +28,11 @@ Deno.test({
       sortBy: { createdAt: '-1' },
     })
 
-    const { docs } = await Model.paginate({ page: dto.page, limit: dto.limit, sort: dto.sortBy })
+    const { docs } = await Model.paginate({
+      page: dto.page,
+      limit: dto.limit,
+      sort: dto.sortBy,
+    })
 
     assertEquals(docs.map((d) => d.name), ['second', 'first'])
 

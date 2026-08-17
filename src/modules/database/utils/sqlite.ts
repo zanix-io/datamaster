@@ -77,7 +77,9 @@ export class LocalSQLite {
    * @protected
    * @returns {T[]} List of rows.
    */
-  public getAllData<T extends Record<string, unknown> = Record<string, unknown>>(): T[] {
+  public getAllData<
+    T extends Record<string, unknown> = Record<string, unknown>,
+  >(): T[] {
     return this.db.prepare(`SELECT * FROM ${this.table}`).all<T>()
   }
 

@@ -28,7 +28,10 @@ export class Program {
    *     readonly seeders: Seeders;
    * }} An object containing the models and seeders for the specified database type.
    */
-  public getMetadata(type: DatabaseTypes = 'mongo', connectorKey: string = DEFAULT_CONNECTOR_KEY): {
+  public getMetadata(
+    type: DatabaseTypes = 'mongo',
+    connectorKey: string = DEFAULT_CONNECTOR_KEY,
+  ): {
     // deno-lint-ignore no-explicit-any
     readonly models: ModelMetadata<any>[]
     readonly seeders: Seeders
@@ -58,8 +61,9 @@ export class Program {
     type: DatabaseTypes = 'mongo',
     connectorKey: string = DEFAULT_CONNECTOR_KEY,
   ): void {
-    if (meta === 'seeders') ProgramModule.seeders.deleteSeeders(type, connectorKey)
-    else ProgramModule.models.deleteModels(type, connectorKey)
+    if (meta === 'seeders') {
+      ProgramModule.seeders.deleteSeeders(type, connectorKey)
+    } else ProgramModule.models.deleteModels(type, connectorKey)
   }
 }
 
