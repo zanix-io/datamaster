@@ -34,17 +34,18 @@ export * from 'modules/cache/mod.ts'
 
 /**
  * CRUD data access and business logic for this package's own persisted triggers collection
- * (`zanix-triggers`) — the actual owner of that data. `@zanix/admin`'s
- * `createTriggersAdminController` composes {@link TriggersAdminService} into a business
- * service's own `/admin/triggers` HTTP surface; it does not author this logic itself.
+ * (`zanix-triggers`) — the actual owner of that data. This package also owns the local HTTP
+ * surface fronting it — see `@zanix/datamaster/triggers-api`'s own `createTriggersAdminController`.
+ * `@zanix/admin` owns a genuinely different, cross-service concern: its own
+ * `TriggersAggregator`/`/triggers` proxy over N services' local APIs.
  */
 export { TriggersAdminRepository } from 'modules/triggers/triggers.repository.ts'
 /** See {@link TriggersAdminRepository}. */
 export { TriggersAdminService } from 'modules/triggers/triggers.service.ts'
 /**
  * Builds the `DiscoveryProvider` for `/.well-known/zanix/triggers`, backed by
- * {@link TriggersAdminRepository}. `@zanix/admin` composes this into an HTTP surface via
- * `ProgramModule.defineDiscovery`; it does not author the provider itself.
+ * {@link TriggersAdminRepository}. `@zanix/admin`'s `defineAdminMetadata` composes this into an
+ * HTTP surface via `ProgramModule.defineDiscovery`; it does not author the provider itself.
  */
 export { createTriggersDiscoveryProvider } from 'modules/triggers/triggers-discovery.provider.ts'
 

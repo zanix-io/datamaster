@@ -404,10 +404,38 @@ access/business logic over exactly this collection — the same "created from sc
 just implemented once instead of every consumer hand-rolling `TriggersModel.create`/`updateOne`
 calls. `create`/`update` accept `CreateTriggerInput`/`UpdateTriggerInput` — both derived from
 `TriggersModelAttrs` (`{ model, active, triggers }`, and a partial of `{ active, triggers }`,
-respectively) rather than hand-declared, so they can never drift from the schema they target.
-`@zanix/admin`'s `createTriggersAdminController` composes `TriggersAdminService` into a business
-service's own authenticated `/admin/triggers` HTTP API; this package only owns the data access,
-never the HTTP surface itself.
+respectively) rather than hand-declared, so they can never drift from the schema they target. This
+package also exports `createTriggersAdminController` (`@zanix/datamaster/triggers-api`) — a real,
+authenticat**able** `/admin/triggers` HTTP API over `TriggersAdminService`, built the same way
+`@zanix/space`'s `assets-api` fronts its own domain layer: this package owns both the data and the
+local HTTP surface fronting it, never assuming an auth mechanism itself (`guards`/`versionProtocol`
+are supplied by whoever composes it). `@zanix/admin`'s own triggers concern is a genuinely different
+one — cross-service aggregation (`TriggersAggregator`, proxying over N services' own local
+`/admin/triggers` APIs).
+
+```ts
+import { createTriggersAdminController } from 'jsr:@zanix/datamaster@[version]/triggers-api'
+
+const TriggersAdminController = createTriggersAdminController({
+  guards: [jwtValidationGuard], // omit for no auth at all — this package assumes none by default
+  versionProtocol: { version: 1 }, // optional, passed straight to `@Controller`
+})
+```
+
+The route prefix (`admin/triggers`) is fixed, not configurable — it's the wire-protocol contract
+`@zanix/admin`'s `TriggersAdminClient` (and any other caller) hardcodes:
+
+| Method   | Path                    | Body/Params                                                             | Returns                         |
+| -------- | ----------------------- | ----------------------------------------------------------------------- | ------------------------------- |
+| `GET`    | `admin/triggers`        | —                                                                       | `TriggersAdminService.list()`   |
+| `GET`    | `admin/triggers/:model` | `TriggerModelParamsRTO` (`{ model }`)                                   | `TriggersAdminService.get()`    |
+| `POST`   | `admin/triggers`        | `CreateTriggerRTO` (`{ model, active?, triggers }`)                     | `TriggersAdminService.create()` |
+| `PUT`    | `admin/triggers/:model` | `UpdateTriggerRTO` (`{ active?, triggers? }`) + `TriggerModelParamsRTO` | `TriggersAdminService.update()` |
+| `DELETE` | `admin/triggers/:model` | `TriggerModelParamsRTO` (`{ model }`)                                   | `{ deleted: model }`            |
+
+`CreateTriggerRTO`/`UpdateTriggerRTO` are also reused unchanged by `@zanix/admin`'s own proxying
+aggregator (`POST`/`PUT /triggers/:serviceId[/:model]`) — a proxying request forwards the same body
+to the target service's local API, so both sides validate the identical wire shape.
 
 This package also exports `createTriggersDiscoveryProvider()`, building the `DiscoveryProvider` for
 `/.well-known/zanix/triggers` (backed by `TriggersAdminRepository.list()`) that `@zanix/admin`'s

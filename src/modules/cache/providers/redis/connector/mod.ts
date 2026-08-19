@@ -107,8 +107,10 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     })
 
     this.#uri = redisUrl
-    const targetName = this.constructor.name
-    this.name = targetName.startsWith('_Zanix') ? 'cache core' : targetName
+    // `coreDisplayName` (`ZanixConnector`, `@zanix/server`) strips the internal `_Zanix`-prefixed
+    // synthetic subclass name a core connector is auto-registered under, falling back to
+    // 'cache core' — a no-op for any ordinary, consumer-authored subclass.
+    this.name = this.coreDisplayName('cache core')
     this.schedulerOptions = schedulerOptions
     this.commandRetryInterval = commandRetryInterval
     this.maxCommandRetries = maxCommandRetries

@@ -110,15 +110,31 @@ local caching utilities, such as in-memory Map for fast, etc.
   - Only available via the dedicated `./observability` subpath (see below) — importing it is always
     an explicit, opt-in choice, keeping `@zanix/logger` fully independent of DataMaster.
 
+- **Storage**
+
+  - Native `SeaweedFSObjectStorage` class — a generic byte store (put/get/delete/exists over an
+    opaque key) backed by a real `@aws-sdk/client-s3` client against a SeaweedFS S3 gateway.
+    Registers the `'s3'` core connector slot, the same DI mechanism `'database'`/`'search'` use.
+  - `MongoFileRepository`: a generic, durable file record registry, following the same
+    `@Provider`/`ZanixMongoConnector` shape as `TriggersAdminRepository`/`DLQProvider`. Neither
+    component assumes a specific file kind, processing state, or consuming domain.
+  - Optional, opt-in object content encryption at rest (AES-GCM, or RSA-wrapped per-object AES keys)
+    — reuses this package's own existing `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY`
+    data-protection keys, no separate key management to set up.
+
 - **Extensible architecture**
 
   - Ready for future connectors (Memcached, PostgreSQL).
-  - Everything is available from the root package (except `./observability`, see above); two
+  - Everything is available from the root package (except `./observability`, see above); several
     narrower entrypoints exist for consumers who prefer to scope their imports:
 
     - `./cache` → cache systems only.
     - `./database` → database connectors only.
     - `./observability` → `ZanixElasticsearchConnector`/`elasticsearchLogSave` only.
+    - `./triggers-api` → `createTriggersAdminController`, the local `/admin/triggers` HTTP surface,
+      only.
+    - `./storage` → `SeaweedFSObjectStorage` only.
+    - `./files` → `MongoFileRepository`/`registerFileModel` only.
     - `./core` → side-effect-only import that auto-registers the default Mongo, Redis, local-cache,
       SQLite, and Elasticsearch/OpenSearch connectors/providers with the Zanix DI container, for
       apps that don't need to customize their configuration.
@@ -140,18 +156,19 @@ import * as datamaster from 'jsr:@zanix/datamaster@[version]'
 Rather than the wildcard import above, you'll typically import only what you need. The table below
 groups the main exports by category — each links to a guide with full usage examples:
 
-| Category                      | Key exports                                                                                                                                                                                           | Guide                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Mongo connector & models      | `ZanixMongoConnector`, `registerModel`, `Schema`                                                                                                                                                      | [Database](./docs/DATABASE.md)                                          |
-| Seeders                       | `seedByIdIfMissing`, `seedManyByIdIfMissing`, `seedRotateProtectionKeys`                                                                                                                              | [Database](./docs/DATABASE.md#seeders-registermodels-extensionsseeders) |
-| Triggers                      | `extensions.triggers`, `DEFAULT_TRIGGER_JOBS`, `registerTriggerActionJob`, `TriggersAdminRepository`, `TriggersAdminService`, `createTriggersDiscoveryProvider`                                       | [Triggers](./docs/TRIGGERS.md)                                          |
-| SQLite (KV store)             | `ZanixKVStoreConnector`, `LocalSQLite`                                                                                                                                                                | [Database](./docs/DATABASE.md#sqlite-key-value-store)                   |
-| Transforms & schema utilities | `transformRecursively`, `transformDeepByPaths`, `transformShallowByPaths`, `transformByDataAccess`, `transformByDataProtection`, `getAllSubschemas`, `findPathsWithAccessorsDeep`                     | [Transforms](./docs/TRANSFORMS.md)                                      |
-| Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject` | [Data Protection](./docs/DATA-PROTECTION.md)                            |
-| Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                                     | [Cache](./docs/CACHE.md)                                                |
-| Observability                 | `ZanixElasticsearchConnector`, `elasticsearchLogSave`                                                                                                                                                 | [Observability](./docs/OBSERVABILITY.md)                                |
-| Dead Letter Queue             | `DLQProvider`, `registerDLQModel` (distributed processing lives in `@zanix/asyncmq/dlq`)                                                                                                              | [DLQ](./docs/DLQ.md)                                                    |
-| Configuration                 | Environment variables for connections and data protection                                                                                                                                             | [Configuration](./docs/CONFIGURATION.md)                                |
+| Category                      | Key exports                                                                                                                                                                                                         | Guide                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Mongo connector & models      | `ZanixMongoConnector`, `registerModel`, `Schema`                                                                                                                                                                    | [Database](./docs/DATABASE.md)                                          |
+| Seeders                       | `seedByIdIfMissing`, `seedManyByIdIfMissing`, `seedRotateProtectionKeys`                                                                                                                                            | [Database](./docs/DATABASE.md#seeders-registermodels-extensionsseeders) |
+| Triggers                      | `extensions.triggers`, `DEFAULT_TRIGGER_JOBS`, `registerTriggerActionJob`, `TriggersAdminRepository`, `TriggersAdminService`, `createTriggersDiscoveryProvider`, `createTriggersAdminController` (`./triggers-api`) | [Triggers](./docs/TRIGGERS.md)                                          |
+| SQLite (KV store)             | `ZanixKVStoreConnector`, `LocalSQLite`                                                                                                                                                                              | [Database](./docs/DATABASE.md#sqlite-key-value-store)                   |
+| Transforms & schema utilities | `transformRecursively`, `transformDeepByPaths`, `transformShallowByPaths`, `transformByDataAccess`, `transformByDataProtection`, `getAllSubschemas`, `findPathsWithAccessorsDeep`                                   | [Transforms](./docs/TRANSFORMS.md)                                      |
+| Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject`               | [Data Protection](./docs/DATA-PROTECTION.md)                            |
+| Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                                                   | [Cache](./docs/CACHE.md)                                                |
+| Observability                 | `ZanixElasticsearchConnector`, `elasticsearchLogSave`                                                                                                                                                               | [Observability](./docs/OBSERVABILITY.md)                                |
+| Dead Letter Queue             | `DLQProvider`, `registerDLQModel` (distributed processing lives in `@zanix/asyncmq/dlq`)                                                                                                                            | [DLQ](./docs/DLQ.md)                                                    |
+| Storage                       | `SeaweedFSObjectStorage` (`./storage`), `MongoFileRepository`, `registerFileModel` (`./files`)                                                                                                                      | [Storage](./docs/STORAGE.md)                                            |
+| Configuration                 | Environment variables for connections and data protection                                                                                                                                                           | [Configuration](./docs/CONFIGURATION.md)                                |
 
 ```ts
 import { registerModel, ZanixMongoConnector } from 'jsr:@zanix/datamaster@[version]'
@@ -271,6 +288,9 @@ await connector['close']()
 - [DLQ](./docs/DLQ.md) — `DLQProvider`, a Mongo-backed dead letter queue for failed business
   processes, with atomic `claim()`-based concurrency and distributed processing via
   `@zanix/asyncmq/dlq`'s `registerDLQProcessor`.
+- [Storage](./docs/STORAGE.md) — `SeaweedFSObjectStorage` (a generic S3-compatible byte store) and
+  `MongoFileRepository` (a generic file record registry), including optional content encryption at
+  rest.
 - [Configuration](./docs/CONFIGURATION.md) — environment variables, defaults, and versioned-key
   naming.
 

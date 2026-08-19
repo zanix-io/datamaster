@@ -211,10 +211,12 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   ) {
     super()
 
-    const targetName = this.constructor.name
     this.#uri = options?.uri || Deno.env.get('MONGO_URI') ||
       'mongodb://localhost'
-    this.name = targetName.startsWith('_Zanix') ? 'database core' : targetName
+    // `coreDisplayName` (`ZanixConnector`, `@zanix/server`) strips the internal `_Zanix`-prefixed
+    // synthetic subclass name a core connector is auto-registered under, falling back to
+    // 'database core' — a no-op for any ordinary, consumer-authored subclass.
+    this.name = this.coreDisplayName('database core')
     this.isReplicaSet = this.#uri?.includes('replicaSet=') ||
       this.#uri?.includes('mongodb+srv://')
     this.#config = options.config

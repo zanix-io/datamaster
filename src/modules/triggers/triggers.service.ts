@@ -4,10 +4,10 @@ import { Interactor, ZanixInteractor } from '@zanix/server'
 import { TriggersAdminRepository } from './triggers.repository.ts'
 
 /**
- * Business logic behind a business service's own local `/admin/triggers` — see
- * `@zanix/admin`'s `createTriggersAdminController`, the composer that wires this into an HTTP
- * surface. Distinct from `@zanix/admin`'s own `/triggers` (a proxy/aggregator over N services) —
- * this one owns real persisted data directly, via {@link TriggersAdminRepository}.
+ * Business logic behind this package's own local `/admin/triggers` — see
+ * `./triggers-api/local-triggers.handler.ts`'s `createTriggersAdminController`. Distinct from
+ * `@zanix/admin`'s own `/triggers` (a proxy/aggregator over N services) — this one owns real
+ * persisted data directly, via {@link TriggersAdminRepository}.
  */
 @Interactor()
 export class TriggersAdminService extends ZanixInteractor {

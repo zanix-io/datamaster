@@ -7,6 +7,47 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-19
+
+### Added
+
+- **New public subpaths `@zanix/datamaster/storage` and `@zanix/datamaster/files`** —
+  `SeaweedFSObjectStorage` (a generic byte store: `put`/`get`/`delete`/`exists` over an opaque key,
+  backed by a real `@aws-sdk/client-s3` client against a
+  [SeaweedFS](https://github.com/seaweedfs/seaweedfs) S3 gateway) and
+  `MongoFileRepository`/`registerFileModel` (a generic, durable file record registry, following the
+  same `@Provider`/`ZanixMongoConnector` shape as `TriggersAdminRepository`/`DLQProvider`). Both are
+  deliberately agnostic of what's being stored or by whom — bytes and metadata are two independent
+  concerns, usable separately or together. See [Storage](docs/STORAGE.md).
+  - New `@aws-sdk/client-s3` dependency.
+  - `SeaweedFSObjectStorage` registers the `'s3'` core connector slot (the same
+    `registerCoreConnectorSlot` mechanism `'database'`/`'search'` already use); `./core` auto-
+    registers the default connector when `SEAWEEDFS_S3_ENDPOINT` is set.
+  - Optional, opt-in object content encryption at rest
+    (`encrypt: { type: 'symmetric' | 'asymmetric', version? }`, or
+    `SEAWEEDFS_ENCRYPT`/`SEAWEEDFS_ENCRYPT_VERSION`) — reuses this package's existing
+    `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY` data-protection keys, no separate key management.
+  - `checkEncryptionRotationStatus()`/`rotateEncryptionKeys()` (`storage/rotation.ts`) migrate
+    already-stored objects to a new key version, mirroring
+    `checkProtectionRotationStatus()`/`seedRotateProtectionKeys()`'s role for field-level
+    protection. Both accept `useWorker: 'one-time' | 'persisted'` to run off the calling thread.
+  - New env vars: `FILE_MODEL_NAME`, `SEAWEEDFS_S3_ENDPOINT`, `SEAWEEDFS_ACCESS_KEY`,
+    `SEAWEEDFS_SECRET_KEY`, `SEAWEEDFS_BUCKET`, `SEAWEEDFS_ENCRYPT`, `SEAWEEDFS_ENCRYPT_VERSION` —
+    see [Configuration](docs/CONFIGURATION.md).
+- **New public subpath `@zanix/datamaster/triggers-api`** — `createTriggersAdminController`, the
+  local `/admin/triggers` CRUD controller. This package now owns both the data
+  (`TriggersAdminRepository`/`Service`, added in `1.3.0`) and the local HTTP surface fronting it,
+  per the "local API vs aggregator API" rule (see the `zanix-libraries-architecture` skill).
+  `@zanix/admin` keeps its own genuinely cross-service concern, `TriggersAggregator`.
+  - The controller never assumes an auth mechanism itself (this package still doesn't depend on
+    `@zanix/auth`) — `guards`/`versionProtocol` are accepted as factory options, supplied by whoever
+    composes it (e.g. `@zanix/admin`).
+  - New `src/@tests/unit/triggers/dependency-boundary.test.ts` — enforces, via a real
+    `deno info
+    --json` module-graph check, that `triggers.service.ts`/`triggers.repository.ts`
+    never import back into `triggers-api/`, the same pattern `@zanix/space`'s
+    `assets-api`/`asset-transform` boundary test already establishes.
+
 ## [1.3.0] - 2026-08-17
 
 ### Added

@@ -12,9 +12,10 @@ import type { ZanixMongoConnector } from 'database/mod.ts'
 
 /**
  * Data access for this package's own persisted triggers collection (`zanix-triggers` by default,
- * or `TRIGGERS_MODEL_NAME`). Backs a business service's own local `/admin/triggers` API — see
- * `@zanix/admin`'s `TriggersAdminService`/`createTriggersAdminController`, the composer that wires
- * this into an HTTP surface. This package owns the data; `@zanix/admin` only composes it.
+ * or `TRIGGERS_MODEL_NAME`). Backs this package's own local `/admin/triggers` API — see
+ * `./triggers-api/local-triggers.handler.ts`'s `createTriggersAdminController`. This package owns
+ * both the data and the local HTTP surface fronting it; `@zanix/admin` owns a genuinely different
+ * concern — cross-service aggregation (`TriggersAggregator`).
  */
 @Provider()
 export class TriggersAdminRepository extends ZanixProvider<{ database: ZanixMongoConnector }> {

@@ -111,8 +111,10 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
     })
     this.#defaultIndex = index.name ?? DEFAULT_INDEX
     this.#defaultIndexOptions = index
-    const targetName = this.constructor.name
-    this.name = targetName.startsWith('_Zanix') ? 'elastic search core' : targetName
+    // `coreDisplayName` (`ZanixConnector`, `@zanix/server`) strips the internal `_Zanix`-prefixed
+    // synthetic subclass name a core connector is auto-registered under, falling back to
+    // 'elastic search core' — a no-op for any ordinary, consumer-authored subclass.
+    this.name = this.coreDisplayName('elastic search core')
   }
 
   /** Resolves the target index name for a given document, per the `index` option/argument. */

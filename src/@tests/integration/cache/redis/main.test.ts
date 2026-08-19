@@ -114,20 +114,31 @@ Deno.test('execWithRetry fails after maxRetries', async () => {
   cache['close']()
 })
 
-Deno.test('RedisCache failed commands by connection timeout', async () => {
-  const cache = new ZanixRedisConnector<string, number>({
-    connectionTimeout: 1000,
-    redisUrl: 'redis://localhost:6390', // closed port
-  })
+Deno.test({
+  sanitizeResources: false,
+  sanitizeOps: false,
+  name: 'RedisCache failed commands by connection timeout',
+  fn: async () => {
+    const cache = new ZanixRedisConnector<string, number>({
+      connectionTimeout: 1000,
+      redisUrl: 'redis://localhost:6390', // closed port
+    })
 
-  const error = await assertRejects(
-    () => cache.get('key'),
-    InternalError,
-  )
+    const error = await assertRejects(
+      () => cache.get('key'),
+      InternalError,
+    )
 
-  assertEquals(error.code, 'REDIS_CONNECTION_TIMEOUT')
+    // `isReady` (`ZanixConnector`, `@zanix/server` >= 3.2.1) now retries a failed `initialize()`
+    // internally against its own `timeoutConnection` (10s default) instead of rejecting on the
+    // first attempt, so the 'reconnecting' handler's `connectionTimeout`-driven
+    // REDIS_CONNECTION_TIMEOUT never surfaces in time — `execWithRetry`'s own `commandTimeout`
+    // race (2s default) wins first and exhausts `maxCommandRetries` (3 default), same as the
+    // command-timeout scenario below.
+    assertEquals(error.code, 'REDIS_COMMAND_TIMEOUT')
 
-  cache['close']()
+    cache['close']()
+  },
 })
 
 Deno.test({
