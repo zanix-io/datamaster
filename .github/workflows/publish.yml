@@ -84,6 +84,13 @@ jobs:
           docker logs seaweedfs
           exit 1
 
+      # A fresh SeaweedFS instance starts with no buckets. The functional suite doesn't set
+      # SEAWEEDFS_BUCKET below, so it falls back to `DEFAULT_BUCKET` ('zanix-objects', see
+      # `src/modules/storage/connector.ts`) — create that bucket here or every real S3 call in the
+      # test fails with `NoSuchBucket`.
+      - name: Create SeaweedFS bucket
+        run: curl -sf -X PUT http://localhost:8333/zanix-objects
+
       - name: Run tests
         env:
           RUN_OPENSEARCH_TESTS: 'true'
