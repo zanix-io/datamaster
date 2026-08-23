@@ -1,27 +1,27 @@
 /**
- * Generic object storage for the Zanix ecosystem — `SeaweedFSObjectStorage`, a byte-store connector
- * (put/get/delete/exists over an opaque key) backed by a SeaweedFS S3 gateway. Agnostic of what the
+ * Generic object storage for the Zanix ecosystem — `S3ObjectStorage`, a byte-store connector
+ * (put/get/delete/exists over an opaque key) backed by an S3-compatible gateway. Agnostic of what the
  * bytes represent or who's storing them — no assumptions about files, assets, or any particular
- * consumer. Registers the `'s3'` core connector slot; see `docs/STORAGE.md` for the full
+ * consumer. Registers the `'s3'` core connector slot; see `docs/storage.md` for the full
  * architecture, configuration, and setup guide.
  *
  * @module zanixStorage
  */
 
 export {
-  SEAWEEDFS_ACCESS_KEY_ENV,
-  SEAWEEDFS_BUCKET_ENV,
-  SEAWEEDFS_ENCRYPT_ENV,
-  SEAWEEDFS_ENCRYPT_VERSION_ENV,
-  SEAWEEDFS_S3_ENDPOINT_ENV,
-  SEAWEEDFS_SECRET_KEY_ENV,
-  SeaweedFSObjectStorage,
+  S3_ACCESS_KEY_ENV,
+  S3_BUCKET_ENV,
+  S3_ENCRYPT_ENV,
+  S3_ENCRYPT_VERSION_ENV,
+  S3_ENDPOINT_ENV,
+  S3_SECRET_KEY_ENV,
+  S3ObjectStorage,
 } from './connector.ts'
 export type {
   DataPolicyVersion,
   EncryptSettings,
   ObjectStorage,
-  SeaweedFSConnectorOptions,
+  S3ConnectorOptions,
   StorageEncryptSettings,
   StoredObject,
 } from './typings/general.ts'

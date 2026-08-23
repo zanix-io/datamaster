@@ -1,7 +1,7 @@
 # Data Protection
 
 Schema-level accessors and standalone utilities for masking, encrypting, hashing, and restricting
-access to sensitive fields. See [Configuration](./CONFIGURATION.md) for the environment variables
+access to sensitive fields. See [Configuration](./configuration.md) for the environment variables
 these all read.
 
 ## Protection strategies (`dataProtectionGetter`)
@@ -170,7 +170,7 @@ Protection (whether set via `dataProtectionGetter` or `dataPoliciesGetter`'s `pr
 isn't purely a read-time concern — a `pre('save')` hook automatically runs every configured
 protection transform on a document's **first** save (`new Model(data).save()`, while `isNew` is
 still `true`), and `upsertById`/`upsertManyById` do the same whenever `useDataPolicies: true` (the
-default — see [Database: seeders](./DATABASE.md#seeders-registermodels-extensionsseeders)).
+default — see [Database: seeders](./database.md#seeders-registermodels-extensionsseeders)).
 **Access** strategies (`dataAccessGetter`) have no such hook — they're a read/serialization-time
 concern only, with nothing to apply before storage.
 
@@ -212,7 +212,7 @@ methods**, sourced from the model's `SchemaStatics`, so you can protect a value 
 building the update payload:
 
 ```ts
-// Model is whatever `connector.getModel(...)` / `registerModel` bound — see [Database](./DATABASE.md)
+// Model is whatever `connector.getModel(...)` / `registerModel` bound — see [Database](./database.md)
 await Model.hash(refreshToken) // one-way; same as the 'hash' strategy
 await Model.encrypt(secret, { type: 'symmetric' }) // same as 'encrypt'
 Model.mask(email) // same as 'mask', synchronous
@@ -234,7 +234,7 @@ substring-preserving one: only a term starting at index 0 of the plaintext is gu
 a matching _prefix_ of the stored value. A term that only occurs in the middle of the plaintext
 masks to different bytes than what's actually stored there, so an unanchored `$regex` would silently
 miss it — build a "starts with" search, not a "contains" one. `buildSearchFilter` (see
-[Database: Search](./DATABASE.md#search-search)) already does this anchoring for you across multiple
+[Database: Search](./database.md#search-search)) already does this anchoring for you across multiple
 fields at once, and is the recommended way to build this kind of filter.
 
 For an **exact-match** filter (equality or `$in`), you don't have to mask the value by hand — see
@@ -424,7 +424,7 @@ dataProtectionGetter({
 
 This is what lets you rotate encryption/masking keys without a hard cutover: old documents keep
 decrypting under their original version's key while new writes use the new one. See
-[Configuration: versioned keys](./CONFIGURATION.md#versioned-keys) for the environment variable
+[Configuration: versioned keys](./configuration.md#versioned-keys) for the environment variable
 naming convention.
 
 ### Key rotation
@@ -515,8 +515,8 @@ performing the protection operation itself.
 
 ## See also
 
-- [Configuration](./CONFIGURATION.md) — the exact environment variable names (`DATA_AES_KEY`,
+- [Configuration](./configuration.md) — the exact environment variable names (`DATA_AES_KEY`,
   `DATA_RSA_PUB`/`DATA_RSA_KEY`, `DATA_SECRET_KEY`) and versioned-key naming convention.
-- [Database](./DATABASE.md) — where these getters attach to a model's schema definition.
-- [Triggers](./TRIGGERS.md) — the other schema-level lifecycle hook, covering both document- and
+- [Database](./database.md) — where these getters attach to a model's schema definition.
+- [Triggers](./triggers.md) — the other schema-level lifecycle hook, covering both document- and
   query-level operations.

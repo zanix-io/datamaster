@@ -9,7 +9,7 @@
 
 /**
  * Side-effect-only module that auto-registers the default Mongo, Redis, local-cache, SQLite,
- * Elasticsearch/OpenSearch, and SeaweedFS connectors/providers with the Zanix DI container.
+ * Elasticsearch/OpenSearch, and S3 connectors/providers with the Zanix DI container.
  *
  * Import it for its side effects only, for apps that don't need to customize their
  * connector configuration:
@@ -27,3 +27,4 @@ export * from 'sqlite/core.ts'
 export * from 'observability/core.ts'
 export * from 'dlq/core.ts'
 export * from 'storage/core.ts'
+export * from 'modules/triggers/log-trigger.core.ts'

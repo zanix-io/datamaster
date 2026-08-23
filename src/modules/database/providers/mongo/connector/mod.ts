@@ -19,17 +19,20 @@ import { type Mongoose, Schema, type SchemaOptions } from 'mongoose'
 import { defineModelBySchema, defineModels } from './models.ts'
 import { loadPersistedTriggersOnStart } from './triggers.ts'
 import { runSeedersOnStart } from './seeders.ts'
-import { HttpError } from '@zanix/errors'
+import { HttpError, InternalError } from '@zanix/errors'
 import logger from '@zanix/logger'
 import ProgramModule from 'modules/program/mod.ts'
 import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
+import { sanitizeConnectionUri } from 'utils/sanitize-uri.ts'
 
 /** Env var names for the constructor options that also accept one — see the class-level doc.
  * Exported so other packages (e.g. a general config bootstrap) can set/read them without
  * redefining the literal strings. */
+export const MONGO_URI_ENV = 'MONGO_URI'
 export const SEED_MODEL_ENV = 'SEED_MODEL_NAME'
 export const TRIGGERS_MODEL_ENV = 'TRIGGERS_MODEL_NAME'
 export const TRIGGERS_POLL_INTERVAL_ENV = 'TRIGGERS_POLL_INTERVAL'
+/** Env var name for the constructor option that also accepts one — see the class-level doc. */
 export const TRIGGERS_CHANGE_STREAM_ENV = 'TRIGGERS_CHANGE_STREAM'
 /** Default persisted-triggers collection name when `TRIGGERS_MODEL_NAME` isn't set. */
 export const DEFAULT_TRIGGERS_MODEL = 'zanix-triggers'
@@ -73,6 +76,14 @@ const modelNameFromEnv = (
 export const isTriggersModelDisabled = (): boolean => Deno.env.get(TRIGGERS_MODEL_ENV) === 'false'
 
 /**
+ * Whether the triggers resource is configured in this deployment — the inverse of
+ * {@link isTriggersModelDisabled}, on by default. A convenience for a downstream consumer (e.g.
+ * `@zanix/admin`'s own REST/operations gating) that wants an "is it enabled" question answered
+ * directly, without re-deriving it from the negated disable-flag itself.
+ */
+export const isTriggersResourceEnabled = (): boolean => !isTriggersModelDisabled()
+
+/**
  * Resolves the effective persisted-triggers collection name (only meaningful when
  * {@link isTriggersModelDisabled} is `false`), mirroring `ZanixMongoConnector`'s own resolution.
  */
@@ -109,7 +120,7 @@ const pollIntervalFromEnv = (): number | false => {
  * - **TRIGGERS_MODEL_NAME**: Names the internal persisted triggers model in place of
  *   `triggersModel`. The literal string `'false'` disables it, same as `triggersModel: false`.
  * - **TRIGGERS_POLL_INTERVAL**: Milliseconds, in place of `triggersPollInterval` (see
- *   `docs/TRIGGERS.md`'s "Keeping the registry fresh" section). Unset, `'false'`, or a
+ *   `docs/triggers.md`'s "Keeping the registry fresh" section). Unset, `'false'`, or a
  *   non-positive/non-numeric value all disable polling.
  * - **TRIGGERS_CHANGE_STREAM**: Set to `'true'` to enable, in place of `triggersChangeStream`.
  *
@@ -211,7 +222,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   ) {
     super()
 
-    this.#uri = options?.uri || Deno.env.get('MONGO_URI') ||
+    this.#uri = options?.uri || Deno.env.get(MONGO_URI_ENV) ||
       'mongodb://localhost'
     // `coreDisplayName` (`ZanixConnector`, `@zanix/server`) strips the internal `_Zanix`-prefixed
     // synthetic subclass name a core connector is auto-registered under, falling back to
@@ -457,16 +468,35 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
       }
     } catch (error) {
       const { message, name, stack } = error as Error
-      logger.error(
+      // A malformed/unescaped `MONGO_URI` throws with the full connection string — credentials
+      // included — embedded verbatim in `message` (and therefore `stack`, whose first line is the
+      // error's own message). `@zanix/logger` redacts by field name only, so an ordinary
+      // `message`/`stack` string reaches the log unredacted otherwise — see `sanitizeConnectionUri`.
+      //
+      // This used to only log, never re-throw — leaving the connector (and `isReady`) in a broken
+      // state with no way for a caller to know `initialize()` failed. `InternalError` with
+      // `shouldLog: true` both surfaces the failure (`ZanixConnector`'s own `isReady`/retry loop,
+      // `@zanix/server`, awaits/rejects on it) and logs it exactly once — it self-logs at
+      // construction, so no separate `logger.error` call is made here (that would double-log; see
+      // `getModel`'s `HttpError` throws above for the same throw-and-log-once pattern). The
+      // instance also gets stamped `_logged: true` by that self-log, which is what keeps
+      // `@zanix/server`'s own outer `logAppError` (called once retries are exhausted) from logging
+      // this exact same error object a second time.
+      throw new InternalError(
         `Unable to establish connection for database in '${this.name}' class.`,
-        { message, name, stack },
         {
+          shouldLog: true,
           code: 'MONGODB_CONNECTOR_MONGO_ERROR',
           meta: {
             connectorName: this.name,
             suggestion: 'Please check configuration or network settings',
             method: 'initialize',
             source: 'zanix',
+            originalError: {
+              name,
+              message: sanitizeConnectionUri(message),
+              stack: stack && sanitizeConnectionUri(stack),
+            },
           },
         },
       )
@@ -501,9 +531,19 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
       logger.info('Closing the MongoDB connection...', 'noSave')
       await this.#database.disconnect()
     } catch (e) {
+      // Same class of risk as `initialize()`'s own catch above: a disconnect failure can surface
+      // the driver's internal state, which for Mongo's own error objects means the connection
+      // string — credentials included — embedded verbatim in `message`/`stack`. Sanitized the same
+      // way here, not just at `initialize()`, since this is the exact same raw driver error
+      // reaching the exact same logger.
+      const { message, name, stack } = e as Error
       logger.error(
         `Failed to disconnect MongoDB in '${this.name}' class`,
-        e,
+        {
+          name,
+          message: sanitizeConnectionUri(message),
+          stack: stack && sanitizeConnectionUri(stack),
+        },
         'noSave',
       )
     }

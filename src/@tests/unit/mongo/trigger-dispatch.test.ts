@@ -114,6 +114,58 @@ Deno.test('handleTrigger dispatches "request" to the well-known request job name
   assertEquals(calls[0].options.args.url, 'http://localhost.com')
 })
 
+Deno.test('handleTrigger dispatches "log" to the well-known log job name', async () => {
+  reset()
+
+  await handleTrigger({ id: '1', email: 'a@b.com' }, {
+    log: { level: 'info', message: 'User {{email}} was created' },
+  })
+
+  assertEquals(calls.length, 1)
+  assertEquals(calls[0].name, DEFAULT_TRIGGER_JOBS.log)
+  assertEquals(calls[0].options.args.level, 'info')
+  assertEquals(calls[0].options.args.message, 'User a@b.com was created')
+  assertEquals(calls[0].options.args.data._data, { id: '1', email: 'a@b.com' })
+})
+
+Deno.test({
+  name: 'handleTrigger dispatches "log" to a registered override job name, not the default',
+  fn: async () => {
+    reset()
+
+    registerTriggerActionJob('log', {
+      name: 'custom-log-job',
+      handler: () => {},
+    })
+
+    try {
+      await handleTrigger({ id: '1' }, {
+        log: { level: 'warn', message: 'careful' },
+      })
+
+      assertEquals(calls.length, 1)
+      assertEquals(calls[0].name, 'custom-log-job')
+    } finally {
+      DatabaseProgramModule.triggerActionJobs.resetContainer()
+    }
+  },
+})
+
+Deno.test('handleTrigger interpolates {{field}}/${{ENV_VAR}} in a "log" message', async () => {
+  reset()
+  Deno.env.set('TEST_LOG_ENVIRONMENT', 'staging')
+
+  try {
+    await handleTrigger({ id: '42' }, {
+      log: { level: 'debug', message: '[${{TEST_LOG_ENVIRONMENT}}] record {{id}} processed' },
+    })
+
+    assertEquals(calls[0].options.args.message, '[staging] record 42 processed')
+  } finally {
+    Deno.env.delete('TEST_LOG_ENVIRONMENT')
+  }
+})
+
 Deno.test('handleTrigger dispatches "custom" to the action\'s own job name', async () => {
   reset()
 

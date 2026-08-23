@@ -9,7 +9,8 @@
  * @module
  */
 
-import type { SeaweedFSObjectStorage } from './connector.ts'
+import { InternalError } from '@zanix/errors'
+import type { S3ObjectStorage } from './connector.ts'
 import type { DataPolicyVersion } from './typings/general.ts'
 import type {
   EncryptionRotationStatus,
@@ -20,12 +21,16 @@ import type {
 
 /** Shared "this instance has no active version to migrate towards" guard — reused by both
  * `runCheck` and `runRotate`. */
-export function requireActiveVersion(storage: SeaweedFSObjectStorage): DataPolicyVersion {
+export function requireActiveVersion(storage: S3ObjectStorage): DataPolicyVersion {
   const settings = storage.encryptSettings
   if (!settings) {
-    throw new Error(
-      'Cannot check/rotate encryption: this SeaweedFSObjectStorage instance has encryption ' +
+    // A native `Error` here previously — see `@zanix/errors`' docs, "Choosing a class": this is an
+    // internal misconfiguration (an ops/admin operation invoked against an instance that was never
+    // set up for it), not a validation of some external caller's input.
+    throw new InternalError(
+      'Cannot check/rotate encryption: this S3ObjectStorage instance has encryption ' +
         'disabled (no `encrypt` configured) — there is no "active version" to migrate objects to.',
+      { code: 'OBJECT_STORAGE_ROTATION_NOT_CONFIGURED' },
     )
   }
   return settings.version ?? 'v0'
@@ -35,7 +40,7 @@ export function requireActiveVersion(storage: SeaweedFSObjectStorage): DataPolic
  * a time, hiding `ListObjectsV2Command`'s own `ContinuationToken` bookkeeping from both functions
  * below. */
 async function* walkKeys(
-  storage: SeaweedFSObjectStorage,
+  storage: S3ObjectStorage,
   prefix: string | undefined,
   maxKeysPerPage: number | undefined,
 ): AsyncGenerator<string> {
@@ -53,7 +58,7 @@ async function* walkKeys(
 /** The real work behind `checkEncryptionRotationStatus()` — read-only, walks every key via
  * `listPage()`/`getMetadata()`. */
 export async function runCheck(
-  storage: SeaweedFSObjectStorage,
+  storage: S3ObjectStorage,
   options: EncryptionRotationStatusOptions,
 ): Promise<EncryptionRotationStatus> {
   const activeVersion = requireActiveVersion(storage)
@@ -89,7 +94,7 @@ export async function runCheck(
 /** The real work behind `rotateEncryptionKeys()` — see that function's own doc for the concurrency
  * contract (checksum re-check before every write). */
 export async function runRotate(
-  storage: SeaweedFSObjectStorage,
+  storage: S3ObjectStorage,
   options: RotationOptionsWithoutWorker,
 ): Promise<RotationResult> {
   const activeVersion = requireActiveVersion(storage)

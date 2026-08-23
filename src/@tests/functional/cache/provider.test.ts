@@ -3,6 +3,7 @@ import { assertEquals } from '@std/assert/assert-equals'
 import { assertRejects, assertThrows } from '@std/assert'
 import { ZanixCacheCoreProvider } from 'modules/cache/providers/mod.ts'
 import { ZanixRedisConnector } from 'modules/cache/providers/redis/connector/mod.ts'
+import { ZanixMemcachedConnector } from 'modules/cache/providers/memcached/connector/mod.ts'
 import { Connector, registerCoreConnectorSlot, ZanixCacheConnector } from '@zanix/server'
 import logger from '@zanix/logger'
 
@@ -11,11 +12,12 @@ console.info = () => {}
 console.error = () => {}
 console.warn = () => {}
 
-// This test decorates `_Redis` directly rather than importing `cache/providers/redis/core.ts`, so
-// the `'cache:redis'` slot needs registering explicitly here — `@zanix/datamaster` owns it
-// (see `redis/core.ts`'s own registration), but that file is never reached by this test's own
-// import graph.
+// This test decorates `_Redis`/`_Memcached` directly rather than importing
+// `cache/providers/{redis,memcached}/core.ts`, so both slots need registering explicitly here —
+// `@zanix/datamaster` owns them (see each connector's own `core.ts` registration), but neither
+// file is ever reached by this test's own import graph.
 registerCoreConnectorSlot('cache:redis', ZanixCacheConnector)
+registerCoreConnectorSlot('cache:memcached', ZanixCacheConnector)
 
 const registerInstance = async () => {
   // Register instance
@@ -24,6 +26,10 @@ const registerInstance = async () => {
   // Register instance
   @Connector({ slot: 'cache:redis', autoInitialize: false })
   class _Redis extends ZanixRedisConnector<string, string> {}
+
+  // Register instance
+  @Connector({ slot: 'cache:memcached', autoInitialize: false })
+  class _Memcached extends ZanixMemcachedConnector<string, string> {}
 }
 
 Deno.test('provider should throws on non instantiated cache', () => {
@@ -473,4 +479,30 @@ Deno.test('withLock runs the function under an exclusive lock and returns its re
   )
 
   assertEquals(result, 'locked-result')
+})
+
+// `ZanixCacheCoreProvider`'s own multi-layer methods (`getCachedOrFetch`/`getCachedOrRevalidate`/
+// `saveToCaches`) stay Redis-only by design (typed against `Extract<CoreCacheConnectors,
+// 'redis'>`) — `memcached` never gets a dedicated getter either, matching every non-`redis`/
+// `local` slot's own convention (see `datamaster-connector-registration`). This doesn't mean
+// `memcached` is unreachable through the provider layer: the base `ZanixCacheProvider.use()`
+// (`@zanix/server`) resolves any registered `CoreCacheConnectors` slot generically — this is the
+// real guarantee that `this.cache.use('memcached')` (or `provider.use('memcached')` here) actually
+// resolves the connector this package registered under `'cache:memcached'`, not just that the slot
+// exists in the registry.
+Deno.test('provider.use("memcached") resolves the registered Memcached connector', async () => {
+  await registerInstance()
+  const provider = new ZanixCacheCoreProvider('testContext')
+
+  const memcached = provider.use('memcached')
+  await memcached['initialize']()
+
+  try {
+    await memcached.clear()
+    await memcached.set('use-memcached-key', 'via-provider-use')
+    assertEquals(await memcached.get('use-memcached-key'), 'via-provider-use')
+    assertEquals(await memcached.has('use-memcached-key'), true)
+  } finally {
+    memcached['close']()
+  }
 })

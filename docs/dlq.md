@@ -147,6 +147,12 @@ indexed top-level column instead (`processType`/`processId` already exist for th
 "correlation id" case). This queryability goes away when `encryptPayload` is enabled — see
 "Protecting the payload" below.
 
+`filter` (on both `list()` and `claim()`) is a dot-path equality lookup only — any `$`-prefixed key
+inside it, at any nesting level, is stripped before the query runs, and it can never override
+`processType`/`status`/`origin` (`list()`) or `claim()`'s own eligibility scoping via a same-named
+key. This makes `filter` safe to build from caller-supplied input (e.g. a host app's own admin
+endpoint forwarding query-string filters) without hand-rolling that sanitization at the call site.
+
 ## Protecting the payload
 
 A DLQ payload is, by nature, "whatever failed" — it can carry internal details or PII. Encryption is
@@ -201,7 +207,7 @@ the _storage schema_, not the TypeScript type `push()`/`get()` see.
 
 **Encryption fails open**: if the corresponding key env var (`DATA_AES_KEY`, `DATA_RSA_PUB`/
 `DATA_RSA_KEY`) isn't set, the payload is stored **unencrypted**, silently — this is the underlying
-data-protection mechanism's existing behavior (see [Data Protection](./DATA-PROTECTION.md)), not
+data-protection mechanism's existing behavior (see [Data Protection](./data-protection.md)), not
 something specific to DLQ. Enabling `encryptPayload` without the matching key configured gives a
 false sense of security — verify the key is actually present in every environment where this
 matters.
@@ -261,6 +267,86 @@ per-call-site cache might.
 For a multi-connector app, pass the target connector class as `registerDLQModel`'s second argument —
 same convention as `registerModel`'s own `connector` parameter.
 
+## Local admin API — `@zanix/datamaster/dlq-api`
+
+This package exports `DLQAdminService` as a ready-made business-logic layer over `DLQProvider`, and
+`createDlqAdminController` (`@zanix/datamaster/dlq-api`) as a real, authenticat**able** `/admin/dlq`
+HTTP API fronting it — built the same way `@zanix/datamaster/triggers-api` fronts
+`TriggersAdminService`, and never assuming an auth mechanism itself (`guards`/`versionProtocol` are
+supplied by whoever composes it, typically `@zanix/admin`).
+
+```ts
+import { createDlqAdminController } from 'jsr:@zanix/datamaster@[version]/dlq-api'
+
+const DLQAdminController = createDlqAdminController({
+  guards: [jwtValidationGuard], // omit for no auth at all — this package assumes none by default
+  versionProtocol: { version: 1 }, // optional, passed straight to `@Controller`
+})
+```
+
+**Only a subset of `DLQProvider`'s methods is exposed here — deliberately, not by omission.**
+`push`/`get`/`list`/`requeue`/`discard`/`remove` are genuine admin/operator actions: register a
+failure, inspect one or many entries, force a retry, permanently close one, delete one. They map
+cleanly to "a human clicks a button in a REST admin panel."
+
+`claim`/`release`/`complete`/`fail` are **not** part of this surface. They're lease-based primitives
+fenced by a `leaseOwner` a specific worker process holds (see
+[Concurrency](#concurrency-claim-not-static-worker-slots) above) — built for `@zanix/asyncmq/dlq`'s
+`registerDLQProcessor`, or any other automated consumer, to drive programmatically. An admin has no
+real lease to present: exposing these here would mean either faking a `leaseOwner` (which can then
+collide with, or forcibly interrupt, a genuine in-flight worker's own claim — exactly what
+`leaseOwner` fencing exists to prevent) or bypassing the fencing outright. A caller that genuinely
+needs them resolves `DLQProvider` directly via `this.providers.get(DLQProvider)`.
+
+The route prefix (`admin/dlq`) is fixed, not configurable — the same wire-protocol-contract
+reasoning `admin/triggers` follows:
+
+| Method   | Path                    | Body/Params/Query                                                                                  | Returns                     |
+| -------- | ----------------------- | -------------------------------------------------------------------------------------------------- | --------------------------- |
+| `GET`    | `admin/dlq`             | `ListDLQEntriesRTO` (`{ processType?, status?, origin?, page?, limit? }`)                          | `DLQAdminService.list()`    |
+| `GET`    | `admin/dlq/:id`         | `DLQEntryIdParamsRTO` (`{ id }`)                                                                   | `DLQAdminService.get()`     |
+| `POST`   | `admin/dlq`             | `PushDLQEntryRTO` (`{ processType, origin, processId?, payload, error, maxAttempts?, metadata? }`) | `DLQAdminService.push()`    |
+| `POST`   | `admin/dlq/:id/requeue` | `RequeueDLQEntryRTO` (`{ resetAttempts? }`) + `DLQEntryIdParamsRTO`                                | `DLQAdminService.requeue()` |
+| `POST`   | `admin/dlq/:id/discard` | `DiscardDLQEntryRTO` (`{ reason? }`) + `DLQEntryIdParamsRTO`                                       | `DLQAdminService.discard()` |
+| `DELETE` | `admin/dlq/:id`         | `DLQEntryIdParamsRTO` (`{ id }`)                                                                   | `{ deleted: id }`           |
+
+`requeue`/`discard` are their own `POST` action routes rather than folded into a generic `PUT`
+update — unlike a trigger configuration entry (one mutable resource updated in place), a DLQ entry's
+admin-facing mutations are discrete lifecycle actions (retry, close), not a partial field-level edit
+of the record itself.
+
+`GET admin/dlq`'s query is deliberately narrower than `DLQProvider.list()`'s own `DLQListOptions`:
+the raw `sort`/`filter` dot-path passthrough (meant for a caller that already knows the schema it's
+querying into, e.g. `{'payload.orderId': 'x'}`) is left off this REST surface — filtering by
+`processType`/`status`/`origin` and paging covers the real "browse the queue" admin use case; a
+caller that needs `sort`/`filter`'s full expressiveness already has direct access to
+`DLQProvider`/`DLQAdminService` without going through HTTP.
+
+This package also exports `createDlqDiscoveryProvider()`, building the `DiscoveryProvider` for
+`/.well-known/zanix/dlq` — the same shape `createTriggersDiscoveryProvider` builds for
+`/.well-known/zanix/triggers` (see `docs/triggers.md`'s own "Local admin API" section).
+`@zanix/admin`'s own `DlqAggregator` (mirroring `TriggersAggregator`) is the real consumer: its
+`list()` fans out across every registered service's own `/.well-known/zanix/dlq` Discovery snapshot.
+This package only authors the provider; wiring it into an HTTP surface via `@zanix/server`'s
+`ProgramModule.defineDiscovery` is whichever app composes it.
+
+```ts
+import { createDlqDiscoveryProvider } from 'jsr:@zanix/datamaster@[version]'
+
+ProgramModule.defineDiscovery('dlq', createDlqDiscoveryProvider())
+```
+
+**Unlike the triggers discovery provider, this one doesn't just reuse `DLQProvider.list()`/
+`DLQAdminService.list()` unchanged.** `DiscoveryProvider.snapshot()` is documented
+(`@zanix/server`'s `typings/discovery.ts`) as fine for resources confirmed to stay small (dozens–low
+thousands of items) — true for triggers (few per service), but not for DLQ entries, which can be
+numerous and keep accumulating (`remove()` is always manual — there's no TTL/auto-purge). So the
+snapshot is scoped to only `'pending'`/`'claimed'`/`'failed'` entries (the actionable backlog —
+`'completed'`/`'discarded'` are resolved history retained forever, exactly the kind of unbounded
+shape a snapshot isn't designed for), each status capped at 500 entries. A caller that wants the
+full paginated collection, including resolved entries, uses `DLQAdminService.list()`/`admin/dlq`
+directly — the discovery snapshot is deliberately narrower than that.
+
 ## Distributed processing — `@zanix/asyncmq/dlq`
 
 `DLQProvider` is deliberately a **passive store**: it never claims or interprets entries on its own.
@@ -304,7 +390,7 @@ uses for its own persistence.
 
 ## See also
 
-- [Configuration](./CONFIGURATION.md) — the full env var reference.
-- [Data Protection](./DATA-PROTECTION.md) — the `encrypt`/`mask`/`hash` mechanism `encryptPayload`
+- [Configuration](./configuration.md) — the full env var reference.
+- [Data Protection](./data-protection.md) — the `encrypt`/`mask`/`hash` mechanism `encryptPayload`
   builds on.
 - `@zanix/asyncmq`'s `registerDLQProcessor` (`@zanix/asyncmq/dlq`) — distributed processing, above.

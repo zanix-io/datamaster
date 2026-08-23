@@ -1,8 +1,8 @@
 import { assert, assertRejects } from '@std/assert'
-import { SeaweedFSObjectStorage } from 'storage/connector.ts'
+import { S3ObjectStorage } from 'storage/connector.ts'
 
 /**
- * `SeaweedFSObjectStorage`'s "is this object actually missing, or did something else fail?"
+ * `S3ObjectStorage`'s "is this object actually missing, or did something else fail?"
  * classification (`isNotFound()`, `connector.ts`), proven against REAL `@aws-sdk/client-s3`
  * responses — a real local HTTP server returning genuine S3-style XML error bodies, not a hand-
  * stubbed `S3Client.prototype.send`. `isNotFound()` is a strict ALLOWLIST (only `NoSuchKey`/
@@ -49,11 +49,11 @@ function startFakeS3Server() {
 }
 
 Deno.test(
-  'SeaweedFSObjectStorage.get propagates a REAL AccessDenied (403), never treats it as missing',
+  'S3ObjectStorage.get propagates a REAL AccessDenied (403), never treats it as missing',
   async () => {
     const fake = startFakeS3Server()
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         endpoint: fake.endpoint,
       })
@@ -65,13 +65,13 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.exists propagates a REAL InvalidAccessKeyId (403), never treats it ' +
+  'S3ObjectStorage.exists propagates a REAL InvalidAccessKeyId (403), never treats it ' +
     'as missing',
   async () => {
     const fake = startFakeS3Server()
     fake.setMode('InvalidAccessKeyId', 'The AWS Access Key Id you provided does not exist', 403)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         endpoint: fake.endpoint,
       })
@@ -85,12 +85,12 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.get propagates a REAL InternalError (500), never treats it as missing',
+  'S3ObjectStorage.get propagates a REAL InternalError (500), never treats it as missing',
   async () => {
     const fake = startFakeS3Server()
     fake.setMode('InternalError', 'We encountered an internal error', 500)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         endpoint: fake.endpoint,
       })
@@ -102,12 +102,12 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.exists propagates a REAL SlowDown (503), never treats it as missing',
+  'S3ObjectStorage.exists propagates a REAL SlowDown (503), never treats it as missing',
   async () => {
     const fake = startFakeS3Server()
     fake.setMode('SlowDown', 'Please reduce your request rate', 503)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         endpoint: fake.endpoint,
       })
@@ -119,10 +119,10 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.get propagates a REAL connection-refused error, never treats it as missing',
+  'S3ObjectStorage.get propagates a REAL connection-refused error, never treats it as missing',
   async () => {
     // Port 1 — real OS-level ECONNREFUSED, no fake server needed (nothing can ever listen there).
-    const storage = new SeaweedFSObjectStorage({
+    const storage = new S3ObjectStorage({
       autoInitialize: false,
       endpoint: 'http://127.0.0.1:1',
     })
@@ -135,9 +135,9 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.exists propagates a REAL connection-refused error, never treats it as missing',
+  'S3ObjectStorage.exists propagates a REAL connection-refused error, never treats it as missing',
   async () => {
-    const storage = new SeaweedFSObjectStorage({
+    const storage = new S3ObjectStorage({
       autoInitialize: false,
       endpoint: 'http://127.0.0.1:1',
     })
@@ -147,12 +147,12 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.get: a malformed endpoint genuinely rejects get(), never resolves undefined',
+  'S3ObjectStorage.get: a malformed endpoint genuinely rejects get(), never resolves undefined',
   async () => {
     // Confirmed via direct probing: `@aws-sdk/client-s3` doesn't parse/validate `endpoint` at
     // construction time — it throws a real `TypeError` ("Invalid URL") the first time a request
     // is actually attempted, which is exactly what this asserts.
-    const storage = new SeaweedFSObjectStorage({
+    const storage = new S3ObjectStorage({
       autoInitialize: false,
       endpoint: 'not-a-valid-url',
     })

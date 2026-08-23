@@ -7,18 +7,25 @@
  * \_____/ \__,_||_| |_||_|/_/\_\
  */
 
-import type { SeaweedFSConnectorOptions } from './typings/general.ts'
+import type { S3ConnectorOptions } from './typings/general.ts'
 
-import { SEAWEEDFS_S3_ENDPOINT_ENV, SeaweedFSObjectStorage } from './connector.ts'
+import { S3_ENDPOINT_ENV, S3ObjectStorage } from './connector.ts'
 import { Connector, registerCoreConnectorSlot, ZanixConnector } from '@zanix/server'
 
-/** Connector DSL definition */
-const registerConnector = () => {
-  if (!Deno.env.has(SEAWEEDFS_S3_ENDPOINT_ENV)) return
+/**
+ * Connector DSL definition — exported (not just auto-run below) so a caller can re-register after
+ * clearing the `'type:connector'` registry (`closeAllConnections()`/
+ * `ProgramModule.targets.resetContainer(['type:connector'])`, both in `@zanix/server`), without
+ * needing a fresh module evaluation of this file. Re-reads `Deno.env` each call, so a config-reload
+ * in a long-running process — or a test simulating a different env state between cases — gets a
+ * genuinely current registration, not a stale decision baked in at first import.
+ */
+export const registerS3Connector = (): void => {
+  if (!Deno.env.has(S3_ENDPOINT_ENV)) return
 
   @Connector({ slot: 's3', autoInitialize: false })
-  class _SeaweedFSCoreObjectStorage extends SeaweedFSObjectStorage {
-    constructor(options: SeaweedFSConnectorOptions = {}) {
+  class _S3CoreObjectStorage extends S3ObjectStorage {
+    constructor(options: S3ConnectorOptions = {}) {
       super(options)
     }
   }
@@ -35,10 +42,10 @@ registerCoreConnectorSlot('s3', ZanixConnector, {
 })
 
 /**
- * Core `SeaweedFSObjectStorage` connector loader for Zanix.
+ * Core `S3ObjectStorage` connector loader for Zanix.
  *
- * Registers the default connector (`_SeaweedFSCoreObjectStorage`) automatically when
- * `SEAWEEDFS_S3_ENDPOINT` is set, under the `'s3'` core connector slot. Unlike `'database'`/
+ * Registers the default connector (`_S3CoreObjectStorage`) automatically when
+ * `S3_ENDPOINT` is set, under the `'s3'` core connector slot. Unlike `'database'`/
  * `'search'`, `'s3'` isn't one of `CoreBaseClass`'s six hardcoded slots (`kvLocal`, `database`,
  * `search`, `asyncmq`, `cache`, `worker`), so there's no `this.s3` getter — resolve it instead via
  * `this.connectors.get('s3')` (any `ZanixProvider`/`CoreBaseClass` subclass), `this
@@ -48,15 +55,15 @@ registerCoreConnectorSlot('s3', ZanixConnector, {
  * — the same technique `ZanixElasticsearchConnector`'s own `getConnector()` helper uses for
  * `'search'`). When the endpoint isn't configured, the slot exists (so referencing it never throws
  * a "no such slot" error) but has no registered class to construct — `.get('s3')` itself still
- * throws in that case, so callers must check `Deno.env.has('SEAWEEDFS_S3_ENDPOINT')` (or catch)
+ * throws in that case, so callers must check `Deno.env.has('S3_ENDPOINT')` (or catch)
  * before relying on it being available.
  *
  * @requires Deno.env
- * @requires SeaweedFSObjectStorage
+ * @requires S3ObjectStorage
  * @decorator Connector
  *
  * @module
  */
-const seaweedFSConnectorCore: void = registerConnector()
+const s3ConnectorCore: void = registerS3Connector()
 
-export default seaweedFSConnectorCore
+export default s3ConnectorCore

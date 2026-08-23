@@ -194,6 +194,43 @@ Deno.test('DLQProvider.list merges a raw filter passthrough, querying into paylo
   assertEquals(result.docs[0]._id, '1')
 })
 
+Deno.test('DLQProvider.list strips a $-operator out of a raw filter passthrough', async () => {
+  const entries: Entry[] = []
+  const instance = fakeThis(entries)
+  let capturedFilter: Entry | undefined
+  const model = instance.database.getModel()
+  const originalPaginate = model.paginate
+  model.paginate = (opts: Entry) => {
+    capturedFilter = opts.filter
+    return originalPaginate(opts)
+  }
+
+  await provider.list.call(instance as never, {
+    filter: { 'payload.orderId': 'abc123', $where: 'this.attempts > 999' },
+  })
+
+  assertEquals(capturedFilter, { 'payload.orderId': 'abc123' })
+})
+
+Deno.test('DLQProvider.list: processType/status/origin win over a filter key clash', async () => {
+  const entries: Entry[] = []
+  const instance = fakeThis(entries)
+  let capturedFilter: Entry | undefined
+  const model = instance.database.getModel()
+  const originalPaginate = model.paginate
+  model.paginate = (opts: Entry) => {
+    capturedFilter = opts.filter
+    return originalPaginate(opts)
+  }
+
+  await provider.list.call(instance as never, {
+    status: 'pending',
+    filter: { status: 'completed' },
+  })
+
+  assertEquals(capturedFilter?.status, 'pending')
+})
+
 Deno.test('DLQProvider.claim atomically claims one eligible pending entry', async () => {
   const entries: Entry[] = [
     { _id: '1', payloadRaw: '{}', status: 'pending', attempts: 0 },
@@ -247,6 +284,45 @@ Deno.test('DLQProvider.claim reclaims an abandoned entry (claimed, expired lease
   })
   assertEquals(result?.leaseOwner, 'w2')
   assertEquals(result?.attempts, 2)
+})
+
+Deno.test("DLQProvider.claim: a filter's status can't override built-in eligibility", async () => {
+  const entries: Entry[] = [{
+    _id: '1',
+    payloadRaw: '{}',
+    status: 'completed',
+    attempts: 1,
+  }]
+  const result = await provider.claim.call(fakeThis(entries) as never, {
+    leaseOwner: 'w1',
+    // A caller-supplied 'status' must never widen eligibility to an already-terminal entry.
+    filter: { status: 'completed' },
+  })
+  assertEquals(result, null)
+})
+
+Deno.test('DLQProvider.claim strips a $-operator out of its filter passthrough', async () => {
+  const entries: Entry[] = [{
+    _id: '1',
+    payloadRaw: '{}',
+    status: 'pending',
+    attempts: 0,
+  }]
+  const instance = fakeThis(entries)
+  let capturedFilter: Entry | undefined
+  const model = instance.database.getModel()
+  const originalFindOneAndUpdate = model.findOneAndUpdate
+  model.findOneAndUpdate = (filter: Entry, update: Entry) => {
+    capturedFilter = filter
+    return originalFindOneAndUpdate(filter, update)
+  }
+
+  await provider.claim.call(instance as never, {
+    leaseOwner: 'w1',
+    filter: { $where: 'true' },
+  })
+
+  assertEquals(capturedFilter?.$where, undefined)
 })
 
 Deno.test('DLQProvider.release moves a claimed entry back to pending', async () => {

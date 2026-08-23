@@ -7,6 +7,12 @@ import { type CacheSetOptions, ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
 import logger from '@zanix/logger'
 import { scanKeys } from './scan.ts'
+import { sanitizeConnectionUri } from 'utils/sanitize-uri.ts'
+
+/** Env var name for the constructor option that also accepts one (`redisUrl`) — see the
+ * class-level doc. Exported so other packages can set/read it without redefining the literal
+ * string. */
+export const REDIS_URI_ENV = 'REDIS_URI'
 
 /**
  * A Redis-backed cache implementation with automatic retry and command queuing.
@@ -85,7 +91,7 @@ export class ZanixRedisConnector<K extends string = string, V = any>
   constructor(options: RedisOptions = {}) {
     const {
       ttl = 0,
-      redisUrl = Deno.env.get('REDIS_URI') || 'redis://localhost:6379',
+      redisUrl = Deno.env.get(REDIS_URI_ENV) || 'redis://localhost:6379',
       maxCommandRetries = 3,
       commandTimeout = 2000,
       reconnectStrategy,
@@ -174,9 +180,17 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     })
 
     this.#client.on('error', (err) => {
+      // A malformed/unescaped `REDIS_URI` throws with the full connection string — credentials
+      // included — embedded verbatim in `err.message` (and therefore `err.stack`). `@zanix/logger`
+      // redacts by field name only, so passing the raw `Error` reaches the log unredacted
+      // otherwise — see `sanitizeConnectionUri`.
       logger.error(
         'An error ocurred. Retry to connect to Redis...',
-        err,
+        {
+          name: err.name,
+          message: sanitizeConnectionUri(err.message),
+          stack: err.stack && sanitizeConnectionUri(err.stack),
+        },
         'noSave',
       )
     })
@@ -193,7 +207,17 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
   }
 
-  /** Stores a value under the given key, optionally scheduling the write and applying a TTL. */
+  /**
+   * Stores a value under the given key, applying a TTL.
+   *
+   * `options.schedule: true` batches the write through {@link RedisPipelineScheduler} instead of
+   * writing immediately — this method resolves once the write is queued, not once it actually
+   * lands in Redis. That's a deliberate, best-effort/fire-and-forget design (it's what makes the
+   * call non-blocking): if the queued write ultimately fails — once `execWithRetry`'s own retries
+   * are exhausted — the failure can no longer reject this call (it already resolved), so it's only
+   * logged (`REDIS_SCHEDULED_WRITE_FAILED`), never thrown. Omit `schedule` (or pass `false`) for a
+   * write whose failure this method's own returned `Promise` rejects with instead.
+   */
   public async set(
     key: K,
     value: V,
@@ -213,7 +237,20 @@ export class ZanixRedisConnector<K extends string = string, V = any>
     }
 
     if (schedule) {
+      // Best-effort by design (see the JSDoc above) — nothing awaits this, so a failure can only be
+      // logged here, never propagated back to a caller whose own `set()` call already resolved.
       this.execWithRetry(() => this.scheduler.addSet(key, valueToSave, setterOptions) as never)
+        .catch((err) => {
+          logger.error(
+            `Scheduled write for key '${key}' failed in '${this.name}' class.`,
+            err,
+            {
+              code: 'REDIS_SCHEDULED_WRITE_FAILED',
+              meta: { connectorName: this.name, key, method: 'set', source: 'zanix' },
+            },
+            'noSave',
+          )
+        })
     } else await this.execWithRetry(() => this.#client.set(key, valueToSave, setterOptions))
   }
 
@@ -273,9 +310,18 @@ export class ZanixRedisConnector<K extends string = string, V = any>
         this.#client.destroy()
       }
     } catch (e) {
+      // Same class of risk as the `'error'` handler above: a close failure can surface the raw
+      // client error, which for a malformed/unescaped `REDIS_URI` means the connection string —
+      // credentials included — embedded verbatim in `message`/`stack`. Sanitized the same way here
+      // rather than passing the raw `Error`, which reached the log unredacted otherwise.
+      const { message, name, stack } = e as Error
       logger.error(
         `Failed to close Redis in '${this.name}' class`,
-        e,
+        {
+          name,
+          message: sanitizeConnectionUri(message),
+          stack: stack && sanitizeConnectionUri(stack),
+        },
         'noSave',
       )
     }

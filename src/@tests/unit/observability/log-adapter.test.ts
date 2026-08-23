@@ -4,6 +4,7 @@ import { Logger } from '@zanix/logger'
 import { WorkerManager } from '@zanix/workers'
 import { ProgramModule } from '@zanix/server'
 import { elasticsearchLogSave } from 'observability/log-adapter.ts'
+import { ZanixElasticsearchConnector } from 'observability/connector.ts'
 
 /**
  * Stubs `ProgramModule.getProviders` (via its prototype — the exported singleton is frozen, so a
@@ -20,6 +21,23 @@ const stubWorkerProvider = (
   const original = proto.getProviders
   proto.getProviders = () => ({ get: () => ({ executeGeneralTask }) })
   return () => (proto.getProviders = original)
+}
+
+/**
+ * Stubs `ProgramModule.getConnectors` (same technique as `stubWorkerProvider` above) so
+ * `getConnector()` resolves a real `ZanixElasticsearchConnector`, built from the exact same
+ * options the test itself passes to `elasticsearchLogSave` — since `getConnector()` no longer
+ * falls back to constructing one silently when nothing is registered (see its own doc), every
+ * test exercising a real flush needs this stub, not just the ones exercising `useWorker`.
+ */
+const stubSearchConnector = (
+  options: ConstructorParameters<typeof ZanixElasticsearchConnector>[0],
+) => {
+  const registered = new ZanixElasticsearchConnector(options)
+  const proto = Object.getPrototypeOf(ProgramModule)
+  const original = proto.getConnectors
+  proto.getConnectors = () => ({ get: () => registered })
+  return () => (proto.getConnectors = original)
 }
 
 /** Installs a fake `fetch` capturing every `_bulk` request body, restored via the returned function. */
@@ -48,6 +66,7 @@ const contextFor = (log: Record<string, unknown>) => ({
 
 Deno.test('aliases an existing `timestamp` field to `@timestamp` without removing it', async () => {
   const { bodies, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
+  const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
   try {
     const save = elasticsearchLogSave({
       node: 'http://localhost:9200',
@@ -68,11 +87,13 @@ Deno.test('aliases an existing `timestamp` field to `@timestamp` without removin
     }])
   } finally {
     restore()
+    restoreConnector()
   }
 })
 
 Deno.test('leaves an already-present `@timestamp` untouched', async () => {
   const { bodies, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
+  const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
   try {
     const save = elasticsearchLogSave({
       node: 'http://localhost:9200',
@@ -92,11 +113,13 @@ Deno.test('leaves an already-present `@timestamp` untouched', async () => {
     )
   } finally {
     restore()
+    restoreConnector()
   }
 })
 
 Deno.test('synthesizes `@timestamp` only when no timestamp field is present at all', async () => {
   const { bodies, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
+  const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
   try {
     const save = elasticsearchLogSave({
       node: 'http://localhost:9200',
@@ -110,11 +133,13 @@ Deno.test('synthesizes `@timestamp` only when no timestamp field is present at a
     assertEquals(doc.level, 'info')
   } finally {
     restore()
+    restoreConnector()
   }
 })
 
 Deno.test('addTimestampField: false skips the aliasing entirely', async () => {
   const { bodies, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
+  const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
   try {
     const save = elasticsearchLogSave({
       node: 'http://localhost:9200',
@@ -127,11 +152,13 @@ Deno.test('addTimestampField: false skips the aliasing entirely', async () => {
     assertEquals(bodies[0], [{ timestamp: '2026-07-22T21:56:34.403Z' }])
   } finally {
     restore()
+    restoreConnector()
   }
 })
 
 Deno.test('flush() manually sends whatever is currently buffered', async () => {
   const { bodies, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
+  const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
   try {
     const save = elasticsearchLogSave({
       node: 'http://localhost:9200',
@@ -144,6 +171,7 @@ Deno.test('flush() manually sends whatever is currently buffered', async () => {
     assertEquals(bodies.length, 1)
   } finally {
     restore()
+    restoreConnector()
   }
 })
 
@@ -155,6 +183,11 @@ Deno.test({
     ;(Logger.prototype as any).error = (...args: unknown[]) => calls.push(args)
 
     const { restore } = mockFetch(() => new Response('down', { status: 503 }))
+    // Real registered connector, so this genuinely exercises the 503 path below — not
+    // `getConnector()`'s own "nothing registered" throw, which would also (correctly) reach
+    // `reportFlushFailure` but for the wrong reason, silently proving nothing about this test's
+    // actual subject.
+    const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
     try {
       const save = elasticsearchLogSave({
         node: 'http://localhost:9200',
@@ -168,9 +201,41 @@ Deno.test({
       assertEquals(calls[0][2], 'noSave')
     } finally {
       restore()
+      restoreConnector()
       ;(Logger.prototype as any).error = originalError
     }
   },
+})
+
+Deno.test('a flush is reported the same way when nothing is registered for "search"', async () => {
+  const originalError = (Logger.prototype as any).error
+  const calls: unknown[][] = []
+  ;(Logger.prototype as any).error = (...args: unknown[]) => calls.push(args)
+
+  const proto = Object.getPrototypeOf(ProgramModule)
+  const original = proto.getConnectors
+  proto.getConnectors = () => ({
+    get: () => {
+      throw new Error('missing core connector slot')
+    },
+  })
+  try {
+    // `getConnector()`'s own real throw — never a synchronous crash out of `save()`, per
+    // `flushInline`'s own doc on why that guarantee matters for a fire-and-forget log call.
+    const save = elasticsearchLogSave({
+      node: 'http://localhost:9200',
+      bulk: { maxSize: 1 },
+    })
+    save(contextFor({ timestamp: '2026-01-01T00:00:00.000Z' }) as any)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    assertEquals(calls.length, 1)
+    assertStringIncludes(calls[0][0] as string, 'Failed to flush logs')
+    assertEquals(calls[0][2], 'noSave')
+  } finally {
+    proto.getConnectors = original
+    ;(Logger.prototype as any).error = originalError
+  }
 })
 
 Deno.test({

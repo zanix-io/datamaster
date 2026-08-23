@@ -7,16 +7,15 @@ import type {
 } from './typings/general.ts'
 
 import { ProgramModule, ZanixSearchConnector } from '@zanix/server'
+import {
+  ELASTICSEARCH_API_KEY_ENV,
+  OPENSEARCH_API_KEY_ENV,
+  SEARCH_URL_ENV,
+} from './search-config.ts'
 
 const DEFAULT_NODE = 'http://localhost:9200'
 const DEFAULT_INDEX = 'zanix-logs'
 const NDJSON_CONTENT_HEADER = { 'Content-Type': 'application/x-ndjson' }
-
-/** Env var name for the Elasticsearch cluster URL — exported so other packages (e.g. a general
- * config bootstrap) can read/gate on it without redefining the literal string. */
-export const ELASTICSEARCH_URL_ENV = 'ELASTICSEARCH_URL'
-/** Env var name for the OpenSearch cluster URL — same rationale as {@link ELASTICSEARCH_URL_ENV}. */
-export const OPENSEARCH_URL_ENV = 'OPENSEARCH_URL'
 
 /** Builds the `Authorization`/`ApiKey` header pair for a given set of Elasticsearch credentials. */
 const authHeaders = (auth?: ElasticsearchAuth): Record<string, string> => {
@@ -29,18 +28,15 @@ const authHeaders = (auth?: ElasticsearchAuth): Record<string, string> => {
 
 /**
  * Resolves the cluster URL: the explicit `node` option always wins; otherwise falls back to
- * `ELASTICSEARCH_URL`, then `OPENSEARCH_URL`, then a local-dev default — the same
- * explicit-option-over-env-var precedence `MONGO_URI`/`REDIS_URI` already follow elsewhere in
- * this package.
+ * `SEARCH_URL`, then a local-dev default — the same explicit-option-over-env-var precedence
+ * `MONGO_URI`/`REDIS_URI` already follow elsewhere in this package.
  *
- * Basic-auth credentials can be embedded directly in any of these (`https://user:pass@host:9200`)
+ * Basic-auth credentials can be embedded directly in either of these (`https://user:pass@host:9200`)
  * — `fetch` honors userinfo in a URL and sends it as a real `Authorization: Basic` header, so no
  * separate username/password env vars are needed for that case; see `resolveAuth` below for the
  * API-key case, which a URL has no syntax for.
  */
-const resolveNode = (node?: string): string =>
-  node || Deno.env.get(ELASTICSEARCH_URL_ENV) ||
-  Deno.env.get(OPENSEARCH_URL_ENV) || DEFAULT_NODE
+const resolveNode = (node?: string): string => node || Deno.env.get(SEARCH_URL_ENV) || DEFAULT_NODE
 
 /**
  * Resolves auth credentials: the explicit `auth` option always wins; otherwise falls back to an
@@ -51,8 +47,8 @@ const resolveAuth = (
   auth?: ElasticsearchAuth,
 ): ElasticsearchAuth | undefined => {
   if (auth) return auth
-  const apiKey = Deno.env.get('ELASTICSEARCH_API_KEY') ||
-    Deno.env.get('OPENSEARCH_API_KEY')
+  const apiKey = Deno.env.get(ELASTICSEARCH_API_KEY_ENV) ||
+    Deno.env.get(OPENSEARCH_API_KEY_ENV)
   return apiKey ? { apiKey } : undefined
 }
 
@@ -301,22 +297,37 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
   }
 }
 
+/**
+ * Resolves the `'search'` core connector — the same shared instance any other
+ * `this.connectors.get('search')`/`this.getProviderConnector('search')` call in the process
+ * resolves, reused rather than duplicated. Optionally wires `indexInitialized` (see
+ * {@link ZanixElasticsearchConnector.indexInitialized}) to lazily `ensureIndex()` before first
+ * use, driven by `connectorOptions.index`.
+ *
+ * @throws If nothing is registered under `'search'` in this process — no silent fallback
+ *   construction; see this function's own inline doc for why a fallback would be actively
+ *   dangerous here (masking a real "the app forgot to import `@zanix/datamaster/core`"
+ *   misconfiguration as a working-but-pointed-nowhere-real connector).
+ */
 export const getConnector = (
   { indexInitialize, ...connectorOptions }: ElasticsearchConnectorOptions & {
     indexInitialize?: boolean
   },
 ) => {
-  const connector = (() => {
-    try {
-      return ProgramModule.getConnectors(undefined, false).get<
-        ZanixElasticsearchConnector
-      >(
-        'search',
-      )
-    } catch {
-      return new ZanixElasticsearchConnector(connectorOptions)
-    }
-  })()
+  // No fallback construction when nothing is registered under `'search'` — let
+  // `ProgramModule.getConnectors().get('search')`'s own real error propagate (`@zanix/server`
+  // already produces a clear "did you forget to import @zanix/datamaster/core?" message; see
+  // `missingCoreSlotError`, `server/src/modules/program/public.ts`). Silently constructing a
+  // standalone `ZanixElasticsearchConnector` here — potentially against nothing but a bare,
+  // possibly-unset env var (`SEARCH_URL`, defaulting all the way to `http://localhost:9200`) —
+  // would mean a deployment that genuinely enabled `logger.elastic` but forgot to import
+  // `@zanix/datamaster/core` starts silently writing logs into a black hole, instead of failing
+  // loud at the one point where the real cause is still visible.
+  // `'search'` is a real, unconditionally-registered core slot (see `observability/core.ts`) —
+  // this only throws when no connector was ever actually configured/registered for it.
+  const connector = ProgramModule.getConnectors(undefined, false).get<
+    ZanixElasticsearchConnector
+  >('search')
 
   if (indexInitialize) {
     connector.indexInitialized = (index) => connector.ensureIndex(index, connectorOptions.index)

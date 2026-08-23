@@ -1,7 +1,7 @@
 /**
  * A REAL, disk-backed `ObjectStorage` — the dev/test/fallback counterpart to
- * `SeaweedFSObjectStorage`. **Not the intended production object store** — a real deployment's
- * bytes belong in a real object store (`SeaweedFSObjectStorage`); this exists for local
+ * `S3ObjectStorage`. **Not the intended production object store** — a real deployment's
+ * bytes belong in a real object store (`S3ObjectStorage`); this exists for local
  * development with zero external infra, and as the local half of `createFallbackObjectStorage`'s
  * own S3-with-local-fallback composition (`fallback-object-storage.ts`).
  *
@@ -19,11 +19,15 @@
 
 import type { ObjectStorage, StoredObject } from './typings/general.ts'
 
-import { dirname, join } from '@std/path'
+import { dirname } from '@std/path'
+import { confinePath } from '@zanix/helpers'
 import { checksumOf, readAllBytes } from './bytes.ts'
 
+// `key` is caller-supplied (ultimately, in `@zanix/space`'s Asset API, an HTTP route param) —
+// `confinePath` rejects one that would resolve outside `rootDir` (`../` traversal, or an absolute
+// `key` overriding `rootDir` outright) instead of letting `put`/`get`/`delete` touch disk there.
 function bytesPath(rootDir: string, key: string): string {
-  return join(rootDir, key)
+  return confinePath(rootDir, key)
 }
 
 /** A sidecar file next to the real bytes — `StoredObject`'s own properties (`contentType`/
@@ -31,7 +35,7 @@ function bytesPath(rootDir: string, key: string): string {
  * object metadata/headers instead; a plain filesystem has no such concept, so this is this
  * adapter's own, local-only way of not losing it). */
 function metaPath(rootDir: string, key: string): string {
-  return join(rootDir, `${key}.meta.json`)
+  return confinePath(rootDir, `${key}.meta.json`)
 }
 
 /**

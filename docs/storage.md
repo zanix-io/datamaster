@@ -1,41 +1,42 @@
 # Storage
 
-`SeaweedFSObjectStorage` and `MongoFileRepository` — a generic byte store and a generic file record
+`S3ObjectStorage` and `MongoFileRepository` — a generic byte store and a generic file record
 registry. Both are deliberately agnostic of what's being stored or by whom: neither has any notion
 of a specific domain, file kind, or processing state. Bytes and metadata are two independent
-concerns, backed by two independent modules: `./storage` (`SeaweedFSObjectStorage`) never touches
-file metadata, and `./files` (`MongoFileRepository`) never touches object content.
+concerns, backed by two independent modules: `./storage` (`S3ObjectStorage`) never touches file
+metadata, and `./files` (`MongoFileRepository`) never touches object content.
 
 ## Architecture
 
 ```
-./storage  -> SeaweedFSObjectStorage, a byte store keyed by an opaque string, backed by a real
-              @aws-sdk/client-s3 S3Client pointed at a SeaweedFS S3 gateway.
+./storage  -> S3ObjectStorage, a byte store keyed by an opaque string, backed by a real
+              @aws-sdk/client-s3 S3Client pointed at any S3-compatible gateway.
 ./files    -> MongoFileRepository, a generic file record registry backed by ZanixMongoConnector.
 ```
 
-Neither module assumes the other is in use — an application can use `SeaweedFSObjectStorage` alone
-for raw byte storage, `MongoFileRepository` alone for tracking file records against some other
-backend, or both together for a full store-and-track setup.
+Neither module assumes the other is in use — an application can use `S3ObjectStorage` alone for raw
+byte storage, `MongoFileRepository` alone for tracking file records against some other backend, or
+both together for a full store-and-track setup.
 
-## `SeaweedFSObjectStorage`
+## `S3ObjectStorage`
 
-Wraps a real `@aws-sdk/client-s3` `S3Client` (`forcePathStyle: true` — SeaweedFS doesn't support
-virtual-hosted-style addressing) against a [SeaweedFS](https://github.com/seaweedfs/seaweedfs) S3
-gateway. Registers the `'s3'` core connector slot (the same `registerCoreConnectorSlot` mechanism
-`'database'`/`'search'` already use). `'s3'` isn't one of the framework's six hardcoded slots, so
-there's no dedicated `this.s3` getter — resolve it via `this.connectors.get('s3')`/
-`this.getProviderConnector('s3')` inside a `ZanixProvider`, or
-`ProgramModule.getConnectors(undefined, false).get('s3')` anywhere else.
+Wraps a real `@aws-sdk/client-s3` `S3Client` (`forcePathStyle: true` — many self-hosted
+S3-compatible gateways, e.g. [SeaweedFS](https://github.com/seaweedfs/seaweedfs), don't support
+virtual-hosted-style addressing) against any S3-compatible gateway. Registers the `'s3'` core
+connector slot (the same `registerCoreConnectorSlot` mechanism `'database'`/`'search'` already use).
+`'s3'` isn't one of the framework's six hardcoded slots, so there's no dedicated `this.s3` getter —
+resolve it via `this.connectors.get('s3')`/ `this.getProviderConnector('s3')` inside a
+`ZanixProvider`, or `ProgramModule.getConnectors(undefined, false).get('s3')` anywhere else.
 
 ```ts
-import { SeaweedFSObjectStorage } from 'jsr:@zanix/datamaster@[version]/storage'
+import { S3ObjectStorage } from 'jsr:@zanix/datamaster@[version]/storage'
 
-const storage = new SeaweedFSObjectStorage({
-  endpoint: 'http://localhost:8333', // falls back to SEAWEEDFS_S3_ENDPOINT
-  accessKeyId: 'access-key', // falls back to SEAWEEDFS_ACCESS_KEY
-  secretAccessKey: 'secret-key', // falls back to SEAWEEDFS_SECRET_KEY
-  bucket: 'zanix-objects', // falls back to SEAWEEDFS_BUCKET
+const storage = new S3ObjectStorage({
+  endpoint: 'http://localhost:8333', // falls back to S3_ENDPOINT
+  accessKeyId: 'access-key', // falls back to S3_ACCESS_KEY
+  secretAccessKey: 'secret-key', // falls back to S3_SECRET_KEY
+  bucket: 'zanix-objects', // falls back to S3_BUCKET
+  region: 'us-east-1', // falls back to S3_REGION, then a harmless dummy region — see below
 })
 
 const stored = await storage.put('some/opaque/key', bytes, { contentType: 'application/pdf' })
@@ -43,37 +44,44 @@ const found = await storage.get('some/opaque/key') // undefined if it doesn't ex
 await storage.delete('some/opaque/key') // a no-op if it doesn't exist
 ```
 
-Or auto-register the default connector by importing `./core` and setting `SEAWEEDFS_S3_ENDPOINT` —
-same convention as `ZanixElasticsearchConnector`'s own `./core` loader.
+Or auto-register the default connector by importing `./core` and setting `S3_ENDPOINT` — same
+convention as `ZanixElasticsearchConnector`'s own `./core` loader.
 
 A missing object (`NoSuchKey`/`NotFound`) resolves to `undefined`/`false`. Every other failure
 (connectivity, auth, a misconfigured bucket) propagates unmapped, consistent with this package's
 existing connectors.
+
+**`region` matters for real AWS S3 specifically.** `S3ObjectStorage` is a genuinely generic
+`@aws-sdk/client-s3` client — most self-hosted S3-compatible gateways (SeaweedFS included) never
+validate the region a request is signed for, so omitting `region` (falling back to a harmless dummy)
+works fine against them. A real AWS S3 bucket outside `us-east-1` is different: SigV4 signs requests
+using this value, so signature validation genuinely fails without the real region set explicitly
+(`options.region`/`S3_REGION`).
 
 ### Encrypting object content at rest
 
 Off by default. Enable it with the `encrypt` option:
 
 ```ts
-new SeaweedFSObjectStorage({ encrypt: { type: 'symmetric' } }) // AES-GCM, DATA_AES_KEY
-new SeaweedFSObjectStorage({ encrypt: { type: 'asymmetric' } }) // RSA-wrapped per-object AES key
+new S3ObjectStorage({ encrypt: { type: 'symmetric' } }) // AES-GCM, DATA_AES_KEY
+new S3ObjectStorage({ encrypt: { type: 'asymmetric' } }) // RSA-wrapped per-object AES key
 ```
 
-Or via `SEAWEEDFS_ENCRYPT=symmetric`/`SEAWEEDFS_ENCRYPT=asymmetric` (plus optionally
-`SEAWEEDFS_ENCRYPT_VERSION`) when no `encrypt` option is passed — the only way to enable it on the
-connector instance the standard `@Connector`/DI boot path constructs, since that path never receives
-custom constructor arguments. An explicit `encrypt` option always wins over both env vars.
+Or via `S3_ENCRYPT=symmetric`/`S3_ENCRYPT=asymmetric` (plus optionally `S3_ENCRYPT_VERSION`) when no
+`encrypt` option is passed — the only way to enable it on the connector instance the standard
+`@Connector`/DI boot path constructs, since that path never receives custom constructor arguments.
+An explicit `encrypt` option always wins over both env vars.
 
 Passing the literal `encrypt: false` is different from omitting the option: it explicitly forces
-encryption OFF for that one instance, even when `SEAWEEDFS_ENCRYPT` enables it process-wide.
-Omitting `encrypt` entirely means "no opinion" — the env var applies. This matters for any instance
-that genuinely needs an unencrypted view alongside an encrypted one (a migration tool reading raw
-bytes to re-encrypt them under a new key; a diagnostic connector) — without it, a second instance
+encryption OFF for that one instance, even when `S3_ENCRYPT` enables it process-wide. Omitting
+`encrypt` entirely means "no opinion" — the env var applies. This matters for any instance that
+genuinely needs an unencrypted view alongside an encrypted one (a migration tool reading raw bytes
+to re-encrypt them under a new key; a diagnostic connector) — without it, a second instance
 constructed with no `encrypt` key would silently inherit the env var too.
 
 Reuses the exact same `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY` environment variables this
-package's own [Data Protection](./DATA-PROTECTION.md) strategies already use — see
-[Configuration](./CONFIGURATION.md#data-protection-variables) for their exact semantics
+package's own [Data Protection](./data-protection.md) strategies already use — see
+[Configuration](./configuration.md#data-protection-variables) for their exact semantics
 (`DATA_RSA_PUB`/`DATA_RSA_KEY` are base64-encoded PEM, `DATA_AES_KEY` is used as-is). No separate
 storage-specific key variables exist.
 
@@ -93,11 +101,11 @@ incident, not a degraded write.
 #### Key rotation
 
 `encrypt.version` selects a versioned key for new writes — the exact same `_V1`/`_V2`/... convention
-[Configuration](./CONFIGURATION.md#versioned-keys) already documents for field-level protection,
+[Configuration](./configuration.md#versioned-keys) already documents for field-level protection,
 reusing the same env vars (`DATA_AES_KEY_V1`, `DATA_RSA_PUB_V1`/`DATA_RSA_KEY_V1`, ...):
 
 ```ts
-new SeaweedFSObjectStorage({ encrypt: { type: 'symmetric', version: 'v1' } })
+new S3ObjectStorage({ encrypt: { type: 'symmetric', version: 'v1' } })
 ```
 
 Rotating `version` only changes what NEW objects are encrypted under. Each object's own version is
@@ -124,13 +132,13 @@ Rotating `encrypt.version` only changes what NEW writes use — it never retroac
 objects already in the bucket. `checkEncryptionRotationStatus()`/`rotateEncryptionKeys()`
 (`storage/rotation.ts`) are the explicit migration step, mirroring
 `checkProtectionRotationStatus()`/`seedRotateProtectionKeys()`'s own role for field-level protection
-([Configuration](./CONFIGURATION.md#versioned-keys)): one reports status, the other migrates.
+([Configuration](./configuration.md#versioned-keys)): one reports status, the other migrates.
 
 ```ts
 import { checkEncryptionRotationStatus, rotateEncryptionKeys } from '@zanix/datamaster/storage'
 
 // 1. Rotate: reconfigure the connector to encrypt new writes under the new version (e.g. `v2`).
-const storage = new SeaweedFSObjectStorage({ encrypt: { type: 'symmetric', version: 'v2' } })
+const storage = new S3ObjectStorage({ encrypt: { type: 'symmetric', version: 'v2' } })
 
 // 2. Migrate existing objects still on an older version (or never encrypted at all) to v2.
 const result = await rotateEncryptionKeys(storage)
@@ -141,10 +149,10 @@ const status = await checkEncryptionRotationStatus(storage)
 // { activeVersion, totalObjects, onActiveVersion, versionsStillInUse, unencrypted, safeToRetireOldKeys }
 ```
 
-Both enumerate the bucket via `SeaweedFSObjectStorage.listPage()`/`getMetadata()` —
-SeaweedFS-specific methods deliberately kept off the generic `ObjectStorage` port (see
-[Architecture](#architecture)), so this migration is entirely self-contained and never depends on
-`MongoFileRepository` or any other metadata registry.
+Both enumerate the bucket via `S3ObjectStorage.listPage()`/`getMetadata()` — S3-specific methods
+deliberately kept off the generic `ObjectStorage` port (see [Architecture](#architecture)), so this
+migration is entirely self-contained and never depends on `MongoFileRepository` or any other
+metadata registry.
 
 `rotateEncryptionKeys()` is safe to run repeatedly: an object already on the active version is
 skipped cheaply (a metadata check, no decrypt/re-encrypt round trip), so re-running after fixing a
@@ -173,7 +181,7 @@ await rotateEncryptionKeys(storage, { useWorker: 'persisted' })
 
 ### Local fallback and migration
 
-Three generic `ObjectStorage` combinators — none of them SeaweedFS-specific, and none of them assume
+Three generic `ObjectStorage` combinators — none of them S3-specific, and none of them assume
 anything about what's being stored:
 
 - **`createLocalFilesystemObjectStorage(rootDir)`** — a real, disk-backed `ObjectStorage`. Not the
@@ -182,9 +190,9 @@ anything about what's being stored:
 - **`createFallbackObjectStorage(primary, fallback, ensureSynced?)`** — wraps two `ObjectStorage`s:
   `put()` always writes to `primary` only; `get()`/`exists()` try `primary` first, falling back to
   `fallback` on a miss; `delete()` removes from both. Exists for one real scenario: `primary`
-  (typically `SeaweedFSObjectStorage`) becomes unreachable for a while, objects get written to
-  `fallback` in the meantime, then `primary` comes back — reads for those objects must never come
-  back empty just because the active backend changed.
+  (typically `S3ObjectStorage`) becomes unreachable for a while, objects get written to `fallback`
+  in the meantime, then `primary` comes back — reads for those objects must never come back empty
+  just because the active backend changed.
 - **`ensureLocalObjectsSynced(local, primary, rootDir)`** — a one-time, lazy, memoized copy of every
   object found only in `local` into `primary`, the same "sync on first real use, once per process"
   pattern `@zanix/notifications`' own `LocalTemplateBackend` establishes. Existence-based, not
@@ -197,10 +205,10 @@ import {
   createFallbackObjectStorage,
   createLocalFilesystemObjectStorage,
   ensureLocalObjectsSynced,
-  SeaweedFSObjectStorage,
+  S3ObjectStorage,
 } from 'jsr:@zanix/datamaster@[version]/storage'
 
-const primary = new SeaweedFSObjectStorage()
+const primary = new S3ObjectStorage()
 const local = createLocalFilesystemObjectStorage('./local-objects')
 const storage = createFallbackObjectStorage(
   primary,
@@ -214,7 +222,7 @@ automatically when constructing its `AssetService` — see that package's own do
 
 ### Testing against a real local SeaweedFS
 
-`src/@tests/functional/storage/seaweedfs-object-storage.test.ts` exercises the full `put`/`get`/
+`src/@tests/functional/storage/s3-object-storage.test.ts` exercises the full `put`/`get`/
 `exists`/`delete` lifecycle against a real instance. Skipped by default; enable it exactly like the
 Elasticsearch/OpenSearch functional suite:
 
@@ -226,10 +234,10 @@ Elasticsearch/OpenSearch functional suite:
      chrislusf/seaweedfs server -s3
    ```
 
-2. Copy `src/@tests/.env.test.example` to `src/@tests/.env.test` and set `RUN_SEAWEEDFS_TESTS=true`.
+2. Copy `src/@tests/.env.test.example` to `src/@tests/.env.test` and set `RUN_S3_TESTS=true`.
 3. Run: `deno test --allow-all src/@tests/functional/storage/`
 
-`RUN_SEAWEEDFS_TESTS` gates _whether the test runs at all_ — it does not check whether SeaweedFS is
+`RUN_S3_TESTS` gates _whether the test runs at all_ — it does not check whether SeaweedFS is
 actually reachable. If the flag is set but no SeaweedFS is listening, the test runs for real and
 fails with a real connectivity error, exactly as it should: enabling integration tests is a
 commitment to having the integration available, not a soft hint.
@@ -238,7 +246,7 @@ commitment to having the integration available, not a soft hint.
 
 A generic, durable file record registry, backed by `ZanixMongoConnector`. Follows the same
 `@Provider`/`ZanixProvider` shape as `TriggersAdminRepository`/`DLQProvider` (see
-[Database](./DATABASE.md)).
+[Database](./database.md)).
 
 ```ts
 import { registerFileModel } from 'jsr:@zanix/datamaster@[version]/files'
@@ -261,21 +269,21 @@ business-key field — `create()`/`findById()`/`update()`/`delete()` all key dir
 The prose above describes every shape inline; this table just names the exported symbols behind it,
 for anyone browsing `./storage`'s exports directly:
 
-| Symbol                                                                                                                                                                | What it is                                                                                                                                                                         |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ObjectStorage`                                                                                                                                                       | The generic port `SeaweedFSObjectStorage` implements — `put`/`get`/`delete`/`exists`.                                                                                              |
-| `StoredObject`                                                                                                                                                        | An object's own properties as returned by `put()`/`get()`: `{ key, contentType, size, checksum }`.                                                                                 |
-| `SeaweedFSConnectorOptions`                                                                                                                                           | Constructor options: `endpoint`, `accessKeyId`, `secretAccessKey`, `bucket`, `encrypt` — see [above](#seaweedfsobjectstorage).                                                     |
-| `StorageEncryptSettings`                                                                                                                                              | `EncryptSettings` plus an optional `version` — this module's own key-rotation extension.                                                                                           |
-| `EncryptSettings`, `DataPolicyVersion`                                                                                                                                | Shared data-protection types this module reuses unchanged — see [Data Protection](./DATA-PROTECTION.md).                                                                           |
-| `EncryptionRotationOptions`, `EncryptionRotationStatus`, `EncryptionRotationStatusOptions`, `RotationResult`                                                          | Parameter/return types behind `checkEncryptionRotationStatus()`/`rotateEncryptionKeys()` — shapes shown inline [above](#migrating-already-stored-objects-to-a-new-key-version).    |
-| `SEAWEEDFS_S3_ENDPOINT_ENV`, `SEAWEEDFS_ACCESS_KEY_ENV`, `SEAWEEDFS_SECRET_KEY_ENV`, `SEAWEEDFS_BUCKET_ENV`, `SEAWEEDFS_ENCRYPT_ENV`, `SEAWEEDFS_ENCRYPT_VERSION_ENV` | Typed string constants for the env var names documented in [Configuration](./CONFIGURATION.md) — e.g. `Deno.env.get(SEAWEEDFS_S3_ENDPOINT_ENV)` instead of hardcoding the literal. |
+| Symbol                                                                                                                                    | What it is                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ObjectStorage`                                                                                                                           | The generic port `S3ObjectStorage` implements — `put`/`get`/`delete`/`exists`.                                                                                                  |
+| `StoredObject`                                                                                                                            | An object's own properties as returned by `put()`/`get()`: `{ key, contentType, size, checksum }`.                                                                              |
+| `S3ConnectorOptions`                                                                                                                      | Constructor options: `endpoint`, `accessKeyId`, `secretAccessKey`, `bucket`, `encrypt` — see [above](#s3objectstorage).                                                         |
+| `StorageEncryptSettings`                                                                                                                  | `EncryptSettings` plus an optional `version` — this module's own key-rotation extension.                                                                                        |
+| `EncryptSettings`, `DataPolicyVersion`                                                                                                    | Shared data-protection types this module reuses unchanged — see [Data Protection](./data-protection.md).                                                                        |
+| `EncryptionRotationOptions`, `EncryptionRotationStatus`, `EncryptionRotationStatusOptions`, `RotationResult`                              | Parameter/return types behind `checkEncryptionRotationStatus()`/`rotateEncryptionKeys()` — shapes shown inline [above](#migrating-already-stored-objects-to-a-new-key-version). |
+| `S3_ENDPOINT_ENV`, `S3_ACCESS_KEY_ENV`, `S3_SECRET_KEY_ENV`, `S3_BUCKET_ENV`, `S3_REGION_ENV`, `S3_ENCRYPT_ENV`, `S3_ENCRYPT_VERSION_ENV` | Typed string constants for the env var names documented in [Configuration](./configuration.md) — e.g. `Deno.env.get(S3_ENDPOINT_ENV)` instead of hardcoding the literal.        |
 
 ## See also
 
-- [Configuration](./CONFIGURATION.md) — every environment variable this package reads, including
-  `SEAWEEDFS_*` and the reused `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY`.
-- [Data Protection](./DATA-PROTECTION.md) — the encryption strategy `SeaweedFSObjectStorage`'s
-  `encrypt` option reuses.
-- [Database](./DATABASE.md) — `ZanixMongoConnector`/`registerModel`, the pattern
+- [Configuration](./configuration.md) — every environment variable this package reads, including
+  `S3_*` and the reused `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY`.
+- [Data Protection](./data-protection.md) — the encryption strategy `S3ObjectStorage`'s `encrypt`
+  option reuses.
+- [Database](./database.md) — `ZanixMongoConnector`/`registerModel`, the pattern
   `MongoFileRepository` follows.

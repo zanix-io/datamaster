@@ -3,8 +3,8 @@
 Utilities for walking and transforming a document's tree, and for inspecting a schema's shape. Most
 consumers never call these directly — a schema's own `toJSON`/`toObject` transform already invokes
 `transformByDataAccess`/`transformByDataProtection` automatically wherever
-[`dataAccessGetter`](./DATA-PROTECTION.md#access-strategies-dataaccessgetter)/
-[`dataProtectionGetter`](./DATA-PROTECTION.md#protection-strategies-dataprotectiongetter) are used.
+[`dataAccessGetter`](./data-protection.md#access-strategies-dataaccessgetter)/
+[`dataProtectionGetter`](./data-protection.md#protection-strategies-dataprotectiongetter) are used.
 Reach for the utilities below directly only for custom serialization paths outside the normal
 document lifecycle (e.g. a script rewriting raw JSON).
 
@@ -53,7 +53,7 @@ These are the schema-getter-facing wrappers that `toJSON()`/`toObject()` already
 driven by `Model._getDataAccessPaths()`/`_getDataProtectionPaths()` (populated from which fields use
 `dataAccessGetter`/`dataProtectionGetter`). `transformByDataProtection` accepts
 `{ excludeHashedFields?: boolean }` — used internally by
-[`seedRotateProtectionKeys`](./DATA-PROTECTION.md#key-rotation), which calls it directly on a raw
+[`seedRotateProtectionKeys`](./data-protection.md#key-rotation), which calls it directly on a raw
 document since key rotation happens outside the normal serialization path.
 
 ## Schema inspection
@@ -74,6 +74,6 @@ top of a schema — e.g. deciding which paths need special handling before defin
 
 ## See also
 
-- [Data Protection](./DATA-PROTECTION.md) — the getters that drive
+- [Data Protection](./data-protection.md) — the getters that drive
   `transformByDataAccess`/`transformByDataProtection`.
-- [Database](./DATABASE.md) — where these fit into a model's lifecycle.
+- [Database](./database.md) — where these fit into a model's lifecycle.

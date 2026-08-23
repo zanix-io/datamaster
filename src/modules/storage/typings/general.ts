@@ -26,7 +26,7 @@ export interface StoredObject {
 
 /**
  * A generic byte store, keyed by an opaque string — put/get/delete/exists over arbitrary content,
- * with no knowledge of what the bytes represent. `SeaweedFSObjectStorage` (`connector.ts`) is this
+ * with no knowledge of what the bytes represent. `S3ObjectStorage` (`connector.ts`) is this
  * package's own implementation; nothing else in this package (or in `@zanix/datamaster` generally)
  * assumes a specific consumer, domain, or file kind.
  */
@@ -48,19 +48,27 @@ export interface ObjectStorage {
 }
 
 /**
- * Connection options for {@link SeaweedFSObjectStorage}. Every field falls back to an environment
+ * Connection options for {@link S3ObjectStorage}. Every field falls back to an environment
  * variable when omitted — see `connector.ts`'s `resolveEndpoint`/`resolveCredentials`/
- * `resolveBucket` for the exact precedence (explicit option always wins).
+ * `resolveBucket`/`resolveRegion` for the exact precedence (explicit option always wins).
  */
-export type SeaweedFSConnectorOptions = ConnectorOptions & {
-  /** S3 gateway endpoint, e.g. `http://localhost:8333`. Falls back to `SEAWEEDFS_S3_ENDPOINT`. */
+export type S3ConnectorOptions = ConnectorOptions & {
+  /** S3 gateway endpoint, e.g. `http://localhost:8333`. Falls back to `S3_ENDPOINT`. */
   endpoint?: string
-  /** SigV4 access key. Falls back to `SEAWEEDFS_ACCESS_KEY`. */
+  /** SigV4 access key. Falls back to `S3_ACCESS_KEY`. */
   accessKeyId?: string
-  /** SigV4 secret key. Falls back to `SEAWEEDFS_SECRET_KEY`. */
+  /** SigV4 secret key. Falls back to `S3_SECRET_KEY`. */
   secretAccessKey?: string
-  /** Bucket every object is stored under. Falls back to `SEAWEEDFS_BUCKET`. */
+  /** Bucket every object is stored under. Falls back to `S3_BUCKET`. */
   bucket?: string
+  /**
+   * AWS region every request is SigV4-signed for. Falls back to `S3_REGION`, then a harmless
+   * dummy region most self-hosted S3-compatible gateways don't validate anyway. **Required for a
+   * real, non-`us-east-1` AWS S3 bucket specifically** — without it, signature validation fails
+   * against real AWS S3 (see `connector.ts`'s own `DUMMY_REGION` doc for the full reasoning; this
+   * option is what makes that gap fixable rather than a hard limitation).
+   */
+  region?: string
   /**
    * Encrypts object bytes at rest before they leave the process — off by default. `'symmetric'`
    * encrypts the bytes directly with `DATA_AES_KEY`; `'asymmetric'` wraps a random per-object AES
@@ -70,7 +78,7 @@ export type SeaweedFSConnectorOptions = ConnectorOptions & {
    * fail-open `encrypt`/`decrypt` wrappers. `version` supports key rotation — see
    * {@link StorageEncryptSettings}'s own doc.
    *
-   * Omitted (`undefined`) falls back to `SEAWEEDFS_ENCRYPT`/`SEAWEEDFS_ENCRYPT_VERSION` — the only
+   * Omitted (`undefined`) falls back to `S3_ENCRYPT`/`S3_ENCRYPT_VERSION` — the only
    * way to enable encryption on the connector instance the standard `@Connector`/DI boot path
    * constructs, since that path never receives custom constructor arguments. Passing the literal
    * `false` is different from omitting this option: it explicitly forces encryption OFF for this

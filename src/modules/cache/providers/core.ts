@@ -10,18 +10,23 @@
 import { ZanixCacheCoreProvider } from './mod.ts'
 import { Provider, registerCoreProviderSlot, ZanixCacheProvider } from '@zanix/server'
 
-// Connectors DSL load
-import './qlru/core.ts'
-import './redis/core.ts'
+// Connectors DSL load — `export *` (not a plain side-effect `import`) so each one's own
+// `registerQLRUConnector`/`registerRedisConnector`/`registerMemcachedConnector` propagates up
+// through this module's own `export *` re-export in the top-level `core.ts` barrel, reachable via
+// `@zanix/datamaster/core`.
+export * from './qlru/core.ts'
+export * from './redis/core.ts'
+export * from './memcached/core.ts'
 
 /**
  * Provider DSL definition — applies the decorator directly to `ZanixCacheCoreProvider` (calling it
  * as a plain function, not `@Provider(...)` syntax) rather than wrapping it in a throwaway
  * anonymous subclass, so `this.providers.get(ZanixCacheCoreProvider)` — the class every consumer
  * actually imports — resolves correctly. See `@zanix/auth`'s `providers/core.ts` for the full
- * rationale.
+ * rationale. Exported (not just auto-run below) for the same reason every connector DSL definition
+ * in this package now is — see `storage/core.ts`'s own `registerS3Connector` doc.
  */
-const registerProvider = () => {
+export const registerCacheProvider = (): void => {
   Provider('cache')(ZanixCacheCoreProvider)
 }
 
@@ -46,6 +51,6 @@ registerCoreProviderSlot('cache', ZanixCacheProvider, {
  *
  * @module
  */
-const zanixCacheProviderCore: void = registerProvider()
+const zanixCacheProviderCore: void = registerCacheProvider()
 
 export default zanixCacheProviderCore

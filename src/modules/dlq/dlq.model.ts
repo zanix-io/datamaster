@@ -19,6 +19,16 @@ export const DLQ_DEFAULT_LEASE_MS_ENV = 'DLQ_DEFAULT_LEASE_MS'
 
 /** Default DLQ collection name when `DLQ_MODEL_NAME` isn't set. */
 export const DEFAULT_DLQ_MODEL = 'zanix-dlq'
+
+/**
+ * Whether the DLQ resource is configured in this deployment — `true` once `DLQ_MODEL_NAME` is set,
+ * the deployment's own opt-in signal (this model has no auto-registration to check instead — see
+ * {@link registerDLQModel}'s own doc). Doesn't guarantee `registerDLQModel()` was actually called:
+ * env var presence alone can't know that, and this package exposes no stronger "was it registered"
+ * query yet — a known, documented gap (`@zanix/admin`'s own `metadata.ts` mirrors this exact
+ * signal for its `/admin/dlq` REST gating, inheriting the same limitation rather than a new one).
+ */
+export const isDlqResourceEnabled = (): boolean => !!Deno.env.get(DLQ_MODEL_ENV)
 /** Default `claim()` lease duration (ms) when neither a per-call option nor
  * `DLQ_DEFAULT_LEASE_MS` is set. */
 const DEFAULT_LEASE_MS = 30_000
@@ -75,7 +85,7 @@ export type RegisterDLQModelOptions = {
    * Encrypts the persisted payload using the existing `encrypt` data-protection strategy — `true`
    * is shorthand for `{ type: 'symmetric' }`. Off by default: a DLQ payload is, by nature, "whatever
    * failed," which often carries internal/PII data, but forcing encryption/key-management on every
-   * consumer isn't appropriate either — see `docs/DLQ.md`'s "Protecting the payload" section.
+   * consumer isn't appropriate either — see `docs/dlq.md`'s "Protecting the payload" section.
    *
    * `DLQ_ENCRYPT_PAYLOAD` (`'true'`/`'false'`), when set, always overrides this option — lets an
    * environment force the behavior without touching code.

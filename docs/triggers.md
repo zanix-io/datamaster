@@ -76,13 +76,13 @@ coexist freely, even within the same field — see
 resolution rules.
 
 `Triggers` is `{ pre?, post? } × { created?, updated?, deleted? } → Array<Partial<TriggerActions>>`
-— each event can list several actions, and an action can mix `mail`, `request`, and `custom` on the
-same entry (all present ones fire).
+— each event can list several actions, and an action can mix `mail`, `request`, `log`, and `custom`
+on the same entry (all present ones fire).
 
 **`conditions`/`priority`/`delay`/`data` are independent per action type, never shared** — even when
-`mail`, `request`, and `custom` are grouped on the same entry, each reads its own copy of these
-fields, not a sibling's. A `custom` action with `conditions` next to a `mail` action with none means
-`custom` is conditional and `mail` fires unconditionally, every time:
+`mail`, `request`, `log`, and `custom` are grouped on the same entry, each reads its own copy of
+these fields, not a sibling's. A `custom` action with `conditions` next to a `mail` action with none
+means `custom` is conditional and `mail` fires unconditionally, every time:
 
 ```ts
 const created = [{
@@ -100,20 +100,21 @@ to dispatch either way; it's purely a matter of how you want to read the config.
 
 ## Trigger actions (`TriggerActions`)
 
-| Action    | Fields                                                    | How it's dispatched                                                                      |
-| --------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `mail`    | `to`, `subject`, plus whatever the registered job expects | `DEFAULT_TRIGGER_JOBS.mail`, or a `registerTriggerActionJob('mail', ...)` override       |
-| `request` | `url`, `method`, `headers`, `body?`                       | `DEFAULT_TRIGGER_JOBS.request`, or a `registerTriggerActionJob('request', ...)` override |
-| `custom`  | `name`                                                    | The job named `name` — one you (or `@zanix/asyncmq`) already registered yourself         |
+| Action    | Fields                                                    | How it's dispatched                                                                                                       |
+| --------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `mail`    | `to`, `subject`, plus whatever the registered job expects | `DEFAULT_TRIGGER_JOBS.mail`, or a `registerTriggerActionJob('mail', ...)` override                                        |
+| `request` | `url`, `method`, `headers`, `body?`                       | `DEFAULT_TRIGGER_JOBS.request`, or a `registerTriggerActionJob('request', ...)` override                                  |
+| `log`     | `level`, `message`                                        | `DEFAULT_TRIGGER_JOBS.log` — self-registered by this package itself, or a `registerTriggerActionJob('log', ...)` override |
+| `custom`  | `name`                                                    | The job named `name` — one you (or `@zanix/asyncmq`) already registered yourself                                          |
 
 Datamaster only knows `mail` needs a recipient and a subject — the rest of the payload (e.g. which
 template to render, and its data) is interpreted entirely by whichever job actually handles it. See
 `@zanix/notifications`'s own docs for the concrete contract its default `mail` handler uses.
 
-**Every string field** on `mail`/`request` (`to`, `subject`, `url`, `headers`' values, `body`'s own
-values, ...) supports `{{field}}`/`{{nested.path}}` placeholders, resolved against the record the
-trigger fired for. This is the **only** way a field sees per-record data — nothing is merged in
-automatically beyond what a field's own placeholders resolve to (see
+**Every string field** on `mail`/`request`/`log` (`to`, `subject`, `url`, `headers`' values,
+`body`'s own values, `message`, ...) supports `{{field}}`/`{{nested.path}}` placeholders, resolved
+against the record the trigger fired for. This is the **only** way a field sees per-record data —
+nothing is merged in automatically beyond what a field's own placeholders resolve to (see
 [Dispatched payload](#dispatched-payload)). The same fields also support `${{ENV_VAR}}`
 placeholders, resolved from `Deno.env` — see
 [Environment variable interpolation](#environment-variable-interpolation-env_var) below.
@@ -166,27 +167,64 @@ see [Trigger actions](#trigger-actions-triggeractions) above for the whole-vs-pa
 rule that makes this possible. For every other method (`POST`, `PUT`, `PATCH`), `body` is sent as a
 real fetch body, JSON-serialized by the consumer-side job.
 
-All three also accept the common fields from `TriggerActionCommons`: `priority`
+All four also accept the common fields from `TriggerActionCommons`: `priority`
 (`'high'|'medium'|'low'`, defaults to `'low'`), `delay` (forwarded to the job payload), `data`
 (extra static data merged into the job's payload, not the same as `request.body` — see below), and
 `conditions` (see below).
 
-> ⚠️ **`mail`/`request` need a consumer-side job registered to actually do anything.** Datamaster
-> only **dispatches** — via `ProgramModule.providers.get('worker')` (from `@zanix/server`), to
-> whichever job `registerTriggerActionJob('mail' | 'request', descriptor)` last registered, falling
-> back to `DEFAULT_TRIGGER_JOBS`'s literal names if nothing did. Apps bootstrapped via
-> `@zanix/core`'s `Zanix.start()`/`Zanix.startWorker()` get both wired automatically: `request` is
+> ⚠️ **`mail`/`request` need a consumer-side job registered to actually do anything — `log` is the
+> exception.** Datamaster only **dispatches** — via `ProgramModule.providers.get('worker')` (from
+> `@zanix/server`), to whichever job
+> `registerTriggerActionJob('mail' | 'request' | 'log',
+> descriptor)` last registered, falling back
+> to `DEFAULT_TRIGGER_JOBS`'s literal names if nothing did. Apps bootstrapped via `@zanix/core`'s
+> `Zanix.start()`/`Zanix.startWorker()` get `mail`/ `request` wired automatically: `request` is
 > registered by `@zanix/core` itself (generic `fetch`, no other owner); `mail` is self-registered by
 > `@zanix/notifications`'s own `/core` entrypoint, since it owns `NotifierProvider`'s contract.
-> `@zanix/core` drains every descriptor registered this way and performs the actual `@zanix/asyncmq`
-> `registerJob` call — the one place that happens, so a package registering its own trigger-action
-> job never needs to depend on `@zanix/asyncmq` itself. A `custom` action works end-to-end today as
-> long as you've registered that job name yourself via `@zanix/asyncmq`'s `registerJob` — the same
-> job a `this.worker.runJob(name, ...)` call from an interactor would target.
+> **`log` needs no such owner**: `@zanix/datamaster` registers its own handler for `log` from its
+> own `/core` entrypoint (see
+> [The `log` action](#the-log-action-a-structured-log-entry-via-zanixlogger) below), since
+> `@zanix/logger` is already one of this package's own dependencies rather than another package's
+> capability. `@zanix/core` drains every descriptor registered via `registerTriggerActionJob` and
+> performs the actual `@zanix/asyncmq` `registerJob` call — the one place that happens, so a package
+> registering its own trigger-action job never needs to depend on `@zanix/asyncmq` itself, and this
+> registration only ever happens once per action kind (this container throws on a duplicate), so
+> `datamaster` self-registering `log` and `@zanix/core` draining it afterward is not a
+> double-registration. A `custom` action works end-to-end today as long as you've registered that
+> job name yourself via `@zanix/asyncmq`'s `registerJob` — the same job a
+> `this.worker.runJob(name, ...)` call from an interactor would target.
 >
 > Dispatch itself picks `runJob` (queue-backed) when `AMQP_URI` is configured, or falls back to
 > `runTask` (local, in-process) when it isn't — there's no queue to publish to in that case, the
-> same way [Cache](./CACHE.md) only registers the Redis connector when `REDIS_URI` is set.
+> same way [Cache](./cache.md) only registers the Redis connector when `REDIS_URI` is set.
+
+### The `log` action: a structured log entry via `@zanix/logger`
+
+`log` writes a structured log entry through `@zanix/logger` when the trigger fires — useful for
+auditing or debugging a model's lifecycle without wiring up `mail`/`request`/`custom` for something
+that's purely observational:
+
+```ts
+log: {
+  level: 'info',
+  message: 'User {{email}} was created',
+}
+```
+
+`level` is one of `@zanix/logger`'s own method names
+(`'info' | 'success' | 'error' | 'warn' |
+'debug'`); `message` supports the same
+`{{field}}`/`${{ENV_VAR}}` interpolation as every other action's string fields.
+
+**Unlike `mail`/`request`, `log` needs no consumer-side job registered to work** —
+`@zanix/datamaster` self-registers a real handler for it from its own
+`modules/triggers/
+log-trigger.core.ts`, reachable as soon as `jsr:@zanix/datamaster@[version]/core`
+is imported (the same entrypoint that auto-registers the default Mongo/Redis/SQLite/... connectors).
+This is possible specifically because `@zanix/logger` is already one of this package's own
+dependencies — not a capability owned by `@zanix/notifications`/`@zanix/core`/another package, the
+way sending mail or firing an arbitrary HTTP request is. A `registerTriggerActionJob('log', ...)`
+call still overrides it, same as any other built-in action.
 
 ## Environment variable interpolation (`${{ENV_VAR}}`)
 
@@ -280,7 +318,7 @@ const notGroup = { not: [/* ... */] }
 
 Triggers hook into **both** the document level (`.save()`, for a hydrated instance) and the query
 level (`Model.updateOne`/`findOneAndUpdate`, `Model.deleteOne`/`findOneAndDelete`) — the same
-limitation [Data Protection](./DATA-PROTECTION.md#protecting-a-value-before-writing-it) documents
+limitation [Data Protection](./data-protection.md#protecting-a-value-before-writing-it) documents
 for its `pre('save')` hook doesn't apply here, since these hooks are registered directly against the
 query-level methods too. `pre` actions fire in the corresponding pre-hook, `post` actions in the
 corresponding post-hook, symmetrically across both paths.
@@ -325,7 +363,7 @@ custom: { name: 'slow-report-job', _timeout: 60_000 }
 ```
 
 **Data protection is reversed before dispatch.** If the model has
-[Data Protection](./DATA-PROTECTION.md) configured, every document a trigger sees — the current
+[Data Protection](./data-protection.md) configured, every document a trigger sees — the current
 record, `_oldData`, or the deleted record — has its protected paths already decrypted/unmasked
 (hashed paths are dropped instead, same as a client-facing read), exactly like a normal `toJSON()`
 response would show. A trigger's `{{field}}` interpolation and `conditions` never see raw ciphertext
@@ -440,7 +478,7 @@ to the target service's local API, so both sides validate the identical wire sha
 This package also exports `createTriggersDiscoveryProvider()`, building the `DiscoveryProvider` for
 `/.well-known/zanix/triggers` (backed by `TriggersAdminRepository.list()`) that `@zanix/admin`'s
 `defineAdminMetadata` registers via `@zanix/server`'s `ProgramModule.defineDiscovery` — see
-`@zanix/server`'s `docs/HANDLERS.md` for what a Discovery provider is. As with the
+`@zanix/server`'s `docs/handlers.md` for what a Discovery provider is. As with the
 repository/service above, this package only authors the provider; `@zanix/admin` is what wires it
 into an HTTP surface.
 
@@ -449,10 +487,14 @@ restart — see [Keeping the registry fresh](#keeping-the-registry-fresh-without
 previously-active entry that's now `false` (or was deleted, for a non-default one) stops taking
 effect once that refresh happens, not just for newly-added ones.
 
-**`mail` and `request` work fully from the database alone** — no code changes needed, since both
-dispatch to a well-known, always-registered job name. **`custom` does not**: it only references a
-job name, so unless that name was already registered via `@zanix/asyncmq`'s `registerJob` somewhere
-in your code, adding a `custom` entry purely through this collection has nothing to run.
+**`mail`, `request`, and `log` work fully from the database alone** — no code changes needed, since
+all three dispatch to a well-known job name with a real handler already registered: `mail`/`request`
+by an app bootstrapped via `@zanix/core`, `log` by `@zanix/datamaster` itself (as soon as its own
+`/core` entrypoint is imported — see
+[The `log` action](#the-log-action-a-structured-log-entry-via-zanixlogger) above). **`custom`
+doesn't, today**: it only references a job name, so unless that name was already registered via
+`@zanix/asyncmq`'s `registerJob` somewhere in your code, adding a `custom` entry purely through this
+collection has nothing to run.
 
 > ⚠️ **Auto-seeding only sees models registered before `connect()`** — the standard `registerModel`
 > DSL usage, executed at module-load time. A model bound dynamically via
@@ -466,7 +508,7 @@ in your code, adding a `custom` entry purely through this collection has nothing
 > connector always resets its own in-memory persisted-triggers state first, regardless of its own
 > `triggersModel` setting, so it never inherits whatever was previously loaded into that same
 > bucket. This state is scoped per connector (see
-> [Multiple Mongo connectors](./DATABASE.md#multiple-mongo-connectors)): two genuinely different
+> [Multiple Mongo connectors](./database.md#multiple-mongo-connectors)): two genuinely different
 > connectors never share or wipe each other's persisted triggers. It only matters for the same
 > connector re-instantiated (e.g. a reconnect, or a test suite creating several instances of the
 > same class) — that case always starts from a clean slate, never carrying over what the previous
@@ -514,7 +556,7 @@ can't:
   ```
 
   An explicit option always wins over its env var, the same rule every option/env-var pair in this
-  package follows — see [Configuration](./CONFIGURATION.md#connection-variables).
+  package follows — see [Configuration](./configuration.md#connection-variables).
 
 For a horizontally-scaled deployment (several replicas of the same app), on-write refresh only
 updates the replica that made the write — polling or Change Streams are what propagate the change to
@@ -523,7 +565,7 @@ near-instant sync everywhere; if you aren't, polling is the only cross-replica o
 
 ## See also
 
-- [Database](./DATABASE.md) — `registerModel`'s `extensions`, where triggers attach.
-- [Data Protection](./DATA-PROTECTION.md) — the other schema-level `pre('save')` hook, and its
+- [Database](./database.md) — `registerModel`'s `extensions`, where triggers attach.
+- [Data Protection](./data-protection.md) — the other schema-level `pre('save')` hook, and its
   documented document- vs query-level limitation.
-- [Configuration](./CONFIGURATION.md) — environment variables read elsewhere in the package.
+- [Configuration](./configuration.md) — environment variables read elsewhere in the package.

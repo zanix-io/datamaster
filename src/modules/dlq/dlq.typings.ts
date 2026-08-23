@@ -25,7 +25,7 @@ export type DLQErrorHistoryEntry = DLQErrorInfo & {
 /**
  * Attributes for a persisted DLQ entry — the storage layer for "items that failed in some business
  * process," independent of `@zanix/asyncmq`'s own RabbitMQ-native dead-letter mechanism
- * (`ZanixAsyncMQProvider.requeueDeadLetters`). See `docs/DLQ.md`.
+ * (`ZanixAsyncMQProvider.requeueDeadLetters`). See `docs/dlq.md`.
  */
 export type DLQEntryAttrs = {
   /** The entry's persisted id (Mongo's own `_id`, auto-assigned — never part of the schema
@@ -43,7 +43,7 @@ export type DLQEntryAttrs = {
    * `{'payload.orderId': 'x'}`), unindexed. If `RegisterDLQModelOptions.encryptPayload` is enabled,
    * it's instead stored as a JSON-serialized, encrypted string — the underlying `encrypt`/`decrypt`
    * primitives (`utils/protection.ts`) only operate on `string | string[]`, so an encrypted payload
-   * trades away queryability entirely (see `dlq.model.ts` and `docs/DLQ.md`'s "Protecting the
+   * trades away queryability entirely (see `dlq.model.ts` and `docs/dlq.md`'s "Protecting the
    * payload" section). Either way, `push`/`get`/`list` always expose this as a plain value — the
    * storage-shape difference is transparent to callers.
    */
@@ -90,8 +90,10 @@ export type DLQListOptions = {
   page?: number
   limit?: number
   sort?: Record<string, 1 | -1>
-  /** Raw Mongo filter, merged alongside `processType`/`status`/`origin` — e.g. to query into
-   * `payload`/`metadata` sub-fields. Unindexed; see `DLQProvider.list()`'s own doc. */
+  /** Dot-path equality filter, merged alongside `processType`/`status`/`origin` — e.g. to query
+   * into `payload`/`metadata` sub-fields. Any `$`-prefixed key is stripped before use, and
+   * `processType`/`status`/`origin` always win over a same-named key here. Unindexed; see
+   * `DLQProvider.list()`'s own doc. */
   filter?: Record<string, unknown>
 }
 
@@ -105,7 +107,8 @@ export type DLQClaimOptions = {
   leaseTtlMs?: number
   /** Restrict the claim to a single `processType`. */
   processType?: string
-  /** Additional raw Mongo filter, merged with the claim's own eligibility filter. */
+  /** Additional dot-path equality filter, merged with (never overriding) the claim's own
+   * eligibility filter. Any `$`-prefixed key is stripped before use. */
   filter?: Record<string, unknown>
 }
 

@@ -1,13 +1,13 @@
 import { assert, assertEquals } from '@std/assert'
-import { SeaweedFSObjectStorage } from 'storage/connector.ts'
+import { S3ObjectStorage } from 'storage/connector.ts'
 
 /**
- * Exercises `SeaweedFSObjectStorage` against a REAL local SeaweedFS instance — same
+ * Exercises `S3ObjectStorage` against a REAL local SeaweedFS instance — same
  * enabled-by-env-flag convention every other real-service suite in this package uses
  * (`RUN_OPENSEARCH_TESTS`, see `src/@tests/functional/observability/connector-real.test.ts`).
  *
  * Deliberately gated on the flag ALONE, never on whether the service is actually reachable: if
- * `RUN_SEAWEEDFS_TESTS=true` is set but no SeaweedFS is listening, this test runs for real and
+ * `RUN_S3_TESTS=true` is set but no SeaweedFS is listening, this test runs for real and
  * genuinely fails — it never silently downgrades to skipped. That's what makes `ignore` here mean
  * "integration testing wasn't opted into," not "the environment happened to be unavailable."
  *
@@ -17,22 +17,21 @@ import { SeaweedFSObjectStorage } from 'storage/connector.ts'
  *        -p 8333:8333 \
  *        chrislusf/seaweedfs server -s3
  *
- * 2. Set `RUN_SEAWEEDFS_TESTS=true` (see `.env.test.example`) and, if not using the defaults,
- *    `SEAWEEDFS_S3_ENDPOINT`/`SEAWEEDFS_ACCESS_KEY`/`SEAWEEDFS_SECRET_KEY`/`SEAWEEDFS_BUCKET`.
+ * 2. Set `RUN_S3_TESTS=true` (see `.env.test.example`) and, if not using the defaults,
+ *    `S3_ENDPOINT`/`S3_ACCESS_KEY`/`S3_SECRET_KEY`/`S3_BUCKET`.
  * 3. Run: `deno test --allow-all src/@tests/functional/storage/`
  *
- * See `docs/STORAGE.md#testing-against-a-real-local-seaweedfs` for more.
+ * See `docs/storage.md#testing-against-a-real-local-seaweedfs` for more.
  */
-const shouldRun = Deno.env.get('RUN_SEAWEEDFS_TESTS') === 'true'
+const shouldRun = Deno.env.get('RUN_S3_TESTS') === 'true'
 
 Deno.test({
   sanitizeOps: false,
   sanitizeResources: false,
   ignore: !shouldRun,
-  name:
-    'SeaweedFSObjectStorage full put/get/exists/delete lifecycle against a real SeaweedFS instance',
+  name: 'S3ObjectStorage full put/get/exists/delete lifecycle against a real SeaweedFS instance',
   fn: async () => {
-    const storage = new SeaweedFSObjectStorage({ autoInitialize: false })
+    const storage = new S3ObjectStorage({ autoInitialize: false })
     const key = `objects/functional-test-${crypto.randomUUID()}/original`
 
     try {

@@ -8,6 +8,7 @@ import type {
 } from 'typings/protection.ts'
 
 import { generateHash, validateHash } from '@zanix/helpers'
+import { InternalError } from '@zanix/errors'
 import logger from '@zanix/logger'
 import {
   decrypt as baseDecrypt,
@@ -18,6 +19,14 @@ import {
 
 const VERSION_SUFFIX = ':'
 
+/** Env var names for the masking/encryption secrets this module reads — see each function's own
+ * doc for the fallback/versioning rules. Exported so other packages (e.g. a general config
+ * bootstrap) can set/read them without redefining the literal strings. */
+export const DATA_SECRET_KEY_ENV = 'DATA_SECRET_KEY'
+export const DATA_AES_KEY_ENV = 'DATA_AES_KEY'
+export const DATA_RSA_PUB_ENV = 'DATA_RSA_PUB'
+export const DATA_RSA_KEY_ENV = 'DATA_RSA_KEY'
+
 /** Get normalized secret version */
 const normalizeSecretVersion = (version?: string) => {
   return version && version !== 'v0' ? `_${version.toUpperCase()}` : ''
@@ -26,15 +35,26 @@ const normalizeSecretVersion = (version?: string) => {
 /** Get mask secret */
 const getMaskSecret = (v?: string) => {
   const version = normalizeSecretVersion(v)
-  const baseKey = `DATA_SECRET_KEY${version}`
-  const key = Deno.env.get(baseKey) || Deno.env.get(`DATA_AES_KEY${version}`)
+  const baseKey = `${DATA_SECRET_KEY_ENV}${version}`
+  const fallbackKey = `${DATA_AES_KEY_ENV}${version}`
+  const key = Deno.env.get(baseKey) || Deno.env.get(fallbackKey)
 
   if (key) return key
 
-  const error =
-    `Masking key missing: please define '${baseKey}' or 'DATA_AES_KEY${version}' in your environment.`
-
-  throw new Error(error)
+  // Config invariant violated with no way the caller could have prevented it (masking was
+  // requested, but neither key it can come from is set) — see `@zanix/errors`' docs, "Choosing a
+  // class", and `storage/encryption.ts`'s `requireEnv` for the same reasoning applied to object
+  // storage encryption. `shouldLog: false` — this is always caught immediately by `mask`/`unmask`
+  // below, which already logs it (as `DATAMASTER_MASK_ERROR`/`DATAMASTER_UNMASK_ERROR`); letting
+  // `InternalError`'s own default `shouldLog: true` stand here would double-log the same failure.
+  throw new InternalError(
+    `Masking key missing: please define '${baseKey}' or '${fallbackKey}' in your environment.`,
+    {
+      code: 'DATAMASTER_MASK_KEY_MISSING',
+      meta: { envVar: baseKey, fallbackEnvVar: fallbackKey },
+      shouldLog: false,
+    },
+  )
 }
 
 /** Get encrypt secret */
@@ -47,19 +67,26 @@ const getEncryptSecret = (
   const version = normalizeSecretVersion(v)
 
   if (type === 'asymmetric') {
-    key.name = action === 'encrypt' ? `DATA_RSA_PUB${version}` : `DATA_RSA_KEY${version}`
+    key.name = action === 'encrypt'
+      ? `${DATA_RSA_PUB_ENV}${version}`
+      : `${DATA_RSA_KEY_ENV}${version}`
     const rsaKey = Deno.env.get(key.name)
     key.value = rsaKey && atob(rsaKey)
   } else {
-    key.name = `DATA_AES_KEY${version}`
+    key.name = `${DATA_AES_KEY_ENV}${version}`
     key.value = Deno.env.get(key.name)
   }
 
   if (key.value) return key.value
 
-  const error = `Encryption key missing: define a valid '${key.name}' in your environment.`
-
-  throw new Error(error)
+  // Same reasoning as `getMaskSecret` above: outside the caller's control, and always caught
+  // immediately by `encrypt`/`decrypt` below (already logged there as
+  // `DATAMASTER_ENCRYPT_ERROR`/`DATAMASTER_DECRYPT_ERROR`) — `shouldLog: false` to avoid
+  // double-logging the same failure.
+  throw new InternalError(
+    `Encryption key missing: define a valid '${key.name}' in your environment.`,
+    { code: 'DATAMASTER_ENCRYPTION_KEY_MISSING', meta: { envVar: key.name }, shouldLog: false },
+  )
 }
 
 /** Function to validate a hash */

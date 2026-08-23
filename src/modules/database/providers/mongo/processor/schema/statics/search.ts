@@ -61,6 +61,7 @@ export function buildSearchFilter(
 
     if (activeConfig?.strategy !== 'mask') {
       throw new InternalError('An error occurred during data processing', {
+        code: 'DATAMASTER_SEARCH_FIELD_STRATEGY_UNSUPPORTED',
         cause: `Search field '${field}' cannot be used in 'buildSearchFilter' — only the 'mask' ` +
           `strategy allows any partial match (a prefix one) against what's stored (its active ` +
           `version config uses '${activeConfig?.strategy}', which does not).`,

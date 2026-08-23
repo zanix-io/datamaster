@@ -2,6 +2,8 @@ import { assert, assertEquals, assertRejects } from '@std/assert'
 import type { ObjectStorage } from 'storage/typings/general.ts'
 import { createFallbackObjectStorage } from 'storage/fallback-object-storage.ts'
 
+console.error = () => {}
+
 /**
  * `createFallbackObjectStorage`'s own contract, exercised against two fast, controllable
  * in-memory `ObjectStorage` fakes — no real S3/filesystem needed to prove the combinator's own
@@ -46,7 +48,7 @@ function createInMemoryObjectStorage(): ObjectStorage {
   }
 }
 
-/** An `ObjectStorage` whose every method THROWS — stands in for `SeaweedFSObjectStorage` reporting
+/** An `ObjectStorage` whose every method THROWS — stands in for `S3ObjectStorage` reporting
  * a real infrastructure failure, as opposed to it genuinely resolving "this key doesn't exist"
  * (`undefined`/`false`). The distinction the "never silently fall back on an infra error" tests
  * below depend on. */

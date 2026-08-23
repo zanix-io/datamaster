@@ -7,6 +7,7 @@ import {
 } from 'modules/database/policies/protection.ts'
 import { keys } from '../../../../(setup)/keys.ts'
 import { assert, assertEquals, assertThrows } from '@std/assert'
+import { InternalError } from '@zanix/errors'
 import { model, Schema } from 'mongoose'
 import { preprocessSchema } from 'mongo/processor/mod.ts'
 import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
@@ -147,8 +148,9 @@ Deno.test('uses active version config', () => {
     },
   } as never
 
-  assertThrows(
+  const error = assertThrows(
     () => dataProtectionSetterDefinition(configs, 'value'),
-    Error,
+    InternalError,
   )
+  assertEquals(error.code, 'DATAMASTER_DATA_PROTECTION_VERSION_CONFIG_MISSING')
 })

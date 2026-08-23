@@ -7,6 +7,7 @@ import { interpolate, interpolateEnv, interpolateUrl, toSearchParams } from '@za
 import { InternalError } from '@zanix/errors'
 import ProgramModule from 'modules/program/mod.ts'
 import { validateConditions } from './conditions.ts'
+import { AMQP_URI_ENV } from 'database/utils/constants.ts'
 
 type TriggerActionType = keyof TriggerActions
 type TriggerActionConfig<T extends TriggerActionType> =
@@ -25,9 +26,9 @@ const BODYLESS_METHODS = new Set(['GET', 'HEAD', 'DELETE'])
  * Resolves the job name `type` dispatches to: `custom` always carries its own job name inline;
  * every other action kind resolves through `ProgramModule.triggerActionJobs` (populated via
  * `registerTriggerActionJob` — see `database/defs/trigger-actions.ts`), falling back to
- * {@link DEFAULT_TRIGGER_JOBS}'s literal defaults for `mail`/`request` if nothing registered an
- * override. A future built-in-like action kind with no registration and no default throws instead
- * of dispatching to `undefined`.
+ * {@link DEFAULT_TRIGGER_JOBS}'s literal defaults for `mail`/`request`/`log` if nothing
+ * registered an override. A future built-in-like action kind with no registration and no default
+ * throws instead of dispatching to `undefined`.
  */
 const jobNameFor = <T extends TriggerActionType>(
   type: T,
@@ -39,7 +40,7 @@ const jobNameFor = <T extends TriggerActionType>(
   const registered = ProgramModule.triggerActionJobs.resolve(builtInType)
   if (registered) return registered.name
 
-  if (builtInType === 'mail' || builtInType === 'request') {
+  if (builtInType === 'mail' || builtInType === 'request' || builtInType === 'log') {
     return DEFAULT_TRIGGER_JOBS[builtInType]
   }
 
@@ -122,7 +123,7 @@ const dispatchAction = async <T extends TriggerActionType>(
   // via `runTask` instead of `runJob`. Same `Deno.env.has(...)` gate this ecosystem already uses to
   // decide whether an optional external service is available (e.g. `REDIS_URI` for the Redis
   // connector, `mongo/connector/core.ts`'s `MONGO_URI` check).
-  if (Deno.env.has('AMQP_URI')) {
+  if (Deno.env.has(AMQP_URI_ENV)) {
     await worker.runJob(jobName, {
       contextId,
       args,
@@ -134,8 +135,8 @@ const dispatchAction = async <T extends TriggerActionType>(
 }
 
 /**
- * Dispatches every action present on a matched trigger (`mail`, `request`, `custom`) for a given
- * document event.
+ * Dispatches every action present on a matched trigger (`mail`, `request`, `log`, `custom`) for a
+ * given document event.
  *
  * Each action's `conditions` are evaluated against `data` first (see {@link validateConditions});
  * actions whose conditions don't pass are skipped. Passing actions go through two interpolation
@@ -158,9 +159,9 @@ const dispatchAction = async <T extends TriggerActionType>(
  * configured `body` is converted into query parameters appended to `url` instead of being sent as
  * a fetch body — after both interpolation passes, so an env-resolved value can also be sent this
  * way. Actions are dispatched via `ProgramModule.providers.get('worker')` to their corresponding
- * job name ({@link DEFAULT_TRIGGER_JOBS} for `mail`/`request`, or the action's own `name` for
- * `custom`) — via `runJob` (queue-backed) when `AMQP_URI` is configured, or `runTask` (local,
- * in-process) when it isn't, since there's no queue to publish to in that case.
+ * job name ({@link DEFAULT_TRIGGER_JOBS} for `mail`/`request`/`log`, or the action's own
+ * `name` for `custom`) — via `runJob` (queue-backed) when `AMQP_URI` is configured, or `runTask`
+ * (local, in-process) when it isn't, since there's no queue to publish to in that case.
  *
  * @param data - The document (or plain payload) the trigger fired for. If it carries an `_old`
  * property (the pre-change document, for `updated`/`deleted` events), it's forwarded to the job

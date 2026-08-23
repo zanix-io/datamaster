@@ -2,6 +2,7 @@ import { assertEquals } from '@std/assert'
 import {
   DEFAULT_TRIGGERS_MODEL,
   isTriggersModelDisabled,
+  isTriggersResourceEnabled,
   TRIGGERS_MODEL_ENV,
   triggersModelName,
 } from 'mongo/connector/mod.ts'
@@ -36,6 +37,29 @@ envTest(
   () => {
     Deno.env.set(TRIGGERS_MODEL_ENV, 'my-triggers')
     assertEquals(isTriggersModelDisabled(), false)
+  },
+)
+
+envTest(
+  'isTriggersResourceEnabled: true when TRIGGERS_MODEL_NAME is unset (inverse of isTriggersModelDisabled)',
+  () => {
+    assertEquals(isTriggersResourceEnabled(), true)
+  },
+)
+
+envTest(
+  'isTriggersResourceEnabled: false only when TRIGGERS_MODEL_NAME is the literal "false"',
+  () => {
+    Deno.env.set(TRIGGERS_MODEL_ENV, 'false')
+    assertEquals(isTriggersResourceEnabled(), false)
+  },
+)
+
+envTest(
+  'isTriggersResourceEnabled: true when TRIGGERS_MODEL_NAME is a real name',
+  () => {
+    Deno.env.set(TRIGGERS_MODEL_ENV, 'my-triggers')
+    assertEquals(isTriggersResourceEnabled(), true)
   },
 )
 

@@ -162,20 +162,26 @@ Deno.test('RedisCache: overwriting key resets TTL', async () => {
 })
 
 Deno.test('RedisCache: overwriting key dont resets TTL if KEEP', async () => {
+  // Wider margins than a naive 1s TTL with a ~100ms window around it — under full-suite load,
+  // scheduler/IO contention from neighboring tests (real Mongo/Memcached activity elsewhere in
+  // the same run) can push actual elapsed time past a tight nominal window, causing the "still
+  // valid" read to land after the key has genuinely expired. Same class of flake already fixed
+  // for the Memcached equivalent, `overwriting key resets TTL`, in this file's own memcached
+  // sibling — widened here the same way instead of tightening the assertion.
   const cache = new ZanixRedisConnector<string, number>({
-    ttl: 1,
+    ttl: 6,
     maxTTLOffset: 0,
   })
   await cache.set('x', 10)
 
-  await new Promise((r) => setTimeout(r, 800))
+  await new Promise((r) => setTimeout(r, 2000))
   await cache.set('x', 20, { exp: 'KEEPTTL' }) // KEEP TTL
 
-  await new Promise((r) => setTimeout(r, 100)) // Now 900ms since first write
+  await new Promise((r) => setTimeout(r, 2000)) // Now ~4000ms since first write — still within the 6s TTL
 
   assertEquals(await cache.get('x'), 20) // Still valid
 
-  await new Promise((r) => setTimeout(r, 200)) // Now 1100ms since first write
+  await new Promise((r) => setTimeout(r, 3000)) // Now ~7000ms since first write — safely past the 6s TTL
 
   assertFalse(await cache.has('x'))
 
@@ -183,17 +189,21 @@ Deno.test('RedisCache: overwriting key dont resets TTL if KEEP', async () => {
 })
 
 Deno.test('RedisCache: with custom TTL', async () => {
+  // The overwrite at 800ms sets a custom 0.7s TTL (expires at ~1500ms since first write) — the
+  // original 600ms wait afterward (checking "still valid" at ~1400ms) left only ~100ms of real
+  // margin, the same class of flake fixed for the other TTL tests in this file (also: the stale
+  // comments below both said "Now 1600ms" for two different actual times). Widened the same way.
   const cache = new ZanixRedisConnector<string, number>({ ttl: 1 })
   await cache.set('x', 10, { maxTTLOffset: 0 })
 
   await new Promise((r) => setTimeout(r, 800))
-  await cache.set('x', 20, { exp: 0.7, maxTTLOffset: 0 }) // Reset TTL with custom TTL value
+  await cache.set('x', 20, { exp: 2, maxTTLOffset: 0 }) // Reset TTL with a custom 2s TTL value
 
-  await new Promise((r) => setTimeout(r, 600)) // Now 1600ms since first write
+  await new Promise((r) => setTimeout(r, 1000)) // Now ~1800ms since first write — still within the 2.8s expiry
 
   assert(await cache.has('x'))
 
-  await new Promise((r) => setTimeout(r, 800)) // Now 1600ms since first write
+  await new Promise((r) => setTimeout(r, 1500)) // Now ~3300ms since first write — safely past the 2.8s expiry
 
   assertFalse(await cache.has('x'))
 

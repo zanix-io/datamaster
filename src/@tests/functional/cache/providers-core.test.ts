@@ -25,3 +25,25 @@ Deno.test({
     }
   },
 })
+
+Deno.test(
+  'memcached core DSL skips connector registration when MEMCACHED_URI is not set',
+  async () => {
+    Deno.env.delete('MEMCACHED_URI')
+
+    await import('cache/providers/memcached/core.ts?case=no-uri')
+  },
+)
+
+Deno.test({
+  name: 'memcached core DSL registers the default memcached connector when MEMCACHED_URI is set',
+  fn: async () => {
+    Deno.env.set('MEMCACHED_URI', 'localhost:11211')
+
+    try {
+      await import('cache/providers/memcached/core.ts?case=with-uri')
+    } finally {
+      Deno.env.delete('MEMCACHED_URI')
+    }
+  },
+})

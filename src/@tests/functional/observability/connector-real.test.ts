@@ -27,7 +27,7 @@ console.error = () => {}
  *    `RUN_OPENSEARCH_TESTS=true`, loaded automatically below.
  * 3. `deno test --allow-all src/@tests/functional/observability/`
  *
- * See docs/OBSERVABILITY.md#testing-against-a-real-local-cluster for more.
+ * See docs/observability.md#testing-against-a-real-local-cluster for more.
  */
 
 const shouldRun = Deno.env.get('RUN_OPENSEARCH_TESTS') === 'true'

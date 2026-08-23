@@ -223,6 +223,41 @@ Deno.test({
   },
 })
 
+Deno.test({
+  sanitizeResources: false,
+  sanitizeOps: false,
+  name: 'RedisCache scheduled write failure is logged, not thrown back to the caller',
+  fn: async () => {
+    const cache = new ZanixRedisConnector<string, number>({
+      commandTimeout: 500,
+      maxCommandRetries: 1,
+      redisUrl: 'redis://localhost:6390', // closed port
+    })
+
+    const logged: unknown[] = []
+    const originalError = console.error
+    console.error = (...args: unknown[]) => {
+      logged.push(...args)
+    }
+
+    try {
+      // `schedule: true` is fire-and-forget by design — `set()` must resolve here even though the
+      // underlying write is doomed to fail once `execWithRetry` exhausts its retries.
+      await cache.set('scheduled-key', 1, { schedule: true })
+
+      // Wait past `commandTimeout` for the background failure to be caught and logged.
+      await new Promise((resolve) => setTimeout(resolve, 800))
+    } finally {
+      console.error = originalError
+      cache['close']()
+    }
+
+    const output = logged.map((entry) => Deno.inspect(entry)).join(' ')
+    assert(output.includes('REDIS_SCHEDULED_WRITE_FAILED'))
+    assert(output.includes('scheduled-key'))
+  },
+})
+
 // Keep this at the end to ensure the Redis connection (socket) closes properly.
 Deno.test({
   sanitizeResources: false,

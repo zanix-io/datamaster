@@ -4,6 +4,7 @@ import type { UnmaskableObject } from 'typings/data.ts'
 import { DropCollection, getDB, sanitize } from '../../../../(setup)/mongo/connector.ts'
 import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
 import { assert, assertEquals, assertRejects } from '@std/assert'
+import { InternalError } from '@zanix/errors'
 import { Schema, Types } from 'mongoose'
 
 console.error = () => {}
@@ -443,11 +444,14 @@ Deno.test({
       newProtectedSchema(),
     )
 
-    await assertRejects(() =>
-      Model.findOne({ secret: { $regex: 'a' } } as any, null, {
-        useDataPolicies: true,
-      }).exec()
+    const error = await assertRejects(
+      () =>
+        Model.findOne({ secret: { $regex: 'a' } } as any, null, {
+          useDataPolicies: true,
+        }).exec(),
+      InternalError,
     )
+    assertEquals(error.code, 'DATAMASTER_QUERY_FILTER_OPERATOR_UNSUPPORTED')
 
     Deno.env.delete('DATA_SECRET_KEY')
     await DropCollection(Model, db)
@@ -467,10 +471,13 @@ Deno.test({
       newHashProtectedSchema(),
     )
 
-    await assertRejects(() =>
-      Model.findOne({ secret: 'a-secret' }, null, { useDataPolicies: true })
-        .exec()
+    const error = await assertRejects(
+      () =>
+        Model.findOne({ secret: 'a-secret' }, null, { useDataPolicies: true })
+          .exec(),
+      InternalError,
     )
+    assertEquals(error.code, 'DATAMASTER_QUERY_FILTER_PROTECTED_PATH_UNSAFE')
 
     Deno.env.delete('DATA_SECRET_KEY')
     await DropCollection(Model, db)

@@ -31,7 +31,7 @@ have already run, so restarts don't re-run them — see
 [Seeders](#seeders-registermodels-extensionsseeders). `triggersModel` names (or disables) the
 internal collection used to add/toggle triggers at runtime, and `triggersPollInterval`/
 `triggersChangeStream` control how quickly a change made there takes effect without a restart — see
-[Triggers: keeping the registry fresh](./TRIGGERS.md#keeping-the-registry-fresh-without-a-restart).
+[Triggers: keeping the registry fresh](./triggers.md#keeping-the-registry-fresh-without-a-restart).
 
 Every option above also has an environment variable counterpart, for when you'd rather configure it
 per-deployment than in code — the explicit option always wins if both are set:
@@ -44,7 +44,7 @@ per-deployment than in code — the explicit option always wins if both are set:
 | `triggersPollInterval` | `TRIGGERS_POLL_INTERVAL` |
 | `triggersChangeStream` | `TRIGGERS_CHANGE_STREAM` |
 
-See [Configuration](./CONFIGURATION.md#connection-variables) for each one's exact defaults and
+See [Configuration](./configuration.md#connection-variables) for each one's exact defaults and
 disabling convention (`'false'` for the two model-name variables).
 
 ### `getModel`
@@ -71,7 +71,7 @@ const Model = connector.getModel<Attrs>('users')
 
 `GetModelOptions.useALS: boolean` re-enters the current request's `AsyncLocalStorage` session
 context before resolving the model, so accessors that read the session (like
-[`dataAccessGetter`](./DATA-PROTECTION.md#access-strategies-dataaccessgetter)) see it — enable this
+[`dataAccessGetter`](./data-protection.md#access-strategies-dataaccessgetter)) see it — enable this
 if `useALS`/`enableALS` is already active on the handler that's calling `getModel`. Both the schema
 and the plain-definition overloads' `SchemaModelInitOptions` also accept `extensions` and
 `relatedModels` (models to bind and populate together with the main one).
@@ -160,17 +160,17 @@ from a production database, with masked/encrypted values and their version prefi
 like `'v0:...'`) — otherwise the setter would protect an already-protected value a second time.
 
 Skip execution globally with the `DATABASE_SEEDERS` environment variable — see
-[Configuration](./CONFIGURATION.md).
+[Configuration](./configuration.md).
 
 To rotate protection keys across every document in a model, see
-[Data Protection: key rotation](./DATA-PROTECTION.md#key-rotation).
+[Data Protection: key rotation](./data-protection.md#key-rotation).
 
 `extensions` also accepts `triggers` — reactive `mail`/`request`/`custom` actions tied to a model's
-create/update/delete lifecycle — see [Triggers](./TRIGGERS.md).
+create/update/delete lifecycle — see [Triggers](./triggers.md).
 
 `extensions.autoProtectOnUpdate: true` extends automatic data protection to document-level updates
 (`.save()` on an existing document), not just a document's first save — see
-[Data Protection: automatic update-time protection](./DATA-PROTECTION.md#automatic-update-time-protection-autoprotectonupdate).
+[Data Protection: automatic update-time protection](./data-protection.md#automatic-update-time-protection-autoprotectonupdate).
 
 ## Multi-database support
 
@@ -235,7 +235,7 @@ Calling `getModel()` for a model registered under a _different_ connector throws
 you get when a model was never registered at all (`error.meta.kind` is `'wrong-connector'` vs
 `'never-registered'`, respectively, for programmatic handling).
 
-Seeders and [persisted triggers](./TRIGGERS.md#persisted-triggers-online-adaptation) follow the same
+Seeders and [persisted triggers](./triggers.md#persisted-triggers-online-adaptation) follow the same
 per-connector isolation as models: each connector only ever reads/writes its own bucket, so two
 genuinely different connectors (different `@Connector` slots) never share or clobber each other's
 state, even when both happen to point at the same physical database.
@@ -258,7 +258,7 @@ await kv.withLock(
 ```
 
 TTL expiry is **lazy** — an expired entry is skipped on read, not proactively deleted. `withLock`
-uses the same internal keyed lock manager the cache module uses (see [Cache](./CACHE.md#withlock)).
+uses the same internal keyed lock manager the cache module uses (see [Cache](./cache.md#withlock)).
 For direct SQLite table access without the KV/TTL semantics, use `LocalSQLite(table, filename?)`
 directly.
 
@@ -284,7 +284,7 @@ const cursorPage = await UsersModel.paginateCursor({
 
 Both also accept `useDataPolicies: true`, protecting `filter`'s `mask`-strategy paths before the
 query runs — see
-[Data Protection: query-level protection](./DATA-PROTECTION.md#query-level-protection-usedatapolicies).
+[Data Protection: query-level protection](./data-protection.md#query-level-protection-usedatapolicies).
 
 ### Search (`search`)
 
@@ -322,9 +322,9 @@ await Model.find(filter)
 
 ## See also
 
-- [Triggers](./TRIGGERS.md) — `extensions.triggers`, reactive actions tied to the model lifecycle.
-- [Data Protection](./DATA-PROTECTION.md) — `dataProtectionGetter`/`dataAccessGetter`, used inside a
+- [Triggers](./triggers.md) — `extensions.triggers`, reactive actions tied to the model lifecycle.
+- [Data Protection](./data-protection.md) — `dataProtectionGetter`/`dataAccessGetter`, used inside a
   model's `definition`.
-- [Transforms](./TRANSFORMS.md) — the schema/document transform utilities, and when to call them
+- [Transforms](./transforms.md) — the schema/document transform utilities, and when to call them
   directly vs let `toJSON`/`toObject` handle them.
-- [Configuration](./CONFIGURATION.md) — `MONGO_URI`, `DATABASE_SEEDERS`.
+- [Configuration](./configuration.md) — `MONGO_URI`, `DATABASE_SEEDERS`.

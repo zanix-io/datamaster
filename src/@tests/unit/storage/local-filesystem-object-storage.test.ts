@@ -1,4 +1,4 @@
-import { assert, assertEquals } from '@std/assert'
+import { assert, assertEquals, assertRejects } from '@std/assert'
 import { createLocalFilesystemObjectStorage } from 'storage/local-filesystem-object-storage.ts'
 
 /**
@@ -73,6 +73,44 @@ Deno.test(
       await storage.put('deeply/nested/key', new Uint8Array([9]), { contentType: 'x' })
       const found = await storage.get('deeply/nested/key')
       assert(found, 'expected the nested key to round-trip correctly')
+    } finally {
+      await Deno.remove(dir, { recursive: true })
+    }
+  },
+)
+
+/**
+ * Regression coverage for a confirmed path-traversal vulnerability: `key` used to be joined
+ * straight onto `rootDir` (`join(rootDir, key)`) with no containment check, so a `key` that
+ * escaped `rootDir` (`../`, or an absolute path overriding it entirely) let `put`/`get`/`delete`
+ * touch disk outside the intended store. Fixed via `@zanix/helpers`'s `confinePath`.
+ */
+Deno.test(
+  'createLocalFilesystemObjectStorage: put/get/delete/exists reject a traversing key',
+  async () => {
+    const dir = await Deno.makeTempDir()
+    try {
+      const storage = createLocalFilesystemObjectStorage(dir)
+      const bytes = new TextEncoder().encode('x')
+      const traversingKeys = ['../../etc/passwd', 'a/../../x', '/etc/passwd']
+
+      // Sequential per key, deliberately — a real Promise.all here would run every key's four
+      // checks interleaved, which is fine functionally but harder to read than "one key, fully
+      // checked, then the next".
+      for (const key of traversingKeys) {
+        // deno-lint-ignore no-await-in-loop
+        await assertRejects(() => storage.put(key, bytes, { contentType: 'text/plain' }))
+        // deno-lint-ignore no-await-in-loop
+        await assertRejects(() => storage.get(key))
+        // deno-lint-ignore no-await-in-loop
+        await assertRejects(() => storage.delete(key))
+        // `exists()` wraps everything in a catch-all that already treats any thrown error as
+        // "not found" (true even before this fix, for e.g. a permission error) — so a rejected
+        // key surfaces as `false` here, not a throw. Still safe: no traversal ever occurs either
+        // way, only the shape of the negative result differs from the other three methods.
+        // deno-lint-ignore no-await-in-loop
+        assertEquals(await storage.exists(key), false)
+      }
     } finally {
       await Deno.remove(dir, { recursive: true })
     }

@@ -8,7 +8,7 @@
  */
 
 import { Connector } from '@zanix/server'
-import { ZanixMongoConnector } from './mod.ts'
+import { MONGO_URI_ENV, ZanixMongoConnector } from './mod.ts'
 import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
 
 /**
@@ -22,8 +22,13 @@ import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
  * module's own comment for why: it needs to be guaranteed by merely importing
  * `ZanixMongoConnector`, not gated behind this file (or `MONGO_URI`) ever running.
  */
-const registerConnector = () => {
-  if (!Deno.env.has('MONGO_URI')) return
+// Exported (not just auto-run below) so a caller can re-register after clearing the
+// `'type:connector'` registry (`closeAllConnections()`/
+// `ProgramModule.targets.resetContainer(['type:connector'])`, both in `@zanix/server`), without
+// needing a fresh module evaluation of this file — see `storage/core.ts`'s own
+// `registerS3Connector` doc for the full reasoning, same pattern here.
+export const registerMongoConnector = (): void => {
+  if (!Deno.env.has(MONGO_URI_ENV)) return
 
   Connector(DEFAULT_CONNECTOR_KEY)(ZanixMongoConnector)
 }
@@ -45,6 +50,6 @@ const registerConnector = () => {
  *
  * @module
  */
-const zanixMongoConnectorCore: void = registerConnector()
+const zanixMongoConnectorCore: void = registerMongoConnector()
 
 export default zanixMongoConnectorCore

@@ -10,8 +10,9 @@
 /**
  * This module provides cache connectors and utilities for the Zanix project.
  *
- * It includes the Redis connector, the local LRU (QLRU) connector, and the multi-layer
- * cache provider that combines them with configurable fetch/revalidate strategies.
+ * It includes the Redis connector, the Memcached connector, the local LRU (QLRU) connector, and
+ * the multi-layer cache provider that combines them with configurable fetch/revalidate
+ * strategies.
  *
  * @module zanixCache
  */
@@ -28,6 +29,10 @@ export {
   /** A Redis-backed cache implementation with automatic retry and command queuing. */
   ZanixRedisConnector,
 } from './providers/redis/connector/mod.ts'
+export {
+  /** A Memcached-backed cache implementation using the classic text protocol over raw TCP. */
+  ZanixMemcachedConnector,
+} from './providers/memcached/connector/mod.ts'
 
 // Utils, extensions
 export {
@@ -43,6 +48,10 @@ export type {
 export type {
   /** Redis cache connector options. */
   RedisOptions,
+} from './typings/general.ts'
+export type {
+  /** Memcached cache connector options. */
+  MemcachedOptions,
 } from './typings/general.ts'
 export type {
   /** Helper that batches Redis commands and executes them in scheduled pipelines. */

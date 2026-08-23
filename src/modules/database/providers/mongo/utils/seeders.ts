@@ -137,7 +137,7 @@ export type ProtectionRotationStatus = Record<string, {
  * Call this **after** running {@link seedRotateProtectionKeys} — and again after fixing anything it
  * reports — before removing an old protection key from the environment. `outdated: 0` for every
  * path is what "safe to remove the old key" actually means; see
- * [Data Protection: key rotation](../../../../../docs/DATA-PROTECTION.md#key-rotation).
+ * [Data Protection: key rotation](../../../../../docs/data-protection.md#key-rotation).
  *
  * Two kinds of paths are always skipped, matching {@link seedRotateProtectionKeys}'s own scope:
  * - **`hash`** — one-way, with no key/version to compare against (same reason

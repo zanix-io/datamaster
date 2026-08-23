@@ -8,7 +8,7 @@
  */
 
 import { Connector, registerCoreConnectorSlot, ZanixCacheConnector } from '@zanix/server'
-import { ZanixRedisConnector } from './connector/mod.ts'
+import { REDIS_URI_ENV, ZanixRedisConnector } from './connector/mod.ts'
 
 /**
  * Connector DSL definition — applies the decorator directly to `ZanixRedisConnector` (calling it
@@ -17,8 +17,13 @@ import { ZanixRedisConnector } from './connector/mod.ts'
  * actually imports — resolves correctly. See `@zanix/auth`'s `providers/core.ts` for the full
  * rationale.
  */
-const registerConnector = () => {
-  if (!Deno.env.has('REDIS_URI')) return
+// Exported (not just auto-run below) so a caller can re-register after clearing the
+// `'type:connector'` registry (`closeAllConnections()`/
+// `ProgramModule.targets.resetContainer(['type:connector'])`, both in `@zanix/server`), without
+// needing a fresh module evaluation of this file — see `storage/core.ts`'s own
+// `registerS3Connector` doc for the full reasoning, same pattern here.
+export const registerRedisConnector = (): void => {
+  if (!Deno.env.has(REDIS_URI_ENV)) return
 
   Connector('cache:redis')(ZanixRedisConnector)
 }
@@ -46,6 +51,6 @@ registerCoreConnectorSlot('cache:redis', ZanixCacheConnector, {
  *
  * @module
  */
-const zanixRedisConnectorCore: void = registerConnector()
+const zanixRedisConnectorCore: void = registerRedisConnector()
 
 export default zanixRedisConnectorCore

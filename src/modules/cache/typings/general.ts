@@ -20,6 +20,39 @@ export type QLRUCacheOptions = ConnectorOptions & {
 }
 
 /**
+ * Memcached cache connector options
+ */
+export type MemcachedOptions = ConnectorOptions & {
+  /**
+   * `host:port` of the Memcached server, using the classic Memcached text protocol over a plain
+   * TCP connection (no auth/TLS support in that protocol — don't embed credentials here).
+   * Falls back to the `MEMCACHED_URI` environment variable, then `localhost:11211`.
+   */
+  memcachedUri?: string
+  /**
+   * The time-to-live (TTL) for Memcached keys, in seconds. If set, keys will automatically expire
+   * after the specified time. If not set (or `0`), keys will not expire by default.
+   */
+  ttl?: number
+  /**
+   * Maximum random TTL offset, in seconds.
+   * A random value between 0 and this number will be added to the base TTL.
+   * Defaults to 9 (0–9).
+   */
+  maxTTLOffset?: number
+  /**
+   * Minimum TTL in seconds required for the offset to be applied.
+   * Defaults to 5.
+   */
+  minTTLForOffset?: number
+  /**
+   * The maximum time (in milliseconds) to wait for the initial TCP connection to be established.
+   * If not set, System uses its default connection timeout.
+   */
+  connectionTimeout?: number
+}
+
+/**
  * Redis cache connector options
  */
 export type RedisOptions = ConnectorOptions & {

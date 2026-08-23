@@ -1,9 +1,12 @@
 # Observability
 
-Elasticsearch/OpenSearch persistence for [`@zanix/logger`](https://jsr.io/@zanix/utils/doc/logger).
-Everything here lives under the `./observability` subpath — it's never re-exported from the package
-root, so a consumer who doesn't import it pays zero cost and Logger stays fully independent of
-DataMaster.
+Search-engine connectors for the `'search'` core connector slot, plus Elasticsearch/OpenSearch
+persistence for [`@zanix/logger`](https://jsr.io/@zanix/utils/doc/logger) (`elasticsearchLogSave`).
+Two connectors are available — `ZanixElasticsearchConnector` (Elasticsearch OSS/Free/OpenSearch) and
+`MeilisearchConnector` — backing the SAME single `'search'` slot; `SEARCH_ENGINE` selects exactly
+one per deployment (see "Selecting a search engine" below). Everything here lives under the
+`./observability` subpath — it's never re-exported from the package root, so a consumer who doesn't
+import it pays zero cost and Logger stays fully independent of DataMaster.
 
 ```ts
 import { elasticsearchLogSave } from 'jsr:@zanix/datamaster@[version]/observability'
@@ -31,7 +34,7 @@ across all three (`_doc`, `_bulk`, `_cluster/health`), which sidesteps both
 import { ZanixElasticsearchConnector } from 'jsr:@zanix/datamaster@[version]/observability'
 
 const es = new ZanixElasticsearchConnector({
-  node: Deno.env.get('ELASTICSEARCH_URL'), // falls back to ELASTICSEARCH_URL, then OPENSEARCH_URL, then http://localhost:9200
+  node: Deno.env.get('SEARCH_URL'), // falls back to SEARCH_URL, then http://localhost:9200
   index: {
     name: 'app-logs', // or a per-document resolver: (doc) => `app-logs-${doc.level}`
     settings: { number_of_shards: 1, number_of_replicas: 0 }, // used by ensureIndex(), see below
@@ -56,7 +59,7 @@ Basic auth can be embedded directly in the URL instead of the `auth` option —
 `https://user:pass@host:9200` — since `fetch` honors userinfo in a URL and sends it as a real
 `Authorization: Basic` header (verified directly against this connector, not assumed). This means
 Basic auth already has a full zero-config env var path today: just put the credentials in
-`ELASTICSEARCH_URL`/`OPENSEARCH_URL` itself, no separate username/password env vars needed.
+`SEARCH_URL` itself, no separate username/password env vars needed.
 
 API-key auth has no URL equivalent — there's no standard syntax for an arbitrary header value like
 an API key — so it falls back to `ELASTICSEARCH_API_KEY`, then `OPENSEARCH_API_KEY`, when the `auth`
@@ -136,6 +139,73 @@ By default, a newly indexed document only becomes searchable on the next automat
 read-your-own-write scenarios. **Avoid calling it after every write in a production hot path**:
 forcing a refresh triggers extra segment work and can hurt indexing throughput under load, and log
 data typically doesn't need stronger-than-near-real-time visibility.
+
+## `MeilisearchConnector`
+
+A plain `fetch`-based connector for [Meilisearch](https://www.meilisearch.com) — no vendor SDK, the
+same rationale as `ZanixElasticsearchConnector` above, applied to Meilisearch's own real REST API
+(verified directly against Meilisearch's docs, not assumed).
+
+```ts
+import { MeilisearchConnector } from 'jsr:@zanix/datamaster@[version]/observability'
+
+const meili = new MeilisearchConnector({
+  host: Deno.env.get('SEARCH_URL'), // falls back to SEARCH_URL, then http://localhost:7700
+  apiKey: '...', // falls back to MEILISEARCH_API_KEY; sent as `Authorization: Bearer {apiKey}`
+  index: {
+    name: 'app-logs', // or a per-document resolver: (doc) => `app-logs-${doc.level}`
+    primaryKey: 'uuid', // only needed when a document's primary-key field isn't named `id`
+  },
+})
+
+await meili.index({ message: 'hello' }) // POST /indexes/{index}/documents, body: [doc]
+await meili.bulkIndex([{ a: 1 }, { a: 2 }]) // POST /indexes/{index}/documents, body: the array as-is
+await meili.checkHealth() // GET /health — true/false, never throws
+```
+
+### No distinct bulk endpoint, unlike Elasticsearch's `_bulk`
+
+`index()` and `bulkIndex()` hit the exact same endpoint — `POST /indexes/{index_uid}/documents`,
+which Meilisearch's own "Getting started with indexing" guide describes as handling "both single and
+batch document submissions" identically. `index()` just wraps its one document in a one-element
+array; there's no NDJSON, no per-line `_index` action — the whole array is the body.
+
+A `bulkIndex()` call whose `index.name` is a per-document resolver function still issues one request
+**per distinct resolved index** (grouped, not one call per document) — Meilisearch's endpoint is
+scoped to a single index per request, unlike Elasticsearch's `_bulk`, which can mix target indices
+within one NDJSON body.
+
+Meilisearch also auto-creates the target index the first time documents are written to it — unlike
+Elasticsearch/OpenSearch, there's no `ensureIndex()`-equivalent here, since there are no
+creation-time-only settings (shard count, etc.) to lock in ahead of time.
+
+### `bulkIndex()`'s result is real, not guessed — because it polls
+
+Meilisearch's document-write API is fundamentally **asynchronous**: every write enqueues a task and
+the response comes back immediately with `status: "enqueued"` — it never reports success/failure
+inline the way Elasticsearch's `_bulk` does. To make `bulkIndex()`'s `{errors, failedCount}` return
+value actually mean something, it polls `GET /tasks/{taskUid}` (per resolved-index group) until each
+task reaches a terminal status (`succeeded`/`failed`/`canceled`), controlled by two options:
+
+```ts
+const meili = new MeilisearchConnector({
+  waitForTask: true, // default — poll to a terminal status before resolving
+  pollIntervalMs: 200, // default
+  pollTimeoutMs: 10_000, // default; a task still pending after this throws, rather than guessing
+})
+```
+
+Set `waitForTask: false` for fire-and-forget semantics instead (no polling latency) — in that case
+`bulkIndex()` always resolves `{errors: false, failedCount: 0}` once the write is accepted,
+regardless of what actually happens to the task afterward. `index()` never polls at all — its
+contract is `Promise<void>`, so there's no result to make meaningful by waiting.
+
+Meilisearch's task API doesn't publicly document the exact field names inside a
+`documentAdditionOrUpdate` task's `details` for a **failed** task. When a task fails, `bulkIndex()`
+reads `details.indexedDocuments` opportunistically (computing `failedCount` as the difference from
+the group's size) when that field is present, and otherwise conservatively treats the **whole
+group** as failed — Meilisearch reports failures per-task, not per-document the way Elasticsearch's
+`items[].error` does, so that's the honest worst-case assumption, not an undercount.
 
 ## `elasticsearchLogSave`
 
@@ -232,19 +302,54 @@ const save = elasticsearchLogSave({
 
 ## Zero-config registration
 
-Importing `jsr:@zanix/datamaster@[version]/core` auto-registers a default
-`ZanixElasticsearchConnector` with the Zanix DI container, gated on either `ELASTICSEARCH_URL` or
-`OPENSEARCH_URL` being set — mirroring how the Mongo/Redis/SQLite core connectors register
-themselves. It registers under `@zanix/server`'s `'search'` core connector type, backed by the
-`ZanixSearchConnector` abstract base `ZanixElasticsearchConnector` extends.
+Importing `jsr:@zanix/datamaster@[version]/core` registers a connector with the Zanix DI container
+for whichever backend `SEARCH_ENGINE` selects — mirroring how the Mongo/Redis/SQLite core connectors
+register themselves. It registers under `@zanix/server`'s `'search'` core connector type, backed by
+the `ZanixSearchConnector` abstract base both connector classes extend:
+
+```sh
+SEARCH_ENGINE=elasticsearch   # or 'opensearch' — both select ZanixElasticsearchConnector
+SEARCH_URL=https://es.internal:9200
+```
+
+```sh
+SEARCH_ENGINE=meilisearch     # selects MeilisearchConnector
+SEARCH_URL=https://meili.internal:7700
+```
 
 When neither an explicit `connector` nor `node`/`auth` override tells it otherwise,
 `elasticsearchLogSave` reuses that same DI-registered `'search'` connector instead of constructing a
-second one — so a single call to `Deno.env.set('ELASTICSEARCH_URL', ...)` (or the equivalent env var
-in your deployment) is enough for both the app's own DI-injected connector and its logger to share
-one underlying client. If no core connector is registered (or the app hasn't booted far enough to
-resolve it yet), it falls back to building a fresh connector from whatever options
-`elasticsearchLogSave` was given, exactly as before.
+second one — so setting `SEARCH_ENGINE`/`SEARCH_URL` once is enough for both the app's own
+DI-injected connector and its logger to share one underlying client. If no core connector is
+registered (or the app hasn't booted far enough to resolve it yet), it falls back to building a
+fresh connector from whatever options `elasticsearchLogSave` was given, exactly as before.
+
+There is currently no `meilisearchLogSave` bridge (`elasticsearchLogSave` stays
+Elasticsearch/OpenSearch-specific); resolve `MeilisearchConnector` directly via
+`this.connectors.get('search')`/`this.getProviderConnector('search')` in your own application code
+when using Meilisearch.
+
+### Selecting a search engine
+
+`'search'` is a single core-connector slot, not independently-coexisting instances the way
+`@zanix/auth`'s OAuth2 providers are. `SEARCH_ENGINE` is the single selector deciding which backend
+registers for it — `'elasticsearch'`/`'opensearch'` (both select `ZanixElasticsearchConnector`) or
+`'meilisearch'` (`MeilisearchConnector`); unset, no connector registers for `'search'` at all.
+
+An unsupported value throws immediately at import time (directly, or via `@zanix/core`), rather than
+silently registering nothing or falling back to a default:
+
+```
+InternalError: [search] "SEARCH_ENGINE" is set to "solr", which isn't a supported search engine —
+use one of: elasticsearch, opensearch, meilisearch.
+```
+
+> **Breaking change**: prior versions gated each backend on its own env var
+> (`ELASTICSEARCH_URL`/`OPENSEARCH_URL`/`MEILISEARCH_URL`), with a dedicated
+> `assertSearchConfigNotConflicting()` guard rejecting the two being set at once. `SEARCH_ENGINE`
+> (which backend) plus the generic `SEARCH_URL` (its connection URL) replace all three — the old
+> vars are no longer read at all, so this is a direct rename with no dual-read/deprecation window.
+> `ELASTICSEARCH_API_KEY`/`OPENSEARCH_API_KEY`/`MEILISEARCH_API_KEY` are unaffected.
 
 ## Testing against a real local cluster
 
@@ -288,9 +393,45 @@ starts an `opensearch` service container the same way it already does for `mongo
 
 Stop and remove the container when done: `docker rm -f zanix-opensearch-test`.
 
+`MeilisearchConnector` has the same two-layer coverage. The unit suite
+(`src/@tests/unit/observability/meilisearch-connector.test.ts`) mocks `fetch`, including
+task-polling behavior (`bulkIndex()`'s `GET /tasks/{taskUid}` loop).
+`src/@tests/functional/observability/meilisearch-connector-real.test.ts` complements it against a
+**real local Meilisearch instance** — real task-queue latency and terminal-status transitions a mock
+can't credibly reproduce, plus one thing only a real instance could reveal: a Meilisearch write task
+fails **atomically** (`details.indexedDocuments: 0` for the whole batch on any invalid document),
+not per-document the way Elasticsearch's `_bulk` does — confirmed directly against a running
+instance, not assumed from the ES connector's shape.
+
+1. Start a local Meilisearch instance with Docker:
+
+   ```sh
+   docker run -d --name zanix-meilisearch-test \
+     -p 7700:7700 \
+     -e "MEILI_NO_ANALYTICS=true" \
+     getmeili/meilisearch:v1.11
+   ```
+
+2. Copy `.env.test.example` to `.env.test` at the project root (gitignored) — it sets
+   `RUN_MEILISEARCH_TESTS=true`, loaded the same way `RUN_OPENSEARCH_TESTS` is.
+
+3. Wait for the instance to accept requests, then run the functional test:
+
+   ```sh
+   until curl -sf http://localhost:7700/health >/dev/null; do sleep 2; done
+   deno test --allow-all src/@tests/functional/observability/
+   ```
+
+CI starts a `meilisearch` service container the same way as `opensearch` — its image's default
+entrypoint needs no extra args, so (unlike SeaweedFS) a plain `services:` block is enough; see
+`.github/workflows/publish.yml`.
+
+Stop and remove the container when done: `docker rm -f zanix-meilisearch-test`.
+
 ## See also
 
-- [Configuration](./CONFIGURATION.md) — `ELASTICSEARCH_URL`, `OPENSEARCH_URL`.
+- [Configuration](./configuration.md) — `SEARCH_ENGINE`, `SEARCH_URL`, `ELASTICSEARCH_API_KEY`,
+  `OPENSEARCH_API_KEY`, `MEILISEARCH_API_KEY`.
 - `@zanix/utils`'s [Logger guide](https://jsr.io/@zanix/utils/doc/logger) — the `storage.save`
   extension point this module plugs into, and the "reusable storage backend" factory-function
   pattern in general.

@@ -53,9 +53,25 @@ export { createTriggersDiscoveryProvider } from 'modules/triggers/triggers-disco
  * Dead Letter Queue — a Mongo-backed registry of items that failed in some business process
  * (payments, webhooks, jobs, ...), for auditing/debugging/manual or programmatic retry.
  * Independent of `@zanix/asyncmq`'s own RabbitMQ-native dead-letter mechanism
- * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/DLQ.md`.
+ * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/dlq.md`.
  */
 export { DLQProvider, ZanixCoreDLQProvider } from 'modules/dlq/dlq.provider.ts'
+/**
+ * Business logic behind this package's own local `/admin/dlq` — see
+ * `@zanix/datamaster/dlq-api`'s own `createDlqAdminController`. Exposes only
+ * `push`/`get`/`list`/`requeue`/`discard`/`remove`; the lease-based
+ * `claim`/`release`/`complete`/`fail` primitives stay off this surface — see
+ * {@link DLQAdminService}'s own JSDoc for why.
+ */
+export { DLQAdminService } from 'modules/dlq/dlq.service.ts'
+/**
+ * Builds the `DiscoveryProvider` for `/.well-known/zanix/dlq`, backed by {@link DLQProvider}. A
+ * future `DlqAggregator` in `@zanix/admin` (mirroring `TriggersAggregator`, not yet built) would
+ * compose this the same way `defineAdminMetadata` composes {@link createTriggersDiscoveryProvider};
+ * it does not author the provider itself. Scoped to unresolved (`pending`/`claimed`/`failed`)
+ * entries only — see this function's own JSDoc for why.
+ */
+export { createDlqDiscoveryProvider } from 'modules/dlq/dlq-discovery.provider.ts'
 /** Registers `@zanix/datamaster`'s own DLQ model — required once before `DLQProvider` resolves. */
 export {
   DEFAULT_DLQ_MODEL,
@@ -64,6 +80,7 @@ export {
   DLQ_ENCRYPT_PAYLOAD_ENV,
   DLQ_MODEL_ENV,
   dlqModelName,
+  isDlqResourceEnabled,
   registerDLQModel,
 } from 'modules/dlq/dlq.model.ts'
 export type { RegisterDLQModelOptions } from 'modules/dlq/dlq.model.ts'

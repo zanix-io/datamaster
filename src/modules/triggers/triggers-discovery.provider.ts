@@ -6,7 +6,7 @@ import { TriggersAdminRepository } from './triggers.repository.ts'
 
 /**
  * Builds the `DiscoveryProvider` for `/.well-known/zanix/triggers` — see `@zanix/server`'s
- * `docs/HANDLERS.md`'s "Discovery" section. `@zanix/admin`'s `defineAdminMetadata` registers it via
+ * `docs/handlers.md`'s "Discovery" section. `@zanix/admin`'s `defineAdminMetadata` registers it via
  * `ProgramModule.defineDiscovery` alongside composing `createTriggersAdminController`; this package
  * only authors the provider, since it's the actual owner of the persisted triggers collection this
  * reuses `TriggersAdminRepository.list()` to read.

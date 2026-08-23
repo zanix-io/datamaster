@@ -26,7 +26,7 @@ import { InternalError } from '@zanix/errors'
  * @example
  * // Example usage with MyModel specification — `access`/`protection` are NOT plain field options;
  * // they're applied as Mongoose `get`/`set` functions via `dataAccessGetter`/`dataProtectionGetter`
- * // (both re-exported from `database/mod.ts`). See `docs/DATA-PROTECTION.md` for every strategy.
+ * // (both re-exported from `database/mod.ts`). See `docs/data-protection.md` for every strategy.
  * import { dataAccessGetter, dataProtectionGetter, registerModel } from '@zanix/datamaster/database'
  *
  * registerModel({
