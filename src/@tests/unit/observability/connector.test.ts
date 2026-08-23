@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import { assert, assertEquals, assertStringIncludes } from '@std/assert'
+import { assert, assertEquals, assertStringIncludes, assertThrows } from '@std/assert'
 import { getConnector, ZanixElasticsearchConnector } from 'observability/connector.ts'
 import { ProgramModule } from '@zanix/server'
 import logger from '@zanix/logger'
@@ -22,7 +22,7 @@ const jsonResponse = (body: unknown, status = 200) =>
   })
 
 Deno.test('resolves node from the explicit option over any env var', async () => {
-  Deno.env.set('ELASTICSEARCH_URL', 'http://from-env:9200')
+  Deno.env.set('SEARCH_URL', 'http://from-env:9200')
   const { calls, restore } = mockFetch(() => jsonResponse({}))
   try {
     const connector = new ZanixElasticsearchConnector({
@@ -33,32 +33,24 @@ Deno.test('resolves node from the explicit option over any env var', async () =>
     assertStringIncludes(calls[0].url, 'from-option')
   } finally {
     restore()
-    Deno.env.delete('ELASTICSEARCH_URL')
+    Deno.env.delete('SEARCH_URL')
   }
 })
 
 Deno.test({
-  name: 'falls back to ELASTICSEARCH_URL, then OPENSEARCH_URL, when node is omitted',
+  name: 'falls back to SEARCH_URL when node is omitted',
   fn: async () => {
     const { calls, restore } = mockFetch(() => jsonResponse({}))
     try {
-      Deno.env.set('OPENSEARCH_URL', 'http://from-opensearch:9200')
-      const connectorFromOpenSearch = new ZanixElasticsearchConnector({
+      Deno.env.set('SEARCH_URL', 'http://from-search-url:9200')
+      const connector = new ZanixElasticsearchConnector({
         autoInitialize: false,
       })
-      await connectorFromOpenSearch.index({ a: 1 })
-      assertStringIncludes(calls[0].url, 'from-opensearch')
-
-      Deno.env.set('ELASTICSEARCH_URL', 'http://from-elasticsearch:9200')
-      const connectorFromElasticsearch = new ZanixElasticsearchConnector({
-        autoInitialize: false,
-      })
-      await connectorFromElasticsearch.index({ a: 1 })
-      assertStringIncludes(calls[1].url, 'from-elasticsearch')
+      await connector.index({ a: 1 })
+      assertStringIncludes(calls[0].url, 'from-search-url')
     } finally {
       restore()
-      Deno.env.delete('ELASTICSEARCH_URL')
-      Deno.env.delete('OPENSEARCH_URL')
+      Deno.env.delete('SEARCH_URL')
     }
   },
 })
@@ -387,29 +379,9 @@ Deno.test('sends no Authorization header when auth and its env vars are unset', 
   }
 })
 
-Deno.test('basic-auth credentials embedded in the node URL reach the server', async () => {
-  // A mocked `fetch` (see `mockFetch` above) never reproduces the URL-userinfo-to-`Authorization`
-  // behavior real `fetch` implementations provide — only a genuine `fetch` call proves it, so this
-  // spins up an ephemeral local server instead of mocking anything.
-  let seenAuth: string | null | undefined = 'NOT_CALLED'
-  const server = Deno.serve({ port: 0, onListen: () => {} }, (req) => {
-    seenAuth = req.headers.get('authorization')
-    return new Response(JSON.stringify({}), {
-      headers: { 'Content-Type': 'application/json' },
-    })
-  })
-
-  try {
-    const connector = new ZanixElasticsearchConnector({
-      node: `http://myuser:mypass@localhost:${server.addr.port}`,
-      autoInitialize: false,
-    })
-    await connector.index({ a: 1 })
-    assertEquals(seenAuth, `Basic ${btoa('myuser:mypass')}`)
-  } finally {
-    await server.shutdown()
-  }
-})
+// The "basic-auth credentials embedded in the node URL reach the server" test moved to
+// `integration/observability/connector-basic-auth.test.ts` — it spins up a real local HTTP
+// server + real `fetch`, which never belongs in `unit/` regardless of the ephemeral port used.
 
 Deno.test('a per-call index option overrides the connector-level default index', async () => {
   const { calls, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
@@ -607,7 +579,7 @@ Deno.test('indexInitialized setter is awaited before bulkIndex(), given every in
   }
 })
 
-Deno.test('getConnector() falls back to a fresh connector when no core connector resolves', () => {
+Deno.test('getConnector() throws (no silent fallback) when nothing resolves for "search"', () => {
   const proto = Object.getPrototypeOf(ProgramModule)
   const original = proto.getConnectors
   proto.getConnectors = () => ({
@@ -616,11 +588,15 @@ Deno.test('getConnector() falls back to a fresh connector when no core connector
     },
   })
   try {
-    const connector = getConnector({
-      node: 'http://localhost:9200',
-      autoInitialize: false,
-    })
-    assert(connector instanceof ZanixElasticsearchConnector)
+    assertThrows(
+      () =>
+        getConnector({
+          node: 'http://localhost:9200',
+          autoInitialize: false,
+        }),
+      Error,
+      'missing core connector slot',
+    )
   } finally {
     proto.getConnectors = original
   }
@@ -641,16 +617,18 @@ Deno.test('getConnector() reuses the connector ProgramModule resolves for "searc
 
 Deno.test('getConnector() wires indexInitialized to ensureIndex when enabled', async () => {
   const { calls, restore } = mockFetch(() => new Response(null, { status: 200 }))
+  // Real registered connector (not the removed fallback-construction path — see
+  // `getConnector()`'s own doc on why that fallback was removed) — `indexInitialize`'s wiring
+  // applies to whatever connector actually resolves, registered or not.
+  const registered = new ZanixElasticsearchConnector({
+    node: 'http://localhost:9200',
+    autoInitialize: false,
+  })
   const proto = Object.getPrototypeOf(ProgramModule)
   const original = proto.getConnectors
-  proto.getConnectors = () => ({
-    get: () => {
-      throw new Error('no core connector registered')
-    },
-  })
+  proto.getConnectors = () => ({ get: () => registered })
   try {
     const connector = getConnector({
-      node: 'http://localhost:9200',
       index: { name: 'logs' },
       indexInitialize: true,
       autoInitialize: false,
@@ -669,16 +647,15 @@ Deno.test('getConnector() wires indexInitialized to ensureIndex when enabled', a
 
 Deno.test('getConnector() leaves indexInitialized as the default no-op when disabled', async () => {
   const { calls, restore } = mockFetch(() => new Response(null, { status: 200 }))
+  const registered = new ZanixElasticsearchConnector({
+    node: 'http://localhost:9200',
+    autoInitialize: false,
+  })
   const proto = Object.getPrototypeOf(ProgramModule)
   const original = proto.getConnectors
-  proto.getConnectors = () => ({
-    get: () => {
-      throw new Error('no core connector registered')
-    },
-  })
+  proto.getConnectors = () => ({ get: () => registered })
   try {
     const connector = getConnector({
-      node: 'http://localhost:9200',
       autoInitialize: false,
     })
     const result = await connector.indexInitialized('logs')

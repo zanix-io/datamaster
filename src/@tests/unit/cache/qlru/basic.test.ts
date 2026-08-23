@@ -157,20 +157,24 @@ Deno.test('QuickLRU: overwriting key resets TTL', async () => {
 })
 
 Deno.test('QuickLRU: overwriting key dont resets TTL if KEEP', async () => {
+  // A 1s TTL checked at 950ms left only ~50ms of real margin — under full-suite load, GC/scheduler
+  // contention from everything else running in the same process can delay a `setTimeout` callback
+  // enough for the "still valid" read to land after the real expiry (the same class of flake fixed
+  // for the Memcached/Redis/SQLite-KV TTL tests — widened here the same way).
   const cache = new ZanixQLRUConnector<string, number>({
     capacity: 2,
-    ttl: 1,
+    ttl: 3,
   })
   cache.set('x', 10)
 
-  await new Promise((r) => setTimeout(r, 800))
+  await new Promise((r) => setTimeout(r, 1500))
   cache.set('x', 20, { exp: 'KEEPTTL' }) // KEEP TTL
 
-  await new Promise((r) => setTimeout(r, 150)) // Now 950ms since first write
+  await new Promise((r) => setTimeout(r, 1000)) // Now ~2500ms since first write — still within the 3s TTL
 
   assertEquals(cache.get('x'), 20) // Still valid
 
-  await new Promise((r) => setTimeout(r, 200)) // Now 1100ms since first write
+  await new Promise((r) => setTimeout(r, 1500)) // Now ~4000ms since first write — safely past the 3s TTL
 
   assertFalse(cache.has('x'))
 })

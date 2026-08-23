@@ -2,7 +2,7 @@ import { uint8ArrayToHEX } from '@zanix/helpers'
 
 /**
  * Shared byte helpers used by every `ObjectStorage` implementation in this module —
- * `SeaweedFSObjectStorage` (`connector.ts`) and `LocalFilesystemObjectStorage`
+ * `S3ObjectStorage` (`connector.ts`) and `LocalFilesystemObjectStorage`
  * (`local-filesystem-object-storage.ts`) both need the exact same "compute this package's own
  * checksum" and "read a `Uint8Array | ReadableStream<Uint8Array>` fully into memory" steps —
  * factored out here once rather than duplicated per implementation.

@@ -1,37 +1,43 @@
 import { assert } from '@std/assert'
 
-Deno.test({
-  name: 'observability core DSL skips connector registration when no cluster URL is set',
-  fn: async () => {
-    Deno.env.delete('ELASTICSEARCH_URL')
-    Deno.env.delete('OPENSEARCH_URL')
+const clearEnv = () => {
+  Deno.env.delete('SEARCH_ENGINE')
+  Deno.env.delete('SEARCH_URL')
+}
 
-    await import('observability/core.ts?case=no-url')
+Deno.test({
+  name: 'observability core DSL skips connector registration when SEARCH_ENGINE is unset',
+  fn: async () => {
+    clearEnv()
+
+    await import('observability/core.ts?case=no-engine')
   },
 })
 
 Deno.test({
-  name: 'observability core DSL registers the default connector when ELASTICSEARCH_URL is set',
+  name: 'observability core DSL registers the default connector when SEARCH_ENGINE=elasticsearch',
   fn: async () => {
-    Deno.env.set('ELASTICSEARCH_URL', 'http://localhost:9200')
+    Deno.env.set('SEARCH_ENGINE', 'elasticsearch')
+    Deno.env.set('SEARCH_URL', 'http://localhost:9200')
 
     try {
-      await import('observability/core.ts?case=with-elasticsearch-url')
+      await import('observability/core.ts?case=with-elasticsearch-engine')
     } finally {
-      Deno.env.delete('ELASTICSEARCH_URL')
+      clearEnv()
     }
   },
 })
 
 Deno.test({
-  name: 'observability core DSL registers the default connector when OPENSEARCH_URL is set',
+  name: 'observability core DSL registers the default connector when SEARCH_ENGINE=opensearch',
   fn: async () => {
-    Deno.env.set('OPENSEARCH_URL', 'http://localhost:9200')
+    Deno.env.set('SEARCH_ENGINE', 'opensearch')
+    Deno.env.set('SEARCH_URL', 'http://localhost:9200')
 
     try {
-      await import('observability/core.ts?case=with-opensearch-url')
+      await import('observability/core.ts?case=with-opensearch-engine')
     } finally {
-      Deno.env.delete('OPENSEARCH_URL')
+      clearEnv()
     }
   },
 })
@@ -40,7 +46,8 @@ Deno.test({
   name:
     'observability core DSL resolves an actual connector instance, forwarding options.index through its constructor override',
   fn: async () => {
-    Deno.env.set('ELASTICSEARCH_URL', 'http://localhost:9200')
+    Deno.env.set('SEARCH_ENGINE', 'elasticsearch')
+    Deno.env.set('SEARCH_URL', 'http://localhost:9200')
 
     try {
       await import('observability/core.ts?case=resolve-instance')
@@ -55,7 +62,7 @@ Deno.test({
 
       assert(connector instanceof ZanixElasticsearchConnector)
     } finally {
-      Deno.env.delete('ELASTICSEARCH_URL')
+      clearEnv()
     }
   },
 })

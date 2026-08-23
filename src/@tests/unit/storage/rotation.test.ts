@@ -3,14 +3,17 @@ import { assert, assertEquals, assertRejects } from '@std/assert'
 import { generateRSAKeys } from '@zanix/helpers'
 import { ProgramModule } from '@zanix/server'
 import { WorkerManager } from '@zanix/workers'
-import { SeaweedFSObjectStorage } from 'storage/connector.ts'
+import { S3ObjectStorage } from 'storage/connector.ts'
 import { checkEncryptionRotationStatus, rotateEncryptionKeys } from 'storage/rotation.ts'
 import { S3Client } from '@aws-sdk/client-s3'
+
+console.error = () => {}
 
 /**
  * `checkEncryptionRotationStatus()`/`rotateEncryptionKeys()` (`storage/rotation.ts`) against a
  * stubbed `S3Client.prototype.send` backed by an in-memory fake bucket — no network, no real
- * SeaweedFS (see `src/@tests/functional/storage/` for the real-infrastructure counterpart).
+ * S3-compatible backend (see `src/@tests/functional/storage/` for the real-infrastructure
+ * counterpart).
  * Exercises pagination, dry-run, already-active/old-version/unencrypted handling, per-key failure
  * collection, the concurrent-overwrite checksum re-check, and the `useWorker` dispatch path.
  */
@@ -31,7 +34,7 @@ function notFoundError(name: string): Error {
 
 /** An in-memory fake bucket backing `S3Client.prototype.send` — handles every command
  * `rotation-core.ts`'s walk actually issues (`ListObjectsV2Command`/`HeadObjectCommand`/
- * `GetObjectCommand`/`PutObjectCommand`), real enough for real `SeaweedFSObjectStorage` instances
+ * `GetObjectCommand`/`PutObjectCommand`), real enough for real `S3ObjectStorage` instances
  * (including real encryption) to round-trip through it. */
 function installFakeBucket(store: Map<string, FakeObject>): () => void {
   S3Client.prototype.send = ((command: { constructor: { name: string }; input: any }) => {
@@ -88,7 +91,7 @@ function installFakeBucket(store: Map<string, FakeObject>): () => void {
 Deno.test(
   'checkEncryptionRotationStatus throws when the storage instance has no encrypt configured',
   async () => {
-    const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+    const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
     await assertRejects(() => checkEncryptionRotationStatus(storage), Error, 'encryption disabled')
   },
 )
@@ -96,7 +99,7 @@ Deno.test(
 Deno.test(
   'rotateEncryptionKeys throws when the storage instance has no encrypt configured',
   async () => {
-    const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+    const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
     await assertRejects(() => rotateEncryptionKeys(storage), Error, 'encryption disabled')
   },
 )
@@ -114,7 +117,7 @@ Deno.test(
     ])
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v2' },
@@ -142,7 +145,7 @@ Deno.test(
     ])
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v2' },
@@ -170,7 +173,7 @@ Deno.test(
     }
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -198,7 +201,7 @@ Deno.test(
     }
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -228,7 +231,7 @@ Deno.test(
     ])
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -271,7 +274,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     }) as any
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -298,7 +301,7 @@ Deno.test(
     const restore = installFakeBucket(store)
     try {
       // Written for real, under v1 (the active version at the time).
-      const v1Storage = new SeaweedFSObjectStorage({
+      const v1Storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -309,7 +312,7 @@ Deno.test(
       const ciphertextBeforeRotation = store.get('objects/rot/a')?.Body
 
       // Rotate: active version is now v2.
-      const v2Storage = new SeaweedFSObjectStorage({
+      const v2Storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v2' },
@@ -351,7 +354,7 @@ Deno.test(
     ])
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -415,7 +418,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     }) as any
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -481,7 +484,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     }) as any
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -525,7 +528,7 @@ Deno.test(
       }
     }
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -571,7 +574,7 @@ Deno.test(
       return originalTask.apply(this, args as never)
     }
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -624,7 +627,7 @@ Deno.test(
       }
     }
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -664,7 +667,7 @@ Deno.test(
       }
     }
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -703,7 +706,7 @@ Deno.test(
     ])
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -729,7 +732,7 @@ Deno.test(
     ])
     const restore = installFakeBucket(store)
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -766,7 +769,7 @@ Deno.test(
     const store = new Map<string, FakeObject>()
     const restore = installFakeBucket(store)
     try {
-      const v1Storage = new SeaweedFSObjectStorage({
+      const v1Storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'asymmetric', version: 'v1' },
@@ -775,7 +778,7 @@ Deno.test(
       await v1Storage.put('objects/asym/a', plaintext, { contentType: 'text/plain' })
       assertEquals(store.get('objects/asym/a')?.Metadata['encryption-version'], 'v1')
 
-      const v2Storage = new SeaweedFSObjectStorage({
+      const v2Storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'asymmetric', version: 'v2' },

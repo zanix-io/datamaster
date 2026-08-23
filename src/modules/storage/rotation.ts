@@ -1,5 +1,5 @@
 /**
- * Key-rotation migration for `SeaweedFSObjectStorage` — mirrors the exact shape
+ * Key-rotation migration for `S3ObjectStorage` — mirrors the exact shape
  * `seedRotateProtectionKeys()`/`checkProtectionRotationStatus()` (`mongo/utils/seeders.ts`) already
  * establish for Mongo field-level protection: standalone functions taking the connector instance
  * (never methods baked into the class), one that reports status, one that actually migrates.
@@ -7,16 +7,16 @@
  * Enabling `encrypt`/rotating `encrypt.version` only changes what NEW writes use — see
  * `connector.ts`'s own doc and `encryption.ts`'s — it never retroactively re-encrypts anything
  * already stored. These two functions are that missing, explicit step. Enumeration goes straight
- * through `SeaweedFSObjectStorage.listPage()` (a real, paginated `ListObjectsV2Command`) — no
+ * through `S3ObjectStorage.listPage()` (a real, paginated `ListObjectsV2Command`) — no
  * dependency on `MongoFileRepository` or any other metadata registry, so this works standalone
  * for storage used entirely on its own.
  *
  * @module
  */
 
-import type { DataPolicyVersion, SeaweedFSConnectorOptions } from './typings/general.ts'
+import type { DataPolicyVersion, S3ConnectorOptions } from './typings/general.ts'
 
-import type { SeaweedFSObjectStorage } from './connector.ts'
+import type { S3ObjectStorage } from './connector.ts'
 
 import { dispatchWorkerTask } from '@zanix/server'
 import { runCheck, runRotate } from './rotation-core.ts'
@@ -79,7 +79,7 @@ export interface EncryptionRotationStatus {
  * @throws If `storage` has encryption disabled — there's no active version to report against.
  */
 export function checkEncryptionRotationStatus(
-  storage: SeaweedFSObjectStorage,
+  storage: S3ObjectStorage,
   options: EncryptionRotationStatusOptions = {},
 ): Promise<EncryptionRotationStatus> {
   if (options.useWorker) {
@@ -158,7 +158,7 @@ export interface RotationResult {
  * @throws If `storage` has encryption disabled.
  */
 export function rotateEncryptionKeys(
-  storage: SeaweedFSObjectStorage,
+  storage: S3ObjectStorage,
   options: EncryptionRotationOptions = {},
 ): Promise<RotationResult> {
   if (options.useWorker) {
@@ -174,8 +174,8 @@ export function rotateEncryptionKeys(
  * `flushViaWorker` already uses to turn a fire-and-forget `invoke()` into an awaitable result.
  */
 function runInWorker<O, R>(
-  fn: (connectorOptions: SeaweedFSConnectorOptions, options: O) => Promise<R>,
-  connectorOptions: SeaweedFSConnectorOptions,
+  fn: (connectorOptions: S3ConnectorOptions, options: O) => Promise<R>,
+  connectorOptions: S3ConnectorOptions,
   mode: 'one-time' | 'persisted',
   options: O,
 ): Promise<R> {

@@ -17,6 +17,7 @@ import { ZanixProvider } from '@zanix/server'
 import { HttpError } from '@zanix/errors'
 import { transformByDataProtection } from 'mongo/processor/schema/transforms/data-policies.ts'
 import { defaultLeaseTtlMs, dlqModelName } from './dlq.model.ts'
+import { sanitizeMongoFilter } from './filter.ts'
 
 /** Paginated `list()` result — same shape as the shared `paginate` static's own return value. */
 export type DLQPaginatedResult = {
@@ -116,7 +117,7 @@ export class ZanixCoreDLQProvider<T extends CoreModules = object> extends ZanixP
  * (`zanix-dlq` by default, or `DLQ_MODEL_NAME`) — a Mongo-backed registry of items that failed in
  * some business process (payments, webhooks, jobs, ...), for auditing/debugging/manual or
  * programmatic retry. Independent of `@zanix/asyncmq`'s own RabbitMQ-native dead-letter mechanism
- * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/DLQ.md` for the distinction.
+ * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/dlq.md` for the distinction.
  *
  * Registered under the `'dlq'` core-provider slot (`dlq/core.ts`) — resolve it via
  * `this.providers.get(DLQProvider)` or `this.providers.get('dlq')`, both resolve the same
@@ -174,10 +175,13 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
   /**
    * Lists/paginates DLQ entries, optionally filtered by `processType`/`status`/`origin`, plus a raw
    * `filter` passthrough merged alongside those — e.g. `{ 'payload.orderId': 'abc123' }` or
-   * `{ 'metadata.tenantId': 'x' }`, when `payload`/`metadata` aren't encrypted (see `docs/DLQ.md`'s
-   * "Protecting the payload" section — an encrypted `payload` isn't queryable this way). Unindexed:
-   * a hot ad hoc query path should get its own `schema.index()` via a custom connector, or promote
-   * the field to a real top-level column instead.
+   * `{ 'metadata.tenantId': 'x' }`, when `payload`/`metadata` aren't encrypted (see `docs/dlq.md`'s
+   * "Protecting the payload" section — an encrypted `payload` isn't queryable this way). A dot-path
+   * equality lookup only: any `$`-prefixed key in `filter`, at any nesting level, is stripped (see
+   * `sanitizeMongoFilter`) before it reaches the query — `filter` isn't a place to hand this a raw
+   * Mongo operator, and `processType`/`status`/`origin` always win over a same-named `filter` key.
+   * Unindexed: a hot ad hoc query path should get its own `schema.index()` via a custom connector,
+   * or promote the field to a real top-level column instead.
    */
   public async list(options: DLQListOptions = {}): Promise<DLQPaginatedResult> {
     const Model = await this.model()
@@ -191,7 +195,7 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
       filter: rawFilter,
     } = options
 
-    const filter: Record<string, unknown> = { ...rawFilter }
+    const filter: Record<string, unknown> = sanitizeMongoFilter(rawFilter)
     if (processType) filter.processType = processType
     if (status) filter.status = status
     if (origin) filter.origin = origin
@@ -209,11 +213,16 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    * `'claimed'` with an expired lease (an abandoned claim, e.g. a worker that crashed mid-processing
    * without calling `release()`/`complete()`/`fail()`) — never `'failed'`/`'completed'`/`'discarded'`.
    * The primitive that makes concurrent processing across multiple instances safe, without any
-   * static worker/slot partitioning (see `docs/DLQ.md`'s "Concurrency" section): `findOneAndUpdate`
+   * static worker/slot partitioning (see `docs/dlq.md`'s "Concurrency" section): `findOneAndUpdate`
    * is atomic at the document level, so two concurrent `claim()` calls can never both succeed
    * against the same entry.
    *
    * Returns `null` when nothing is eligible — never throws for "nothing to claim."
+   *
+   * `options.filter` is a dot-path equality lookup, additive to this method's own eligibility
+   * filter — never a way to widen or replace it. `sanitizeMongoFilter` strips any `$`-prefixed key
+   * from it first (at any nesting level), and it's merged *before* `status`/`$or`/`processType` so
+   * none of those can be overridden by a same-named `filter` key either.
    */
   public async claim(options: DLQClaimOptions): Promise<DLQEntryAttrs | null> {
     const Model = await this.model()
@@ -221,12 +230,12 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
     const leaseTtlMs = options.leaseTtlMs ?? defaultLeaseTtlMs()
 
     const filter: Record<string, unknown> = {
+      ...sanitizeMongoFilter(options.filter),
       status: { $in: ['pending', 'claimed'] },
       $or: [{ leaseExpiresAt: { $exists: false } }, {
         leaseExpiresAt: { $lt: now },
       }],
       ...(options.processType ? { processType: options.processType } : {}),
-      ...(options.filter || {}),
     }
 
     const doc = await Model.findOneAndUpdate(

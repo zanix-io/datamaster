@@ -2,6 +2,7 @@
 import { DropCollection, getDB, sanitize } from '../../../../(setup)/mongo/connector.ts'
 import { dataProtectionGetter } from 'modules/database/policies/protection.ts'
 import { assertEquals, assertThrows } from '@std/assert'
+import { InternalError } from '@zanix/errors'
 import { Schema } from 'mongoose'
 
 console.error = () => {}
@@ -165,7 +166,8 @@ Deno.test({
     const db = await getDB()
     const Model = db.getModel('test-search-hash-field', newSchema())
 
-    assertThrows(() => Model.buildSearchFilter('123', ['ssn']))
+    const error = assertThrows(() => Model.buildSearchFilter('123', ['ssn']), InternalError)
+    assertEquals(error.code, 'DATAMASTER_SEARCH_FIELD_STRATEGY_UNSUPPORTED')
 
     Deno.env.delete('DATA_SECRET_KEY')
     await DropCollection(Model, db)

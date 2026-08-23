@@ -6,6 +6,7 @@ import {
   DLQ_ENCRYPT_PAYLOAD_ENV,
   DLQ_MODEL_ENV,
   dlqModelName,
+  isDlqResourceEnabled,
   registerDLQModel,
 } from 'modules/dlq/dlq.model.ts'
 import ProgramModule from 'modules/program/mod.ts'
@@ -31,6 +32,18 @@ Deno.test('dlqModelName defaults to zanix-dlq', () => {
 Deno.test('dlqModelName honors DLQ_MODEL_NAME', () => {
   withEnv(DLQ_MODEL_ENV, 'custom-dlq', () => {
     assertEquals(dlqModelName(), 'custom-dlq')
+  })
+})
+
+Deno.test('isDlqResourceEnabled: false when DLQ_MODEL_NAME is unset', () => {
+  withEnv(DLQ_MODEL_ENV, undefined, () => {
+    assertEquals(isDlqResourceEnabled(), false)
+  })
+})
+
+Deno.test('isDlqResourceEnabled: true once DLQ_MODEL_NAME is set', () => {
+  withEnv(DLQ_MODEL_ENV, 'custom-dlq', () => {
+    assertEquals(isDlqResourceEnabled(), true)
   })
 })
 

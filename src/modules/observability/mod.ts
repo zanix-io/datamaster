@@ -17,10 +17,6 @@
  */
 
 export {
-  /** Env var name for the Elasticsearch cluster URL. */
-  ELASTICSEARCH_URL_ENV,
-  /** Env var name for the OpenSearch cluster URL. */
-  OPENSEARCH_URL_ENV,
   /** Connector for Elasticsearch OSS, Elasticsearch (Free tier), and OpenSearch. */
   ZanixElasticsearchConnector,
 } from './connector.ts'
@@ -28,9 +24,26 @@ export {
   /** `@zanix/logger` `storage.save` factory that persists logs to Elasticsearch/OpenSearch. */
   elasticsearchLogSave,
 } from './log-adapter.ts'
+export {
+  /** Env var name for the Meilisearch API key. */
+  MEILISEARCH_API_KEY_ENV,
+  /** Connector for Meilisearch. */
+  MeilisearchConnector,
+} from './meilisearch-connector.ts'
+export {
+  /** Resolves and validates the configured `SEARCH_ENGINE`, if any. */
+  resolveSearchEngine,
+  /** Env var selecting which search engine registers under the shared `'search'` core connector
+   * slot — one of `SEARCH_ENGINES`. */
+  SEARCH_ENGINE_ENV,
+  /** Supported `SEARCH_ENGINE` values. */
+  SEARCH_ENGINES,
+  /** Env var for the selected search engine's connection URL. */
+  SEARCH_URL_ENV,
+} from './search-config.ts'
 
 export type {
-  /** The outcome of a `ZanixElasticsearchConnector.bulkIndex` call. */
+  /** The outcome of a `ZanixElasticsearchConnector.bulkIndex`/`MeilisearchConnector.bulkIndex` call. */
   BulkIndexResult,
   /** Basic-auth or API-key credentials for an Elasticsearch/OpenSearch cluster. */
   ElasticsearchAuth,
@@ -44,4 +57,15 @@ export type {
   ElasticsearchLogSaveOptions,
   /** Shared base of `ElasticsearchLogSaveOptions`'s `useWorker: true`/`false` variants. */
   ElasticsearchLogSaveOptionsBase,
+  /** `MeilisearchConnector` constructor options. */
+  MeilisearchConnectorOptions,
+  /** Index name/primary-key configuration, e.g. `MeilisearchConnectorOptions.index`. */
+  MeilisearchIndexOptions,
+  /** A single Meilisearch task, as returned by the document-write/`GET /tasks/{taskUid}` endpoints. */
+  MeilisearchTask,
 } from './typings/general.ts'
+
+export type {
+  /** A supported `SEARCH_ENGINE` value. */
+  SearchEngine,
+} from './search-config.ts'

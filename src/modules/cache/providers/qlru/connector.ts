@@ -3,6 +3,11 @@ import type { ExpiredValueEntry } from 'database/typings/general.ts'
 import { type CacheSetOptions, ZanixCacheConnector } from '@zanix/server'
 import { InternalError } from '@zanix/errors'
 
+/** Env var name for the constructor option that also accepts one (`capacity`) — see the
+ * class-level doc. Exported so other packages can set/read it without redefining the literal
+ * string. */
+export const LOCAL_CACHE_MAX_ITEMS_ENV = 'LOCAL_CACHE_MAX_ITEMS'
+
 /**
  * A fast and lightweight Least Recently Used (LRU) cache with optional TTL (Time-To-Live) support.
  *
@@ -31,7 +36,7 @@ export class ZanixQLRUConnector<K = string, V = any> extends ZanixCacheConnector
    */
   constructor(options: QLRUCacheOptions) {
     const {
-      capacity = Number(Deno.env.get('LOCAL_CACHE_MAX_ITEMS')) || 50000,
+      capacity = Number(Deno.env.get(LOCAL_CACHE_MAX_ITEMS_ENV)) || 50000,
       contextId,
       ttl = 0,
       maxTTLOffset,

@@ -42,7 +42,16 @@ const reportFlushFailure = (context: string, error: unknown): void => {
   )
 }
 
-/** Flushes a batch on the main thread, logging (never throwing) on failure. */
+/**
+ * Flushes a batch on the main thread, logging (never throwing) on failure — including a failure
+ * to even RESOLVE a connector. `getConnector()` now throws (no silent fallback construction —
+ * see its own doc) when nothing is registered under `'search'`, which a naive `connector ||
+ * getConnector(connectorOptions)` would let escape synchronously, breaking this function's own
+ * "never throws" contract (real regression, caught by this file's own test suite before
+ * shipping: `elasticsearchLogSave` is a fire-and-forget `SaveDataFunction`, called from
+ * arbitrary logging call sites that never expect it to throw). Wrapped the same way a
+ * `bulkIndex()` rejection already is.
+ */
 const flushInline = (
   connector: ZanixElasticsearchConnector | undefined,
   connectorOptions: ElasticsearchConnectorOptions & {
@@ -50,7 +59,13 @@ const flushInline = (
   },
   docs: Record<string, unknown>[],
 ): Promise<void> => {
-  const conn = connector || getConnector(connectorOptions)
+  let conn: ZanixElasticsearchConnector
+  try {
+    conn = connector || getConnector(connectorOptions)
+  } catch (e) {
+    reportFlushFailure('inline', e)
+    return Promise.resolve()
+  }
   return conn.bulkIndex(docs).then(
     () => {},
     (e) => reportFlushFailure('inline', e),

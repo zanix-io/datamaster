@@ -44,6 +44,7 @@ const evaluateCondition = (condition: Condition, data: any): boolean => {
   throw new InternalError(
     'An error occurred while evaluating a trigger condition',
     {
+      code: 'DATAMASTER_TRIGGER_CONDITION_INVALID_FORMAT',
       cause: `Invalid condition format: ${JSON.stringify(condition)}`,
       meta: {
         source: 'zanix',
@@ -98,6 +99,7 @@ const evaluateSingleCondition = (
       throw new InternalError(
         'An error occurred while evaluating a trigger condition',
         {
+          code: 'DATAMASTER_TRIGGER_CONDITION_OPERATOR_UNSUPPORTED',
           cause: `Unsupported conditional operator: ${op}`,
           meta: {
             source: 'zanix',

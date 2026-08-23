@@ -1,4 +1,5 @@
 import { assertEquals, assertThrows } from '@std/assert'
+import { InternalError } from '@zanix/errors'
 import { validateConditions } from 'mongo/processor/triggers/conditions.ts'
 
 console.error = () => {}
@@ -146,13 +147,20 @@ Deno.test('validateConditions "$field" prefix compares against another field', (
 })
 
 Deno.test('validateConditions throws on an unsupported operator', () => {
-  assertThrows(() =>
-    validateConditions({ num: 1 }, [
-      { field: 'num', op: 'unsupported' as never, value: 1 },
-    ])
+  const error = assertThrows(
+    () =>
+      validateConditions({ num: 1 }, [
+        { field: 'num', op: 'unsupported' as never, value: 1 },
+      ]),
+    InternalError,
   )
+  assertEquals(error.code, 'DATAMASTER_TRIGGER_CONDITION_OPERATOR_UNSUPPORTED')
 })
 
 Deno.test('validateConditions throws on an invalid condition shape', () => {
-  assertThrows(() => validateConditions({}, [{ nope: true } as never]))
+  const error = assertThrows(
+    () => validateConditions({}, [{ nope: true } as never]),
+    InternalError,
+  )
+  assertEquals(error.code, 'DATAMASTER_TRIGGER_CONDITION_INVALID_FORMAT')
 })

@@ -152,6 +152,29 @@ export type TriggerActions = {
     /** The name of the job to dispatch to, as registered via `registerJob`. */
     name: string
   }
+  /**
+   * Structured log action — writes a log entry via `@zanix/logger` when the trigger fires.
+   *
+   * Unlike `mail`/`request`, this package **self-registers a real handler for `log` itself**
+   * (`modules/triggers/log-trigger.core.ts`, loaded from this package's own `/core` entrypoint)
+   * instead of leaving it for a sibling package or consuming app to own — `@zanix/logger` is one
+   * of `@zanix/datamaster`'s own foundational dependencies (`jsr:@zanix/utils/logger`), not a
+   * capability that belongs to another package the way sending mail belongs to
+   * `@zanix/notifications` or firing an arbitrary HTTP request belongs to `@zanix/core`. `log` still
+   * dispatches to the job registered for it (see `registerTriggerActionJob`) and falls back to
+   * {@link DEFAULT_TRIGGER_JOBS.log} if something clears the registration — importing
+   * `jsr:@zanix/datamaster@[version]/core` is what makes the self-registered handler active.
+   *
+   * `message` supports `{{field}}`/`{{nested.path}}` placeholders, resolved against the record the
+   * trigger fired for, and `${{ENV_VAR}}` placeholders resolved from `Deno.env` — see the security
+   * note on {@link TriggerActions}.
+   */
+  log: Partial<TriggerActionCommons> & {
+    /** The log level to write at — matches `@zanix/logger`'s own method names. */
+    level: 'info' | 'success' | 'error' | 'warn' | 'debug'
+    /** The log message. Supports `{{field}}`/`{{nested.path}}` interpolation. */
+    message: string
+  }
 }
 
 /**
@@ -172,16 +195,22 @@ export type TriggerTypes = Record<
 export type Triggers = Partial<Record<'pre' | 'post', Partial<TriggerTypes>>>
 
 /**
- * The default job names `mail`/`request` trigger actions dispatch to when nothing registered an
- * override via `registerTriggerActionJob` — see `database/defs/trigger-actions.ts`. Apps
- * bootstrapped via `@zanix/core` get both registered automatically (`request` directly by
- * `@zanix/core` itself; `mail` self-registered by `@zanix/notifications`'s own `/core`
+ * The default job names `mail`/`request`/`log` trigger actions dispatch to when nothing
+ * registered an override via `registerTriggerActionJob` — see `database/defs/trigger-actions.ts`.
+ * Apps bootstrapped via `@zanix/core` get `mail`/`request` registered automatically (`request`
+ * directly by `@zanix/core` itself; `mail` self-registered by `@zanix/notifications`'s own `/core`
  * entrypoint); standalone `@zanix/asyncmq` usage must register a job for these names itself.
- * `custom` actions reference their own job name directly instead of one of these.
+ * **`log` self-registers within this package itself**: `@zanix/datamaster` registers its own
+ * handler for it (`modules/triggers/log-trigger.core.ts`) once `@zanix/datamaster/core` is
+ * imported, since `@zanix/logger` is already this package's own dependency rather than another
+ * package's owned capability. `custom` actions reference their own job name directly instead of
+ * one of these.
  */
 export const DEFAULT_TRIGGER_JOBS = {
   /** Job name for the built-in `mail` trigger action. */
   mail: 'zanix:trigger:mail',
   /** Job name for the built-in `request` trigger action. */
   request: 'zanix:trigger:request',
+  /** Job name for the built-in `log` trigger action. */
+  log: 'zanix:trigger:log',
 } as const

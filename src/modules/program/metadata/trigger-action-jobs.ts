@@ -27,12 +27,18 @@ export type TriggerActionJobDescriptor<A = never> = {
 }
 
 /**
- * A container mapping a built-in trigger action kind (`mail`, `request`, or a future named key on
- * `TriggerActions`) to the job descriptor it dispatches to. Populated by whichever package owns
- * that action's job handler (`@zanix/notifications`, for `mail`, self-registering from its own
+ * A container mapping a built-in trigger action kind (`mail`, `request`, `log`, or a future named
+ * key on `TriggerActions`) to the job descriptor it dispatches to. Populated by whichever package
+ * owns that action's job handler (`@zanix/notifications`, for `mail`, self-registering from its own
  * `/core` entrypoint; `@zanix/core` itself, for the ownerless generic `request` action) — never by
- * this package, which only defines the mechanism. `@zanix/core` drains every registered descriptor
- * and performs the actual `@zanix/asyncmq` `registerJob` call — the one place that happens.
+ * this package for those, which only defines the mechanism. `@zanix/core` drains every registered
+ * descriptor and performs the actual `@zanix/asyncmq` `registerJob` call — the one place that
+ * happens. **`log` is the one built-in kind this package registers itself**
+ * (`modules/triggers/log-trigger.core.ts`), since `@zanix/logger` is already one of its own
+ * dependencies, not another package's owned capability — `@zanix/core`'s drain step still performs
+ * the one real `registerJob` call for it, exactly as for `mail`/`request`; registration only
+ * happens once per action kind (this container throws on a duplicate `actionKind`), so there's no
+ * double-registration risk from `datamaster` and `@zanix/core` both touching `log`.
  */
 export class TriggerActionJobsContainer extends ProgramContainer {
   #key = 'trigger-action-jobs'

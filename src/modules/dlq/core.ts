@@ -16,7 +16,10 @@ import { Provider, registerCoreProviderSlot } from '@zanix/server'
  * so `this.providers.get(DLQProvider)` — the class every consumer actually imports — resolves
  * correctly. See `@zanix/auth`'s `providers/core.ts` for the full rationale.
  */
-const registerProvider = () => {
+// Exported (not just auto-run below) — kept consistent with every other `core.ts` loader's own
+// callable, re-invokable registration function across the Zanix ecosystem (see `storage/core.ts`'s
+// own `registerS3Connector` doc for the full reasoning that pattern exists for).
+export const registerDLQProvider = (): void => {
   Provider({ slot: 'dlq' })(DLQProvider)
 }
 
@@ -43,6 +46,6 @@ registerCoreProviderSlot('dlq', ZanixCoreDLQProvider, {
  *
  * @module
  */
-const zanixDLQProviderCore: void = registerProvider()
+const zanixDLQProviderCore: void = registerDLQProvider()
 
 export default zanixDLQProviderCore

@@ -25,7 +25,7 @@ const FILTER_COMBINATORS = ['$or', '$and', '$nor'] as const
  * throws for the same reason: a masked field can't be partially/range-matched against a plaintext
  * pattern, so doing so silently would just return an always-wrong result set. Partial/substring
  * search against a masked field still needs `Model.mask(term)` applied by hand — see the
- * `useDataPolicies` section of `docs/DATA-PROTECTION.md` for why that stays a manual, per-call
+ * `useDataPolicies` section of `docs/data-protection.md` for why that stays a manual, per-call
  * decision this hook can't infer generically.
  *
  * `$or`/`$and`/`$nor` branches are recursed into, so a protected path used inside one is still
@@ -66,6 +66,7 @@ export function protectFilterByPaths(
 
     if (activeConfig?.strategy !== 'mask') {
       throw new InternalError('An error occurred during data processing', {
+        code: 'DATAMASTER_QUERY_FILTER_PROTECTED_PATH_UNSAFE',
         cause: `Protected path '${path}' cannot be used in a 'useDataPolicies' query filter — ` +
           `only the 'mask' strategy is safe for deterministic query matching (its active ` +
           `version config uses '${activeConfig?.strategy}', which is not).`,
@@ -88,6 +89,7 @@ export function protectFilterByPaths(
 
     if (!isPlain && !isEq && !isIn) {
       throw new InternalError('An error occurred during data processing', {
+        code: 'DATAMASTER_QUERY_FILTER_OPERATOR_UNSUPPORTED',
         cause: `Protected path '${path}' was used with an unsupported operator under ` +
           `'useDataPolicies' — only a plain equality match or '$in' can be protected automatically.`,
         meta: {

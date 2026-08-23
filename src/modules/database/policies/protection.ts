@@ -109,6 +109,7 @@ export const dataProtectionSetterDefinition = (
     configs.versionConfigs['default']
   if (!config) {
     throw new InternalError('An error occurred during data processing', {
+      code: 'DATAMASTER_DATA_PROTECTION_VERSION_CONFIG_MISSING',
       cause: `Data protection version config is not defined for version '${version}'`,
       meta: {
         source: 'zanix',

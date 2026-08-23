@@ -1,18 +1,20 @@
 import { assert, assertEquals, assertNotEquals, assertRejects } from '@std/assert'
 import { generateRSAKeys } from '@zanix/helpers'
-import { SeaweedFSObjectStorage } from 'storage/connector.ts'
+import { S3ObjectStorage } from 'storage/connector.ts'
 import { S3Client } from '@aws-sdk/client-s3'
 
 /**
- * Exercises `SeaweedFSObjectStorage`'s `put`/`get`/`delete`/`exists`/`isHealthy` against a stubbed
- * `S3Client.prototype.send` — no network, no real SeaweedFS. Verifies both the S3 command shape
- * sent for each operation AND the `ObjectStorage` contract (put/get round-trip, undefined
- * for a missing key, idempotent delete). A separate functional suite
- * (`src/@tests/functional/storage/seaweedfs-object-storage.test.ts`) exercises the same contract
- * against a real SeaweedFS instance.
+ * Exercises `S3ObjectStorage`'s `put`/`get`/`delete`/`exists`/`isHealthy` against a stubbed
+ * `S3Client.prototype.send` — no network, no real S3-compatible backend. Verifies both the S3
+ * command shape sent for each operation AND the `ObjectStorage` contract (put/get round-trip,
+ * undefined for a missing key, idempotent delete). A separate functional suite
+ * (`src/@tests/functional/storage/s3-object-storage.test.ts`) exercises the same contract
+ * against a real S3-compatible instance (SeaweedFS in CI/local dev).
  */
 
 type SendHandler = (command: { constructor: { name: string }; input: unknown }) => unknown
+
+console.error = () => {}
 
 const originalSend = S3Client.prototype.send
 
@@ -32,7 +34,7 @@ function notFoundError(name: string): Error {
 }
 
 Deno.test(
-  'SeaweedFSObjectStorage.put sends a PutObjectCommand with the computed checksum and content-type',
+  'S3ObjectStorage.put sends a PutObjectCommand with the computed checksum and content-type',
   async () => {
     let sentInput: { constructor: { name: string }; input: unknown } | undefined
     stubSend((command) => {
@@ -40,7 +42,7 @@ Deno.test(
       return Promise.resolve({})
     })
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       const bytes = new TextEncoder().encode('hello world')
       const result = await storage.put('objects/a/data', bytes, {
         contentType: 'text/plain',
@@ -71,7 +73,7 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.get returns the stored bytes and metadata for an existing key',
+  'S3ObjectStorage.get returns the stored bytes and metadata for an existing key',
   async () => {
     const bytes = new TextEncoder().encode('payload')
     stubSend((command) => {
@@ -85,7 +87,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       const result = await storage.get('objects/a/data')
       assert(result, 'expected the object to be found')
       assertEquals(result.object.checksum, 'abc123')
@@ -99,11 +101,11 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.get returns undefined for a missing key (NoSuchKey)',
+  'S3ObjectStorage.get returns undefined for a missing key (NoSuchKey)',
   async () => {
     stubSend(() => Promise.reject(notFoundError('NoSuchKey')))
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       const result = await storage.get('objects/does-not-exist/data')
       assertEquals(result, undefined)
     } finally {
@@ -113,11 +115,11 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.get propagates a real connectivity error, never treats it as missing',
+  'S3ObjectStorage.get propagates a real connectivity error, never treats it as missing',
   async () => {
     stubSend(() => Promise.reject(new Error('ECONNREFUSED')))
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       await assertRejects(() => storage.get('objects/a/data'), Error, 'ECONNREFUSED')
     } finally {
       restoreSend()
@@ -126,14 +128,14 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.exists returns true when HeadObjectCommand succeeds',
+  'S3ObjectStorage.exists returns true when HeadObjectCommand succeeds',
   async () => {
     stubSend((command) => {
       assertEquals(command.constructor.name, 'HeadObjectCommand')
       return Promise.resolve({})
     })
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       assertEquals(await storage.exists('objects/a/data'), true)
     } finally {
       restoreSend()
@@ -141,10 +143,10 @@ Deno.test(
   },
 )
 
-Deno.test('SeaweedFSObjectStorage.exists returns false for a missing key (NotFound)', async () => {
+Deno.test('S3ObjectStorage.exists returns false for a missing key (NotFound)', async () => {
   stubSend(() => Promise.reject(notFoundError('NotFound')))
   try {
-    const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+    const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
     assertEquals(await storage.exists('objects/does-not-exist/data'), false)
   } finally {
     restoreSend()
@@ -152,7 +154,7 @@ Deno.test('SeaweedFSObjectStorage.exists returns false for a missing key (NotFou
 })
 
 Deno.test(
-  'SeaweedFSObjectStorage.delete sends a DeleteObjectCommand for the given key',
+  'S3ObjectStorage.delete sends a DeleteObjectCommand for the given key',
   async () => {
     let sentInput: unknown
     stubSend((command) => {
@@ -161,7 +163,7 @@ Deno.test(
       return Promise.resolve({})
     })
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       await storage.delete('objects/a/data')
       assertEquals((sentInput as { Key: string }).Key, 'objects/a/data')
     } finally {
@@ -171,14 +173,14 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.isHealthy returns true when HeadBucketCommand succeeds',
+  'S3ObjectStorage.isHealthy returns true when HeadBucketCommand succeeds',
   async () => {
     stubSend((command) => {
       assertEquals(command.constructor.name, 'HeadBucketCommand')
       return Promise.resolve({})
     })
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       assertEquals(await storage.isHealthy(), true)
     } finally {
       restoreSend()
@@ -187,11 +189,11 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.isHealthy returns false when the bucket is unreachable',
+  'S3ObjectStorage.isHealthy returns false when the bucket is unreachable',
   async () => {
     stubSend(() => Promise.reject(new Error('ECONNREFUSED')))
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       assertEquals(await storage.isHealthy(), false)
     } finally {
       restoreSend()
@@ -200,7 +202,7 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage with symmetric encryption stores ciphertext, never the plaintext bytes, and round-trips',
+  'S3ObjectStorage with symmetric encryption stores ciphertext, never the plaintext bytes, and round-trips',
   async () => {
     Deno.env.set('DATA_AES_KEY', 'a-test-symmetric-key-value')
     const store = new Map<
@@ -231,7 +233,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric' },
@@ -259,14 +261,14 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage with symmetric encryption enabled but no DATA_AES_KEY configured fails closed',
+  'S3ObjectStorage with symmetric encryption enabled but no DATA_AES_KEY configured fails closed',
   async () => {
     Deno.env.delete('DATA_AES_KEY')
     stubSend(() => {
       throw new Error('PutObjectCommand should never be sent when encryption fails')
     })
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric' },
@@ -283,7 +285,7 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage with asymmetric encryption wraps a random per-object AES key with RSA and round-trips',
+  'S3ObjectStorage with asymmetric encryption wraps a random per-object AES key with RSA and round-trips',
   async () => {
     const { publicKey, privateKey } = await generateRSAKeys()
     Deno.env.set('DATA_RSA_PUB', btoa(publicKey))
@@ -316,7 +318,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'asymmetric' },
@@ -345,7 +347,7 @@ Deno.test(
 // currently "active" for new writes, must always govern its own decryption. --------------------
 
 Deno.test(
-  'SeaweedFSObjectStorage with a versioned symmetric key encrypts under DATA_AES_KEY_V1 and ' +
+  'S3ObjectStorage with a versioned symmetric key encrypts under DATA_AES_KEY_V1 and ' +
     'records that version in the object metadata',
   async () => {
     Deno.env.set('DATA_AES_KEY_V1', 'a-versioned-key')
@@ -359,7 +361,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -377,7 +379,7 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage: rotating the active key version never breaks decrypting an object ' +
+  'S3ObjectStorage: rotating the active key version never breaks decrypting an object ' +
     'encrypted under the OLD version',
   async () => {
     Deno.env.set('DATA_AES_KEY', 'the-v0-key')
@@ -411,7 +413,7 @@ Deno.test(
     })
     try {
       // Written BEFORE rotation, under the unsuffixed (v0) key.
-      const preRotation = new SeaweedFSObjectStorage({
+      const preRotation = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric' },
@@ -421,7 +423,7 @@ Deno.test(
 
       // Simulates the rotation: a NEW connector instance, configured to encrypt future writes
       // under v1 — but reading the SAME pre-rotation object.
-      const postRotation = new SeaweedFSObjectStorage({
+      const postRotation = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -443,7 +445,7 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage: full V1 -> V2 rotation — an object written under V1 keeps reading ' +
+  'S3ObjectStorage: full V1 -> V2 rotation — an object written under V1 keeps reading ' +
     'correctly after the active version moves to V2, and a NEW object written after rotation ' +
     'uses V2 and reads back correctly too',
   async () => {
@@ -478,7 +480,7 @@ Deno.test(
     })
     try {
       // Write under V1 (the active version at the time).
-      const v1Storage = new SeaweedFSObjectStorage({
+      const v1Storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v1' },
@@ -488,7 +490,7 @@ Deno.test(
 
       // Rotate: active version moves to V2 (a new connector instance, matching how a real
       // deployment would reconfigure and restart with the new active version).
-      const v2Storage = new SeaweedFSObjectStorage({
+      const v2Storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v2' },
@@ -525,7 +527,7 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage: an object declaring an encryption version whose key is unavailable ' +
+  'S3ObjectStorage: an object declaring an encryption version whose key is unavailable ' +
     'fails clearly — it is never silently decrypted with the CURRENT active key instead',
   async () => {
     // Only V2 is configured — the object below claims V5, a version that was never rotated to.
@@ -556,7 +558,7 @@ Deno.test(
         Metadata: { checksum: 'irrelevant', 'encryption-version': 'v5' },
       })
 
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric', version: 'v2' },
@@ -574,7 +576,7 @@ Deno.test(
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.get: an encryption-enabled instance correctly reads BOTH a real ' +
+  'S3ObjectStorage.get: an encryption-enabled instance correctly reads BOTH a real ' +
     'encrypted object AND a genuinely unencrypted object stored alongside it, without corrupting ' +
     'the plaintext one by attempting to decrypt it',
   async () => {
@@ -607,7 +609,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const encrypted = new SeaweedFSObjectStorage({
+      const encrypted = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'symmetric' },
@@ -646,15 +648,15 @@ Deno.test(
   },
 )
 
-// --- SEAWEEDFS_ENCRYPT/SEAWEEDFS_ENCRYPT_VERSION: the only way to enable encryption on the
+// --- S3_ENCRYPT/S3_ENCRYPT_VERSION: the only way to enable encryption on the
 // connector instance the standard @Connector/DI boot path constructs (it never receives custom
 // constructor arguments). --------------------------------------------------------------------
 
 Deno.test(
-  'SeaweedFSObjectStorage: SEAWEEDFS_ENCRYPT=symmetric enables encryption with no constructor option',
+  'S3ObjectStorage: S3_ENCRYPT=symmetric enables encryption with no constructor option',
   async () => {
     Deno.env.set('DATA_AES_KEY', 'env-driven-key')
-    Deno.env.set('SEAWEEDFS_ENCRYPT', 'symmetric')
+    Deno.env.set('S3_ENCRYPT', 'symmetric')
     let sentBody: Uint8Array | undefined
     stubSend((command) => {
       if (command.constructor.name === 'PutObjectCommand') {
@@ -664,9 +666,9 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      // No `encrypt` option at all — matches exactly how `core.ts`'s `_SeaweedFSCoreObjectStorage`
+      // No `encrypt` option at all — matches exactly how `core.ts`'s `_S3CoreObjectStorage`
       // is constructed by the real DI boot path.
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       const plaintext = new TextEncoder().encode('should be encrypted via env var alone')
       await storage.put('objects/i/data', plaintext, { contentType: 'text/plain' })
       assert(sentBody, 'expected a PutObjectCommand to have been sent')
@@ -674,18 +676,18 @@ Deno.test(
     } finally {
       restoreSend()
       Deno.env.delete('DATA_AES_KEY')
-      Deno.env.delete('SEAWEEDFS_ENCRYPT')
+      Deno.env.delete('S3_ENCRYPT')
     }
   },
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage: an explicit encrypt option always wins over SEAWEEDFS_ENCRYPT',
+  'S3ObjectStorage: an explicit encrypt option always wins over S3_ENCRYPT',
   async () => {
     // The env var says "symmetric"; the explicit option below says "asymmetric" instead — proven
     // by requiring DATA_RSA_PUB (which a symmetric encryption would never look for) and NOT
     // setting DATA_AES_KEY at all (which a symmetric encryption would have needed).
-    Deno.env.set('SEAWEEDFS_ENCRYPT', 'symmetric')
+    Deno.env.set('S3_ENCRYPT', 'symmetric')
     const { publicKey } = await generateRSAKeys()
     Deno.env.set('DATA_RSA_PUB', btoa(publicKey))
     stubSend((command) => {
@@ -693,7 +695,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: { type: 'asymmetric' },
@@ -704,16 +706,16 @@ Deno.test(
       assert(result, 'expected the asymmetric-encrypted put to succeed using the explicit option')
     } finally {
       restoreSend()
-      Deno.env.delete('SEAWEEDFS_ENCRYPT')
+      Deno.env.delete('S3_ENCRYPT')
       Deno.env.delete('DATA_RSA_PUB')
     }
   },
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage: an invalid SEAWEEDFS_ENCRYPT value leaves encryption off, never throws',
+  'S3ObjectStorage: an invalid S3_ENCRYPT value leaves encryption off, never throws',
   async () => {
-    Deno.env.set('SEAWEEDFS_ENCRYPT', 'not-a-real-type')
+    Deno.env.set('S3_ENCRYPT', 'not-a-real-type')
     let sentBody: Uint8Array | undefined
     stubSend((command) => {
       if (command.constructor.name === 'PutObjectCommand') {
@@ -723,23 +725,23 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const storage = new SeaweedFSObjectStorage({ autoInitialize: false, bucket: 'test' })
+      const storage = new S3ObjectStorage({ autoInitialize: false, bucket: 'test' })
       const plaintext = new TextEncoder().encode('stored as plaintext, encryption never activated')
       await storage.put('objects/k/data', plaintext, { contentType: 'text/plain' })
       assertEquals(sentBody, plaintext)
     } finally {
       restoreSend()
-      Deno.env.delete('SEAWEEDFS_ENCRYPT')
+      Deno.env.delete('S3_ENCRYPT')
     }
   },
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage: encrypt: false explicitly overrides SEAWEEDFS_ENCRYPT, forcing this ' +
+  'S3ObjectStorage: encrypt: false explicitly overrides S3_ENCRYPT, forcing this ' +
     'ONE instance unencrypted even though the env var enables it process-wide — the exact ' +
     'real-world need: a diagnostic/comparison connector that must see genuinely raw bytes',
   async () => {
-    Deno.env.set('SEAWEEDFS_ENCRYPT', 'symmetric')
+    Deno.env.set('S3_ENCRYPT', 'symmetric')
     Deno.env.set('DATA_AES_KEY', 'irrelevant-should-never-be-read')
     let sentBody: Uint8Array | undefined
     stubSend((command) => {
@@ -750,7 +752,7 @@ Deno.test(
       throw new Error(`unexpected command: ${command.constructor.name}`)
     })
     try {
-      const storage = new SeaweedFSObjectStorage({
+      const storage = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: false,
@@ -760,13 +762,13 @@ Deno.test(
       assertEquals(
         sentBody,
         plaintext,
-        'expected encrypt:false to win over SEAWEEDFS_ENCRYPT — this is the real bug a real ' +
+        'expected encrypt:false to win over S3_ENCRYPT — this is the real bug a real ' +
           'end-to-end test surfaced: a "raw" comparison connector with no encrypt option at all ' +
           'was silently inheriting the env var, masking whether encryption actually happened',
       )
     } finally {
       restoreSend()
-      Deno.env.delete('SEAWEEDFS_ENCRYPT')
+      Deno.env.delete('S3_ENCRYPT')
       Deno.env.delete('DATA_AES_KEY')
     }
   },
@@ -776,10 +778,10 @@ Deno.test(
 // reconstructs a worker-thread instance from — must round-trip to an EQUIVALENT instance. -------
 
 Deno.test(
-  'SeaweedFSObjectStorage.connectorOptions round-trips to a new instance with identical ' +
+  'S3ObjectStorage.connectorOptions round-trips to a new instance with identical ' +
     'behavior, regardless of the env vars at reconstruction time',
   () => {
-    const original = new SeaweedFSObjectStorage({
+    const original = new S3ObjectStorage({
       autoInitialize: false,
       endpoint: 'http://original-endpoint:8333',
       bucket: 'original-bucket',
@@ -796,45 +798,45 @@ Deno.test(
 
     // A DIFFERENT env var setup at reconstruction time must NOT change the reconstructed
     // instance's behavior — every value is already resolved, not re-read from the environment.
-    Deno.env.set('SEAWEEDFS_S3_ENDPOINT', 'http://should-be-ignored:9999')
-    Deno.env.set('SEAWEEDFS_BUCKET', 'should-be-ignored-bucket')
+    Deno.env.set('S3_ENDPOINT', 'http://should-be-ignored:9999')
+    Deno.env.set('S3_BUCKET', 'should-be-ignored-bucket')
     try {
-      const reconstructed = new SeaweedFSObjectStorage({ autoInitialize: false, ...options })
+      const reconstructed = new S3ObjectStorage({ autoInitialize: false, ...options })
       assertEquals(reconstructed.connectorOptions, options)
       assertEquals(reconstructed.encryptSettings, { type: 'symmetric', version: 'v3' })
     } finally {
-      Deno.env.delete('SEAWEEDFS_S3_ENDPOINT')
-      Deno.env.delete('SEAWEEDFS_BUCKET')
+      Deno.env.delete('S3_ENDPOINT')
+      Deno.env.delete('S3_BUCKET')
     }
   },
 )
 
 Deno.test(
-  'SeaweedFSObjectStorage.connectorOptions reports encrypt: false (never undefined) when ' +
+  'S3ObjectStorage.connectorOptions reports encrypt: false (never undefined) when ' +
     'encryption is off, so a worker reconstruction never accidentally re-enables it via env var',
   () => {
-    Deno.env.set('SEAWEEDFS_ENCRYPT', 'symmetric')
+    Deno.env.set('S3_ENCRYPT', 'symmetric')
     Deno.env.set('DATA_AES_KEY', 'irrelevant-should-never-be-read')
     try {
-      const original = new SeaweedFSObjectStorage({
+      const original = new S3ObjectStorage({
         autoInitialize: false,
         bucket: 'test',
         encrypt: false,
       })
       assertEquals(original.connectorOptions.encrypt, false)
 
-      const reconstructed = new SeaweedFSObjectStorage({
+      const reconstructed = new S3ObjectStorage({
         autoInitialize: false,
         ...original.connectorOptions,
       })
       assertEquals(
         reconstructed.encryptSettings,
         undefined,
-        'expected the reconstructed instance to stay unencrypted despite SEAWEEDFS_ENCRYPT ' +
+        'expected the reconstructed instance to stay unencrypted despite S3_ENCRYPT ' +
           'still being set in the environment',
       )
     } finally {
-      Deno.env.delete('SEAWEEDFS_ENCRYPT')
+      Deno.env.delete('S3_ENCRYPT')
       Deno.env.delete('DATA_AES_KEY')
     }
   },

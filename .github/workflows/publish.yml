@@ -3,7 +3,7 @@
 name: Publish
 
 on:
-  # Run on push or PRs to master
+  # Run on push or PRs to main branch
   pull_request:
     branches:
       - master
@@ -12,7 +12,14 @@ on:
       - master
 
 jobs:
+  # Runs `ci.yml` (the `zanix check-cycles` circular-import-hazard check) as a reusable workflow,
+  # same repo, same branch — a same-repo `uses:` job can't also declare `runs-on`/`steps` of its
+  # own. `publish` below only starts once every job inside this one has succeeded.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   publish:
+    needs: ci # blocks `publish` unless every job inside the called `ci.yml` succeeded
     runs-on: ubuntu-latest
     permissions:
       contents: read # Allows reading of the repository's contents.
@@ -39,6 +46,11 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+      memcached:
+        image: memcached:1
+        ports:
+          - 11211:11211
+
       opensearch:
         image: opensearchproject/opensearch:2
         ports:
@@ -49,6 +61,20 @@ jobs:
           OPENSEARCH_JAVA_OPTS: '-Xms512m -Xmx512m'
         options: >-
           --health-cmd="curl -sf http://localhost:9200/_cluster/health || exit 1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      # Unlike SeaweedFS below, this image's default entrypoint runs the server directly with no
+      # extra args needed — a plain `services:` block works, same as mongo/redis/opensearch above.
+      meilisearch:
+        image: getmeili/meilisearch:v1.11
+        ports:
+          - 7700:7700
+        env:
+          MEILI_NO_ANALYTICS: 'true'
+        options: >-
+          --health-cmd="curl -sf http://localhost:7700/health || exit 1"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -85,7 +111,7 @@ jobs:
           exit 1
 
       # A fresh SeaweedFS instance starts with no buckets. The functional suite doesn't set
-      # SEAWEEDFS_BUCKET below, so it falls back to `DEFAULT_BUCKET` ('zanix-objects', see
+      # S3_BUCKET below, so it falls back to `DEFAULT_BUCKET` ('zanix-objects', see
       # `src/modules/storage/connector.ts`) — create that bucket here or every real S3 call in the
       # test fails with `NoSuchBucket`.
       - name: Create SeaweedFS bucket
@@ -94,10 +120,16 @@ jobs:
       - name: Run tests
         env:
           RUN_OPENSEARCH_TESTS: 'true'
-          RUN_SEAWEEDFS_TESTS: 'true'
-          SEAWEEDFS_ACCESS_KEY: zanix-ci-test
-          SEAWEEDFS_SECRET_KEY: zanix-ci-test
+          RUN_MEILISEARCH_TESTS: 'true'
+          RUN_S3_TESTS: 'true'
+          S3_ACCESS_KEY: zanix-ci-test
+          S3_SECRET_KEY: zanix-ci-test
         run: deno test --allow-all
 
       - name: Publish to Deno
+        # `needs.ci.result == 'success'` is explicit, not just relying on the default `needs:`
+        # skip-on-failure behavior above — that default only holds as long as `publish` keeps its
+        # own `if:` unset; an `always()`/similar override on the JOB (e.g. added later to get
+        # diagnostics on a failing run) would silently defeat it without this STEP-level check.
+        if: success() && needs.ci.result == 'success' && github.event_name == 'push'
         run: deno publish

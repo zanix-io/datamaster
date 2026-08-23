@@ -7,6 +7,261 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-23
+
+### Added
+
+- **New `'cache:memcached'` core-connector slot and `ZanixMemcachedConnector`.** A genuine
+  Memcached-backed cache connector using the classic Memcached ASCII text protocol over a raw
+  `Deno.connect` TCP socket — no external client dependency. Registered the same way every other
+  connector in this package is (`cache/providers/memcached/core.ts`'s unconditional
+  `registerCoreConnectorSlot('cache:memcached', ...)` at module load, plus a `MEMCACHED_URI`-gated
+  `registerMemcachedConnector()`, exported for re-registration after a registry reset). Supports TTL
+  (with relative/absolute `exptime` conversion past Memcached's own 30-day threshold) and key
+  validation against the protocol's own constraints (250 bytes, no whitespace/control characters —
+  guards against command injection via a key containing `\r\n`). **Two documented tradeoffs, not
+  neutral features**: `keys()`/`values()`/`size()` have no server-side equivalent to Redis's
+  `SCAN`/`DBSIZE` in the classic protocol, so they're backed by a per-connector-instance in-memory
+  key index instead — invisible to keys written by another instance/process, and only ever a lower
+  bound on the shared server's real contents; and `set(key, value, { exp: 'KEEPTTL' })` throws
+  (`MEMCACHED_KEEPTTL_UNSUPPORTED`) rather than silently guessing, since the protocol exposes no way
+  to read a key's remaining TTL. `clear()` flushes the entire Memcached instance (`flush_all`), the
+  same shared-instance footgun `ZanixRedisConnector.clear()` already documents for Redis. See
+  [cache.md](./docs/cache.md#memcached-connector).
+
+- **`MeilisearchConnector`** (`observability/meilisearch-connector.ts`) — a plain `fetch`-based
+  connector for [Meilisearch](https://www.meilisearch.com), implementing `@zanix/server`'s
+  `ZanixSearchConnector` (`index()`/`bulkIndex()`), registered under the same `'search'` core
+  connector slot `ZanixElasticsearchConnector` already owns, gated on `SEARCH_ENGINE=meilisearch`
+  (plus `SEARCH_URL`/`MEILISEARCH_API_KEY` for auth). `bulkIndex()` polls Meilisearch's own task API
+  to a terminal status by default (`waitForTask: true`) so its `{errors, failedCount}` result is
+  real, since Meilisearch's document-write endpoint is asynchronous (an enqueued task), unlike
+  Elasticsearch's synchronous-ish `_bulk`.
+  - **`resolveSearchEngine()`** (`observability/search-config.ts`) — since `'search'` backs a single
+    instance, not independently-coexisting ones, this resolves the `SEARCH_ENGINE` env var against a
+    fixed allowlist (`elasticsearch`/`opensearch`/`meilisearch`), throwing (`InternalError`,
+    `SEARCH_ENGINE_UNSUPPORTED`) on an unrecognized value — so only ever one engine is selectable,
+    rather than letting whichever connector's class happens to `@Connector`-decorate last silently
+    win the slot. Called both at `observability/core.ts`'s own module load and from inside
+    `registerElasticsearchConnector()`/`registerMeilisearchConnector()` themselves, so the check
+    also applies to a standalone re-registration after a registry reset.
+
+- **New `log` trigger action type**, alongside `mail`/`request`/`custom`
+  (`database/typings/triggers.ts`'s `TriggerActions.log`). Writes a structured log entry via
+  `@zanix/logger` when the trigger fires (`level` + `message`, both supporting `{{field}}`/
+  `${{ENV_VAR}}` interpolation). Dispatches to `DEFAULT_TRIGGER_JOBS.log` (`'zanix:trigger:log'`)
+  via the same `registerTriggerActionJob`/`TriggerActionJobsContainer` mechanism `mail`/`request`
+  already use. **Unlike `mail`/`request`, `@zanix/datamaster` self-registers a real handler for
+  `log` itself** (`modules/triggers/log-trigger.core.ts`, loaded from this package's own `/core`
+  entrypoint) — `@zanix/logger` is already one of this package's own dependencies, not a capability
+  owned by a sibling package, so it needs no consumer-side registration to work. See
+  [triggers.md](./docs/triggers.md#the-log-action-a-structured-log-entry-via-zanixlogger).
+
+- **New public subpath `@zanix/datamaster/dlq-api`** — `createDlqAdminController`, a local
+  `/admin/dlq` REST controller mirroring `@zanix/datamaster/triggers-api`'s own
+  `createTriggersAdminController` shape: a factory (`guards`/`versionProtocol` supplied by whoever
+  composes it, e.g. `@zanix/admin`) wrapping a new `DLQAdminService`, itself delegating straight to
+  the existing `DLQProvider` (no separate repository layer — `DLQProvider` already owns Mongo
+  access). Deliberately exposes only `push`/`get`/`list`/`requeue`/`discard`/`remove`; the
+  lease-based `claim`/`release`/`complete`/`fail` primitives stay off this REST surface (they're
+  fenced by a `leaseOwner` a worker process holds, built for `@zanix/asyncmq/dlq`'s
+  `registerDLQProcessor` to drive programmatically, not for an admin to click a button for). Same
+  `dependency-boundary.test.ts` enforcement `triggers-api` already has, proving
+  `dlq.service.ts`/`dlq.provider.ts` never import back into `dlq-api/`. See
+  [DLQ: Local admin API](./docs/dlq.md#local-admin-api--zanixdatamasterdlq-api).
+  - `createDlqDiscoveryProvider()` (root export) — builds the `DiscoveryProvider` for
+    `/.well-known/zanix/dlq`, mirroring `createTriggersDiscoveryProvider`. Unlike the triggers one,
+    it does NOT reuse `list()` unchanged: DLQ entries can be numerous and never auto-purge (no TTL),
+    so `snapshot()` only ever returns the unresolved backlog (`pending`/`claimed`/`failed`, capped
+    at 500 each, merged from three parallel `list()` calls) — `'completed'`/`'discarded'` history is
+    excluded, kept to `DLQAdminService.list()`'s real pagination instead.
+  - `isDlqResourceEnabled()` (root export, `dlq.model.ts`) — `true` once `DLQ_MODEL_NAME` is set,
+    the same "is this resource configured" signal `@zanix/admin`'s own `/admin/dlq` gating mirrors.
+
+- **Every conditional `@Connector`/`@Provider` DSL registration function is now exported, not just
+  auto-run as a private module-level side effect**: `registerS3Connector` (`storage/core.ts`),
+  `registerMongoConnector` (`database/providers/mongo/connector/core.ts`), `registerRedisConnector`
+  (`cache/providers/redis/core.ts`), `registerQLRUConnector` (`cache/providers/qlru/core.ts`),
+  `registerKVConnector` (`database/providers/sqlite/core.ts`), `registerElasticsearchConnector`
+  (`observability/core.ts`), `registerCacheProvider` (`cache/providers/core.ts`), and
+  `registerDLQProvider` (`dlq/core.ts`) — all reachable via `@zanix/datamaster/core`. The new
+  `registerMemcachedConnector`/`registerMeilisearchConnector` above follow the same pattern from the
+  start. Each still runs automatically once, at import time, exactly as before; the new export lets
+  a caller re-register after clearing the relevant registry (`closeAllConnections()`/
+  `ProgramModule.targets.resetContainer(['type:connector'])`, both `@zanix/server`) without needing
+  a fresh module evaluation — for a config-reload in a long-running process, or a test simulating a
+  different env state between cases. Same pattern adopted across `@zanix/auth`, `@zanix/asyncmq`,
+  `@zanix/notifications`, and `@zanix/app` in the same batch of work.
+
+### Changed
+
+- **BREAKING: unified the `'search'` core-connector slot's backend selection into one env var.**
+  `ELASTICSEARCH_URL`/`OPENSEARCH_URL`/`MEILISEARCH_URL` — three separate, mutually-exclusive env
+  vars guarded pairwise at boot — are replaced by a single
+  `SEARCH_ENGINE=elasticsearch|opensearch|
+  meilisearch` selector plus one generic `SEARCH_URL`.
+  `assertSearchConfigNotConflicting()` is removed; `resolveSearchEngine()` takes its place (see the
+  `Added` entry above) — with a single selector, configuring two backends at once is no longer a
+  representable state, so there's nothing left to guard against. No dual-read or deprecation window:
+  the old vars are no longer read at all.
+  `ELASTICSEARCH_API_KEY`/`OPENSEARCH_API_KEY`/`MEILISEARCH_API_KEY` are unaffected — auth stays
+  per-backend.
+
+- **BREAKING: renamed everything "SeaweedFS"-branded in the `storage` module to generic S3 names.**
+  `SeaweedFSObjectStorage` was never actually SeaweedFS-specific — it's a plain `@aws-sdk/client-s3`
+  client wearing the name of one particular self-hosted S3-compatible backend. No alias/compat shim
+  is provided; this is a direct rename. Affected identifiers and env vars:
+  - `SeaweedFSObjectStorage` (class) → `S3ObjectStorage`
+  - `SeaweedFSConnectorOptions` (type) → `S3ConnectorOptions`
+  - `registerSeaweedFSConnector` (function) → `registerS3Connector`
+  - `seaweedFSConnectorCore` (default export, `storage/core.ts`) → `s3ConnectorCore`
+  - `SEAWEEDFS_S3_ENDPOINT` → `S3_ENDPOINT`
+  - `SEAWEEDFS_ACCESS_KEY` → `S3_ACCESS_KEY`
+  - `SEAWEEDFS_SECRET_KEY` → `S3_SECRET_KEY`
+  - `SEAWEEDFS_BUCKET` → `S3_BUCKET`
+  - `SEAWEEDFS_ENCRYPT` → `S3_ENCRYPT`
+  - `SEAWEEDFS_ENCRYPT_VERSION` → `S3_ENCRYPT_VERSION`
+  - `RUN_SEAWEEDFS_TESTS` (test-only flag) → `RUN_S3_TESTS`
+
+  The default behavior is unchanged: `http://localhost:8333`, `forcePathStyle: true`, and the
+  `DUMMY_REGION` fallback are untouched — only the names moved. Consumers importing
+  `SeaweedFSObjectStorage`/`SeaweedFSConnectorOptions`/`registerSeaweedFSConnector` or setting any
+  `SEAWEEDFS_*` env var must switch to the `S3*` names above; there is no fallback to the old names.
+
+- **BREAKING: `observability/connector.ts`'s `getConnector()` no longer silently constructs a
+  standalone `ZanixElasticsearchConnector` when nothing is registered under the `'search'` core
+  slot.** It now throws the real `@zanix/server` "did you forget to import
+  `@zanix/datamaster/core`?" error instead — the previous fallback could mask a genuine
+  misconfiguration behind a connector silently pointed at bare, possibly-unset env vars
+  (`ELASTICSEARCH_URL`/`OPENSEARCH_URL`, defaulting all the way to `http://localhost:9200`).
+  `elasticsearchLogSave` (the `@zanix/logger` bridge) already wraps this in its own catch-and-report
+  handling, so its own "never throws" contract is unaffected — this only changes behavior for a
+  direct `getConnector()` call site outside that bridge. `flushBulkInWorker` (worker-thread flush)
+  no longer calls `getConnector()` at all — it constructs `ZanixElasticsearchConnector` directly,
+  since a worker thread's own registry state is always empty by design, so the new throw-on-empty
+  behavior would have fired on every single call there for a reason that isn't a real
+  misconfiguration.
+
+- **`sanitizeMongoFilter`'s internal plain-object check now delegates to `@zanix/helpers`'s shared
+  `isPlainObject`** instead of a local copy — the identical predicate had turned up independently
+  re-implemented in `@zanix/space-ui` too. No behavior change: `@zanix/helpers`'s version applies
+  the exact same prototype check this one already did, so a `Date`/`ObjectId` value still passes
+  through `sanitizeMongoFilter` untouched rather than being walked as a nested object.
+
+- **BREAKING: `ZanixMongoConnector.initialize()` now re-throws when the initial MongoDB connection
+  fails, instead of only logging and returning as if nothing happened.** The failure is wrapped as
+  `InternalError` (code `MONGODB_CONNECTOR_MONGO_ERROR`, `shouldLog: true` — it self-logs once, with
+  the same `sanitizeConnectionUri`-cleaned message/name/stack the old manual log call carried, now
+  under `meta.originalError`) instead of a bare native `Error`. Previously the connector was left in
+  a permanently broken state with no signal reaching the caller: `isReady` would resolve to `true`
+  even though nothing had actually connected, and every subsequent model call would fail with its
+  own, unrelated-looking error instead of the real connection failure. `ZanixConnector`'s own
+  `isReady`/auto-init retry loop (`@zanix/server` >= 3.2.1) already expects `initialize()` to
+  possibly reject — this makes `@zanix/datamaster`'s Mongo connector behave the same way its
+  Redis/Memcached siblings already did.
+
+- **Now built against `@zanix/utils@^3.0.0`** (previously pinned `^2.6.1`) **and a broadened
+  `@zanix/server@^3.0.0` range** (previously pinned `^3.2.1`; currently resolves to `3.3.0`) — a
+  real major bump for `@zanix/utils`, pulled in transitively by every `@zanix/datamaster` import
+  (`errors`/`logger`/`types`/`helpers`/`validator`/`workers` subpaths). `@zanix/utils@3.0.0`'s own
+  breaking change (every `/regex` constant renamed to `UPPER_SNAKE_CASE`) doesn't affect this
+  package — nothing here imports `@zanix/utils/regex`. The bump is what makes two new `helpers`
+  additions in that same release available here: `confinePath`/`isPlainObject` (see `Fixed`/
+  `Changed` entries above).
+
+### Fixed
+
+- **`ZanixRedisConnector.set(key, value, { schedule: true })`'s background write failure is now
+  logged instead of vanishing as an unhandled promise rejection.** `schedule: true` batches the
+  write through `RedisPipelineScheduler` and returns before it actually lands in Redis — genuinely
+  best-effort/fire-and-forget by design, which the method's own JSDoc now says outright. Previously,
+  once `execWithRetry` exhausted its retries for that queued write, nothing awaited or caught the
+  rejection, so the failure disappeared silently instead of surfacing anywhere. It's now caught and
+  logged (`logger.error`, code `REDIS_SCHEDULED_WRITE_FAILED`, includes the affected `key`) — still
+  never thrown back to the caller, since by the time it could fail, `set()` has already resolved.
+- **`S3ObjectStorage` now accepts a `region` option (falling back to the new `S3_REGION` env var),
+  fixing a real gap found while empirically verifying it's a genuinely generic S3 client.** Every
+  `S3Client` this connector built was previously signed under the hardcoded `DUMMY_REGION`
+  (`'us-east-1'`) unconditionally, with no way to override it — harmless against a self-hosted
+  gateway that doesn't validate region (SeaweedFS included, the documented rationale for the dummy
+  existing at all), but a real SigV4 signature-validation failure against a genuine, non-`us-east-1`
+  AWS S3 bucket. `region` follows the same `explicit option > env var > default` precedence every
+  other `S3ConnectorOptions` field already has. See [Storage](./docs/storage.md#s3objectstorage).
+- **A malformed `MONGO_URI`/`REDIS_URI` no longer leaks its embedded credentials into the logged
+  connection error.** `ZanixMongoConnector.initialize()`/`ZanixRedisConnector`'s `'error'` handler
+  now run `error.message`/`.stack` through the new `sanitizeConnectionUri`
+  (`src/utils/
+  sanitize-uri.ts`) before logging — an unescaped `@`/`:` in a URI's userinfo throws
+  with the full connection string, credentials included, embedded verbatim in the driver's own error
+  message (and therefore its stack, whose first line is that same message); `@zanix/logger` redacts
+  by field name only, so that string reached both console and any configured storage backend
+  unredacted. `sanitizeConnectionUri` strips a `scheme://user[:password]@` prefix wherever one
+  appears in a string, leaving the scheme/host untouched.
+- `deno lint`'s own `@zanix/utils` plugin (`deno-zanix-plugin`) is now version-pinned (`^3.0.0`),
+  matching every other `@zanix/utils` import in `deno.jsonc` — it used to resolve unpinned, so a
+  lint run could silently pick up a newer, unreviewed plugin version.
+- **`createLocalFilesystemObjectStorage` confines every `key` to `rootDir` before touching disk.**
+  `bytesPath`/`metaPath` used to join `key` straight onto `rootDir` with no containment check, so a
+  `key` containing `../` (or an absolute path, overriding `rootDir` outright) let
+  `put`/`get`/`delete` read, write, or remove a file outside the intended store. Now routed through
+  `@zanix/helpers`'s `confinePath`, which rejects any such `key` instead.
+- **`DLQProvider.list()`/`claim()` no longer let a raw `filter` inject a Mongo operator or override
+  the built-in scoping it's merged alongside.** Both accept a `filter` intended as a dot-path
+  equality lookup (e.g. `{ 'payload.orderId': 'abc123' }`); a `$`-prefixed key inside it — at any
+  nesting level, including inside an array of conditions — used to reach the query unchanged,
+  letting a caller-supplied `filter` run an operator like `$where`/`$expr` or, in `claim()`,
+  override the atomic-claim's own `status`/`$or` eligibility filter via a same-named key
+  (`{ filter: { status: 'completed' } }` reclaiming an already-terminal entry). Both methods now
+  strip every `$`-prefixed key from `filter` first, and `claim()` also merges it _before_ its own
+  eligibility filter so a plain same-named key (`status`, `processType`) can never win over it
+  either.
+- **`MONGO_URI`/`REDIS_URI`/`MEMCACHED_URI`/`AMQP_URI` are now read through their existing exported
+  `_ENV` constants** (`mongo/connector/core.ts`, `cache/providers/redis/core.ts`,
+  `cache/providers/memcached/core.ts`, `mongo/processor/triggers/dispatch.ts`) instead of a raw
+  inline string literal at each `Deno.env.has(...)` call site — the constants (`MONGO_URI_ENV`/
+  `REDIS_URI_ENV`/`MEMCACHED_URI_ENV`/the new `AMQP_URI_ENV`) already existed (or, for `AMQP_URI`,
+  are newly added alongside this fix — `database/utils/constants.ts`) and were already used
+  elsewhere in each connector's own `connector/mod.ts`; only these gate checks still spelled the var
+  name out by hand. Behavior-neutral (a pure literal→constant swap); matches `storage/core.ts`'s own
+  `Deno.env.has(S3_ENDPOINT_ENV)`, the repo's existing conformant precedent for this exact check.
+- **Several previously-uncoded `InternalError` throws now carry a stable `code`**, matching every
+  other error site in this package: data-protection version-config lookup
+  (`DATAMASTER_DATA_PROTECTION_VERSION_CONFIG_MISSING`, `policies/protection.ts`), search
+  field-strategy validation (`DATAMASTER_SEARCH_FIELD_STRATEGY_UNSUPPORTED`,
+  `mongo/processor/schema/statics/search.ts`), protected-path query-filter validation
+  (`DATAMASTER_QUERY_FILTER_PROTECTED_PATH_UNSAFE`/`DATAMASTER_QUERY_FILTER_OPERATOR_UNSUPPORTED`,
+  `mongo/processor/schema/transforms/filter.ts`), and trigger-condition evaluation
+  (`DATAMASTER_TRIGGER_CONDITION_INVALID_FORMAT`/`DATAMASTER_TRIGGER_CONDITION_OPERATOR_UNSUPPORTED`,
+  `mongo/processor/triggers/conditions.ts`). Also, `seederAdaptation`'s "no seed processor for
+  database type" failure now throws `InternalError` (code `SEEDER_TYPE_NOT_IMPLEMENTED`) instead of
+  a native `Error` — a package capability gap the caller couldn't have validated ahead of time, the
+  same reasoning already applied elsewhere in this package. None of these were reachable with a
+  message a caller could mistake for a different failure before; this only makes each one
+  programmatically distinguishable.
+- `cache/providers/core.ts` re-exported its own `./qlru/core.ts`/`./redis/core.ts` connectors via a
+  plain side-effect `import`, not `export *` — their own real exports (including the new
+  `registerQLRUConnector`/`registerRedisConnector` above) never actually propagated up through
+  `@zanix/datamaster/core`'s own barrel. Fixed alongside the registration-function-export change
+  above, since it's what makes it reachable at all.
+- **`src/utils/protection.ts`'s `DATA_SECRET_KEY`/`DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY` now
+  each have an exported `_ENV` constant** (`DATA_SECRET_KEY_ENV`/`DATA_AES_KEY_ENV`/
+  `DATA_RSA_PUB_ENV`/`DATA_RSA_KEY_ENV`), resolved at each use site (including the `_V1`/`_V2`/...
+  versioned-suffix concatenation) instead of a repeated inline literal — the last env-var family in
+  this package without one. Not part of the public export surface (`getMaskSecret`/
+  `getEncryptSecret`, the two functions that read them, are module-private).
+- **The internal "masking/encryption key missing" failure now throws `InternalError` instead of a
+  native `Error`**, matching this same file's own sibling catch blocks
+  (`DATAMASTER_ENCRYPT_ERROR`/`DATAMASTER_DECRYPT_ERROR`/`DATAMASTER_MASK_ERROR`/
+  `DATAMASTER_UNMASK_ERROR`) and `storage/encryption.ts`'s `requireEnv` (same reasoning: a config
+  invariant violated outside the caller's control). New codes:
+  `DATAMASTER_MASK_KEY_MISSING`/`DATAMASTER_ENCRYPTION_KEY_MISSING`. Constructed with
+  `shouldLog: false` — `mask`/`unmask`/`encrypt`/`decrypt` already catch this immediately and log it
+  themselves (as the codes above), so `InternalError`'s own default `shouldLog: true` would
+  otherwise double-log the same failure. Not externally visible: `getMaskSecret`/`getEncryptSecret`
+  are module-private and this error never escapes the surrounding try/catch in the four public
+  functions, which continue to swallow it and return the original input unchanged, exactly as
+  before.
+
 ## [1.4.0] - 2026-08-19
 
 ### Added
@@ -18,7 +273,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   `MongoFileRepository`/`registerFileModel` (a generic, durable file record registry, following the
   same `@Provider`/`ZanixMongoConnector` shape as `TriggersAdminRepository`/`DLQProvider`). Both are
   deliberately agnostic of what's being stored or by whom — bytes and metadata are two independent
-  concerns, usable separately or together. See [Storage](docs/STORAGE.md).
+  concerns, usable separately or together. See [Storage](docs/storage.md).
   - New `@aws-sdk/client-s3` dependency.
   - `SeaweedFSObjectStorage` registers the `'s3'` core connector slot (the same
     `registerCoreConnectorSlot` mechanism `'database'`/`'search'` already use); `./core` auto-
@@ -33,7 +288,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
     protection. Both accept `useWorker: 'one-time' | 'persisted'` to run off the calling thread.
   - New env vars: `FILE_MODEL_NAME`, `SEAWEEDFS_S3_ENDPOINT`, `SEAWEEDFS_ACCESS_KEY`,
     `SEAWEEDFS_SECRET_KEY`, `SEAWEEDFS_BUCKET`, `SEAWEEDFS_ENCRYPT`, `SEAWEEDFS_ENCRYPT_VERSION` —
-    see [Configuration](docs/CONFIGURATION.md).
+    see [Configuration](docs/configuration.md).
 - **New public subpath `@zanix/datamaster/triggers-api`** — `createTriggersAdminController`, the
   local `/admin/triggers` CRUD controller. This package now owns both the data
   (`TriggersAdminRepository`/`Service`, added in `1.3.0`) and the local HTTP surface fronting it,
@@ -56,7 +311,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   (payments, webhooks, jobs, ...) — `push`/`get`/`list`/`claim`/`release`/`complete`/`fail`/
   `requeue`/`discard`/`remove`. Registered under the `'dlq'` core-provider slot, resolvable via
   `this.providers.get(DLQProvider)`/`this.providers.get('dlq')`. Independent of `@zanix/asyncmq`'s
-  own RabbitMQ-native `ZanixAsyncMQProvider.requeueDeadLetters`. See [DLQ](docs/DLQ.md).
+  own RabbitMQ-native `ZanixAsyncMQProvider.requeueDeadLetters`. See [DLQ](docs/dlq.md).
 - `registerDLQModel(options?, connector?)`: registers the DLQ collection (`zanix-dlq` by default, or
   `DLQ_MODEL_NAME`/`options.modelName`), mirroring `registerModel`'s own `connector` parameter for
   multi-connector apps. `payload` is a native, queryable `Mixed` field by default
@@ -67,19 +322,19 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   `encryptPayload`) declares `payload`'s own field shape instead — the same
   `{ field: { type, get, ... } }` shape `registerModel`'s `definition` uses — so individual leaves
   can be protected in place while the rest stays queryable. See
-  [DLQ: Protecting the payload](docs/DLQ.md#protecting-the-payload). `options.defaultLeaseMs` sets
+  [DLQ: Protecting the payload](docs/dlq.md#protecting-the-payload). `options.defaultLeaseMs` sets
   the default `claim()` lease duration (`DLQ_DEFAULT_LEASE_MS` always wins when set; a per-call
   `claim({ leaseTtlMs })` always wins over both).
 - `DLQProvider.claim(options)`: atomically reserves one eligible entry via `findOneAndUpdate` —
   concurrency-safe across multiple app instances with no static worker/slot partitioning and no
   external lock service. Reclaims abandoned entries (`'claimed'` with an expired lease)
-  automatically. See [DLQ: Concurrency](docs/DLQ.md#concurrency-claim-not-static-worker-slots).
+  automatically. See [DLQ: Concurrency](docs/dlq.md#concurrency-claim-not-static-worker-slots).
 - `DLQ_MODEL_NAME`, `DLQ_ENCRYPT_PAYLOAD`, `DLQ_DEFAULT_LEASE_MS` env vars — see
-  [Configuration](docs/CONFIGURATION.md).
+  [Configuration](docs/configuration.md).
 
   Distributed DLQ reprocessing (`registerDLQProcessor`) is **`@zanix/asyncmq/dlq`'s** own addition,
   not this package's — `@zanix/datamaster` never imports `@zanix/asyncmq`. See
-  [DLQ: Distributed processing](docs/DLQ.md#distributed-processing--zanixasyncmqdlq) for why it
+  [DLQ: Distributed processing](docs/dlq.md#distributed-processing--zanixasyncmqdlq) for why it
   lives there (a short-lived earlier revision hosted an open registry here instead, mirroring
   `registerTriggerActionJob`; removed once it became clear the lateral-dependency problem that
   pattern solves doesn't apply to DLQ processors, which are normally app-registered, not owned by a
@@ -89,7 +344,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   check if it doesn't already exist yet, using `settings`/`mappings` from the connector-level
   `index` option (or a per-call override); an already-existing index is left untouched. Accepts a
   single index name or an array (deduped before checking). See
-  [Observability: Creating an index with `ensureIndex()`](docs/OBSERVABILITY.md#creating-an-index-with-ensureindex).
+  [Observability: Creating an index with `ensureIndex()`](docs/observability.md#creating-an-index-with-ensureindex).
 - `indexInitialize` option on `elasticsearchLogSave`: when `true`, every `index()`/`bulkIndex()`/
   `refresh()` call automatically awaits `ensureIndex()` first, so the target index is guaranteed to
   exist (with the configured settings/mappings) before the first write, without calling
@@ -97,7 +352,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 - `elasticsearchLogSave` now reuses the app's DI-registered core `'search'` connector (from
   `jsr:@zanix/datamaster/core`) when one is available, instead of always constructing a fresh
   connector from its own options. See
-  [Observability: Zero-config registration](docs/OBSERVABILITY.md#zero-config-registration).
+  [Observability: Zero-config registration](docs/observability.md#zero-config-registration).
 - `ElasticsearchIndexOptions`/`ElasticsearchLogSaveOptionsBase` types, exported from the
   `./observability` entrypoint alongside the existing `Elasticsearch*` types.
 - `useWorker: 'persisted'` on `elasticsearchLogSave`: reuses a single long-lived worker pool across
@@ -106,7 +361,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   per flush like `'one-time'` does. Falls back to `'one-time'` behavior transparently when that
   provider isn't registered (i.e. outside a booted Zanix Core application), so it's always safe to
   set regardless of runtime. See
-  [Observability: Offloading the flush to a worker](docs/OBSERVABILITY.md#offloading-the-flush-to-a-worker).
+  [Observability: Offloading the flush to a worker](docs/observability.md#offloading-the-flush-to-a-worker).
 
 ### Changed
 
@@ -169,21 +424,21 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   [1.1.0](#110---2026-08-03). Scoped to `mask`-strategy paths only (throws for `hash`/`encrypt`,
   which aren't deterministic); any other operator on a protected path also throws rather than
   silently returning wrong results. See
-  [Data Protection: query-level protection](docs/DATA-PROTECTION.md#query-level-protection-usedatapolicies).
+  [Data Protection: query-level protection](docs/data-protection.md#query-level-protection-usedatapolicies).
 - `Model.buildSearchFilter(query, fields, conditions?)`: builds a partial-match `$or` search filter
   across `fields`, generalizing the common "search a few text fields, filter a couple of exact ones"
   repository pattern. Detects each field's data protection config automatically — an unprotected
   field gets a plain case-insensitive `$regex`; a `mask`-protected field has the search term masked
   first and matched as a **prefix** (`^...`, not an arbitrary substring — masking is a
   position-keyed transform, confirmed empirically); a `hash`/`encrypt`-protected field throws
-  instead of silently matching nothing. See [Database: Search](docs/DATABASE.md#search-search).
+  instead of silently matching nothing. See [Database: Search](docs/database.md#search-search).
 - `paginate`/`paginateCursor` accept a `search: { query, fields }` option, sugar over
   `buildSearchFilter` — combined with `filter` via `$and` (never merged into one object) so an
   `$or`/`$and` already present in `filter` is never overwritten by the search's own `$or`.
 
 ### Fixed
 
-- `docs/DATA-PROTECTION.md`'s masked-field partial-search example was missing the `^` anchor —
+- `docs/data-protection.md`'s masked-field partial-search example was missing the `^` anchor —
   masking is a position-keyed transform, so an unanchored `$regex` only reliably matches when the
   search term is a prefix of the plaintext, silently missing it when it occurs mid-string.
 
@@ -196,7 +451,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   `$set`/`$setOnInsert` payload in place before it executes, using each field's own configured
   protection settings — opt-in (`false`/unset by default), mirrors `upsertById`'s existing
   `useDataPolicies` flag, extended to a raw query call. See
-  [Data Protection: query-level protection](docs/DATA-PROTECTION.md#query-level-protection-usedatapolicies).
+  [Data Protection: query-level protection](docs/data-protection.md#query-level-protection-usedatapolicies).
 - `bulkWrite` gets the same `useDataPolicies` option via a static override — Mongoose has no
   query-middleware hook for `bulkWrite` at all (a driver/ODM limitation, not specific to this
   library) — covering `updateOne`/`updateMany`'s `$set`/`$setOnInsert`, `insertOne`'s `document`,
@@ -210,7 +465,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   to opt back out. Still only ever covers document-level `.save()` on an already-hydrated,
   non-`isNew` document — never `updateOne`/`findOneAndUpdate`/`bulkWrite` (see the `useDataPolicies`
   addition above for those). See
-  [Data Protection: automatic update-time protection](docs/DATA-PROTECTION.md#automatic-update-time-protection-autoprotectonupdate).
+  [Data Protection: automatic update-time protection](docs/data-protection.md#automatic-update-time-protection-autoprotectonupdate).
 
 ## [1.0.0] - 2026-08-02
 
@@ -222,7 +477,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   `@Connector`-decorated by the time `registerModel` runs with it, or the call throws immediately,
   naming it. Models, seeders, and persisted triggers are now scoped per connector internally
   (previously one flat, unscoped registry) — see
-  [Multiple Mongo connectors](docs/DATABASE.md#multiple-mongo-connectors). `getModel()` now throws a
+  [Multiple Mongo connectors](docs/database.md#multiple-mongo-connectors). `getModel()` now throws a
   specific `'wrong-connector'` error (`error.meta.kind`) naming which connector(s) a model IS
   registered for, distinct from `'never-registered'` when it isn't registered anywhere.
 - `extensions.autoProtectOnUpdate` (+ `AUTO_PROTECT_ON_DB_UPDATE` env var, explicit option always
@@ -248,13 +503,13 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   the Discovery provider for `/.well-known/zanix/triggers`) — plus `CreateTriggerInput`/
   `UpdateTriggerInput` types, derived from `TriggersModelAttrs`. `@zanix/admin` composes these into
   an actual HTTP surface; this package only owns the data access. See
-  [Triggers: persisted triggers](docs/TRIGGERS.md#persisted-triggers-online-adaptation).
+  [Triggers: persisted triggers](docs/triggers.md#persisted-triggers-online-adaptation).
 - `registerTriggerActionJob(actionKind, descriptor)`/`getRegisteredTriggerActionJobs()`: lets a
   package (`@zanix/notifications` for `mail`, `@zanix/core` for `request`) register the real job a
   built-in trigger action dispatches to, instead of every consumer being hardcoded to
   `DEFAULT_TRIGGER_JOBS`'s literal job names. `mail`/`request` still work with nothing registered —
   `DEFAULT_TRIGGER_JOBS` remains the fallback. See
-  [Trigger actions](docs/TRIGGERS.md#trigger-actions-triggeractions).
+  [Trigger actions](docs/triggers.md#trigger-actions-triggeractions).
 - `_timeout` (milliseconds, default `20_000`) on `TriggerActionCommons`: sets the worker task's
   timeout when a trigger action dispatches locally (`runTask`, no `AMQP_URI` configured); has no
   effect on a queue-backed dispatch (`runJob`), which has no equivalent timeout parameter to forward
@@ -349,7 +604,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 ### Added
 
 - **New `./observability` subpath**: Elasticsearch/OpenSearch persistence for `@zanix/logger` — see
-  [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md). Never re-exported from the package root, so a
+  [docs/observability.md](docs/observability.md). Never re-exported from the package root, so a
   consumer who doesn't import it pays zero cost and `@zanix/logger` stays fully independent of
   DataMaster.
   - **`ZanixElasticsearchConnector`**: a plain `fetch`-based connector for Elasticsearch OSS,
@@ -405,7 +660,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- Several docs examples (`README.md`, `docs/DATABASE.md`, `docs/CACHE.md`) used Node's
+- Several docs examples (`README.md`, `docs/database.md`, `docs/cache.md`) used Node's
   `process.env.X` to read an environment variable — this is a Deno library; corrected to
   `Deno.env.get('X')`.
 
@@ -414,7 +669,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Persisted triggers now stay current without a restart, via three complementary mechanisms — see
-  [docs/TRIGGERS.md](docs/TRIGGERS.md#keeping-the-registry-fresh-without-a-restart):
+  [docs/triggers.md](docs/triggers.md#keeping-the-registry-fresh-without-a-restart):
   - **On-write refresh** (always on, no configuration): the persisted triggers model's own schema
     gets `post('save')`/`post(['updateOne', 'findOneAndUpdate'])`/
     `post(['deleteOne', 'findOneAndDelete'])` hooks that refresh the in-memory registry instantly
@@ -428,7 +683,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
     instead of failing connector startup.
 - Four new environment variable counterparts for `ZanixMongoConnector`'s constructor options —
   `SEED_MODEL_NAME`, `TRIGGERS_MODEL_NAME`, `TRIGGERS_POLL_INTERVAL`, `TRIGGERS_CHANGE_STREAM` — see
-  [Configuration](docs/CONFIGURATION.md#connection-variables). Same precedence rule as `MONGO_URI`:
+  [Configuration](docs/configuration.md#connection-variables). Same precedence rule as `MONGO_URI`:
   an explicit constructor option always wins over its env var, which only applies when the option is
   omitted entirely. The literal string `'false'` disables the two model-name variables, the same
   convention `DATABASE_SEEDERS` already uses.
@@ -462,7 +717,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   `extensions.triggers` for real (including editing the persisted trigger directly in MongoDB and
   confirming the edited job fires instead of the original one on the next boot) — the same behavior
   already proven for the schema-instance/`registerModel` paths, now covered for this one too.
-- Small `getModel` documentation addition in `docs/DATABASE.md` for the new overload.
+- Small `getModel` documentation addition in `docs/database.md` for the new overload.
 
 ### Changed
 
@@ -510,7 +765,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   (`DEFAULT_TRIGGER_JOBS.mail`/`.request`) that a consuming app (e.g. `@zanix/core`) is expected to
   register handlers for; `custom` dispatches to a caller-registered job by name. `request` actions
   with a bodyless HTTP method (`GET`/`HEAD`/`DELETE`) have `body` converted to query parameters
-  instead of being dropped. See `docs/TRIGGERS.md`.
+  instead of being dropped. See `docs/triggers.md`.
 - **Persisted (runtime) triggers**: a new `triggersModel` connector option (default
   `'zanix-triggers'`, `false` to disable) backs an internal collection for adding/toggling triggers
   at runtime without redeploying code. A model's own static `extensions.triggers` is auto-seeded
@@ -532,8 +787,8 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 - **Breaking**: `Semaphore` and `LockManager` are no longer exported from this package's public
   entrypoints (`mod.ts`). They've moved to `@zanix/utils`'s helpers module — import them from
   `@zanix/helpers` (or `jsr:@zanix/utils/helpers`) instead of `@zanix/datamaster`.
-  `docs/CONCURRENCY.md` (which documented them) has been removed; `README.md`, `docs/CACHE.md`, and
-  `docs/DATABASE.md` were updated to drop references to it and describe `withLock` in terms of an
+  `docs/CONCURRENCY.md` (which documented them) has been removed; `README.md`, `docs/cache.md`, and
+  `docs/database.md` were updated to drop references to it and describe `withLock` in terms of an
   internal lock manager instead.
 - `@zanix/server` dependency bumped to `2.*` (from `1.*`) to align with `@zanix/server@2.0.0`.
 - `mail` trigger action's shape changed from `{ template: string }` (plus common fields) to a
@@ -544,7 +799,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   array), matching that seeders are opt-in.
 - Internal `LockManager` usages (`sqlite/connector.ts`, `cache/providers/mod.ts`) now import from
   `@zanix/helpers` instead of the removed internal module.
-- `docs/DATABASE.md`, `docs/DATA-PROTECTION.md`, and `README.md` updated with `Triggers`
+- `docs/database.md`, `docs/data-protection.md`, and `README.md` updated with `Triggers`
   documentation, cross-links, and a `@zanix/core` mention as the recommended full-app entrypoint
   that auto-registers the `mail`/`request` trigger job handlers.
 
@@ -560,7 +815,7 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 - `Semaphore` and `LockManager` internal implementations (`src/utils/queues/semaphore.ts`,
   `src/utils/queues/lock-manager.ts`) — superseded by `@zanix/utils`'s helpers (see Changed).
 - `docs/CONCURRENCY.md` — superseded by the `@zanix/helpers`-based documentation now inline in
-  `docs/CACHE.md`/`docs/DATABASE.md`.
+  `docs/cache.md`/`docs/database.md`.
 
 ## [0.4.16] - 2026-07-23
 
@@ -601,8 +856,8 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 - Moved `CHANGELOG.md` to the project root (previously under `docs/`), matching `LICENSE`.
 - Split the README's flat "import everything" example and its environment-variable/versioned-keys
-  tables out into dedicated guides — `docs/DATABASE.md`, `docs/DATA-PROTECTION.md`,
-  `docs/TRANSFORMS.md`, `docs/CACHE.md`, `docs/CONCURRENCY.md`, `docs/CONFIGURATION.md` — and
+  tables out into dedicated guides — `docs/database.md`, `docs/data-protection.md`,
+  `docs/transforms.md`, `docs/cache.md`, `docs/CONCURRENCY.md`, `docs/configuration.md` — and
   replaced them in the README with a compact "key exports → guide" table and a "Documentation"
   section linking all six, following the same structure used in `@zanix/server`'s docs.
 - Switched every README/guide example from the `./database`/`./cache` subpath imports to the root

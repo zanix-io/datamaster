@@ -1,5 +1,6 @@
 import type { DatabaseTypes, SeederHandler } from 'database/typings/general.ts'
 
+import { InternalError } from '@zanix/errors'
 import { seederProcessor } from './processor.ts'
 import { seederBaseWrapper } from './wrapper.ts'
 import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
@@ -19,8 +20,12 @@ export const seederAdaptation = (
 ) => {
   const processor = seedProcessor[type]?.(connectorKey)
   if (!processor) {
-    throw new Error(
+    // A native `Error` here previously — an unsupported `type` reaches this unwrapped, not
+    // caught anywhere upstream (see `@zanix/errors`' docs, "Choosing a class"). It's a package
+    // capability gap, not something the caller could have validated ahead of time.
+    throw new InternalError(
       `Not implemented: no seed processor for database type "${type}"`,
+      { code: 'SEEDER_TYPE_NOT_IMPLEMENTED', meta: { type } },
     )
   }
 

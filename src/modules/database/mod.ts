@@ -309,6 +309,9 @@ export {
   DEFAULT_TRIGGERS_MODEL,
   /** Whether the persisted triggers module was explicitly disabled (`TRIGGERS_MODEL_NAME=false`). */
   isTriggersModelDisabled,
+  /** Whether the triggers resource is configured in this deployment — the inverse of
+   * `isTriggersModelDisabled`, on by default. */
+  isTriggersResourceEnabled,
   /** Env var name for `SEED_MODEL_NAME`. */
   SEED_MODEL_ENV,
   /** Env var name for `TRIGGERS_CHANGE_STREAM`. */

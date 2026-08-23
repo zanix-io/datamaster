@@ -1,5 +1,6 @@
 import type { DataPolicyVersion, StorageEncryptSettings } from './typings/general.ts'
 
+import { InternalError } from '@zanix/errors'
 import {
   base64ToUint8Array,
   decrypt as rsaDecrypt,
@@ -42,15 +43,19 @@ const normalizeVersion = (version?: DataPolicyVersion): string =>
 const requireEnv = (name: string): string => {
   const value = Deno.env.get(name)
   if (!value) {
-    throw new Error(
+    // A native `Error` here previously — this is exactly what `InternalError` is for: a config
+    // invariant violated with no way the caller could have prevented it (encryption was already
+    // enabled, but the key it needs isn't there). See `@zanix/errors`' docs, "Choosing a class".
+    throw new InternalError(
       `Object storage encryption is enabled but '${name}' is not set in the environment.`,
+      { code: 'OBJECT_STORAGE_ENCRYPTION_ENV_MISSING', meta: { envVar: name } },
     )
   }
   return value
 }
 
 /**
- * Encrypts/decrypts stored bytes at rest for {@link SeaweedFSObjectStorage} — deliberately separate
+ * Encrypts/decrypts stored bytes at rest for {@link S3ObjectStorage} — deliberately separate
  * from `utils/protection.ts`'s `encrypt`/`decrypt` (used for Mongo field-level masking elsewhere in
  * this package). Those wrappers catch every error and return the original input unencrypted,
  * logging the failure — an acceptable trade-off for a PII field where the alternative is breaking a
@@ -61,7 +66,7 @@ const requireEnv = (name: string): string => {
  * Reuses `@zanix/helpers`' own AES-GCM/RSA-OAEP primitives (`encryptAES`/`decryptAES`/`encrypt`/
  * `decrypt`) directly, and the SAME `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY` environment
  * variables the rest of this package's data-protection story already uses (see
- * `utils/protection.ts`) — no SeaweedFS-specific key variables.
+ * `utils/protection.ts`) — no S3-specific key variables.
  *
  * `'symmetric'` encrypts the object's bytes directly with `DATA_AES_KEY`. `'asymmetric'` uses real
  * envelope encryption: RSA-OAEP has a hard payload-size ceiling far below a typical object's size, so
@@ -76,7 +81,7 @@ const requireEnv = (name: string): string => {
  * recorded as storage metadata (`ENCRYPTION_VERSION_METADATA`) at `put()` time and read back at
  * `get()` time — so rotating the active version only affects future writes; existing objects keep
  * decrypting correctly under whichever key version they were actually written with, as long as
- * that older key stays available (same operational requirement `docs/CONFIGURATION.md`'s own
+ * that older key stays available (same operational requirement `docs/configuration.md`'s own
  * "Security" section already states for field-level rotation: never remove an old key version
  * while any data still depends on it).
  *
@@ -135,8 +140,14 @@ export async function decryptBytes(
   if (settings.type === 'asymmetric') {
     const wrappedKey = metadata[WRAPPED_KEY_METADATA]
     if (!wrappedKey) {
-      throw new Error(
+      // An object recorded as asymmetrically-encrypted but missing the metadata that says how to
+      // unwrap its key — data-integrity fault on the stored object itself, not a caller mistake.
+      throw new InternalError(
         `Cannot decrypt: object is missing its '${WRAPPED_KEY_METADATA}' metadata.`,
+        {
+          code: 'OBJECT_STORAGE_DECRYPT_METADATA_MISSING',
+          meta: { metadataKey: WRAPPED_KEY_METADATA },
+        },
       )
     }
     const rsaPrivateKey = requireEnv(`DATA_RSA_KEY${suffix}`)

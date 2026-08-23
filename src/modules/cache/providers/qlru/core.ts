@@ -16,7 +16,11 @@ import { ZanixQLRUConnector } from './connector.ts'
  * subclass, so `this.connectors.get(ZanixQLRUConnector)` — the class every consumer actually
  * imports — resolves correctly. See `@zanix/auth`'s `providers/core.ts` for the full rationale.
  */
-const registerConnector = () => {
+// Exported (not just auto-run below) — unconditional today (no env check), but kept consistent
+// with every other `core.ts` loader's own callable, re-invokable registration function (see
+// `storage/core.ts`'s `registerS3Connector` doc for the full reasoning that pattern exists
+// for).
+export const registerQLRUConnector = (): void => {
   Connector({ slot: 'cache:local', autoInitialize: false, startMode: 'lazy' })(
     ZanixQLRUConnector,
   )
@@ -42,6 +46,6 @@ registerCoreConnectorSlot('cache:local', ZanixCacheConnector, {
  *
  * @module
  */
-const zanixQLRUConnectorCore: void = registerConnector()
+const zanixQLRUConnectorCore: void = registerQLRUConnector()
 
 export default zanixQLRUConnectorCore

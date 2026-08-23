@@ -60,7 +60,7 @@ export type Extensions = {
    * document was hydrated from the database (not a content heuristic), so reassigning the exact
    * same already-protected value back (a no-op edit, or a partial update that round-trips other
    * fields) is never re-protected — safe even for `hash`, which can't otherwise be reversed to
-   * check. See [Data Protection](../../docs/DATA-PROTECTION.md) for the full rationale.
+   * check. See [Data Protection](../../docs/data-protection.md) for the full rationale.
    *
    * Falls back to the `AUTO_PROTECT_ON_DB_UPDATE` env var (`'true'` to enable) when omitted here —
    * an explicit value on this option always wins over that default. `false` when neither is set.
