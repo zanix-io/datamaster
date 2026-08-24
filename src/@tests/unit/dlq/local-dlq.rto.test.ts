@@ -1,20 +1,20 @@
 import { assertEquals, assertRejects } from '@std/assert'
 import { classValidation } from '@zanix/validator'
-import { DLQEntryIdParamsRTO } from 'modules/dlq/dlq-api/rtos/local-dlq.rto.ts'
+import { DlqEntryIdParamsRTO } from 'modules/dlq/dlq-api/rtos/local-dlq.rto.ts'
 import {
-  DiscardDLQEntryRTO,
-  ListDLQEntriesRTO,
-  PushDLQEntryRTO,
-  RequeueDLQEntryRTO,
+  DiscardDlqEntryRTO,
+  ListDlqEntriesRTO,
+  PushDlqEntryRTO,
+  RequeueDlqEntryRTO,
 } from 'modules/dlq/dlq-api/rtos/dlq.rto.ts'
 
-Deno.test('DLQEntryIdParamsRTO validates a plain "id" string', async () => {
-  const rto = await classValidation(DLQEntryIdParamsRTO, { id: '507f191e810c19729de860ea' })
+Deno.test('DlqEntryIdParamsRTO validates a plain "id" string', async () => {
+  const rto = await classValidation(DlqEntryIdParamsRTO, { id: '507f191e810c19729de860ea' })
   assertEquals(rto.id, '507f191e810c19729de860ea')
 })
 
-Deno.test('PushDLQEntryRTO validates required fields, passes payload/metadata', async () => {
-  const rto = await classValidation(PushDLQEntryRTO, {
+Deno.test('PushDlqEntryRTO validates required fields, passes payload/metadata', async () => {
+  const rto = await classValidation(PushDlqEntryRTO, {
     processType: 'payment.process',
     origin: 'orders-service',
     payload: { orderId: 'abc123' },
@@ -30,9 +30,9 @@ Deno.test('PushDLQEntryRTO validates required fields, passes payload/metadata', 
   assertEquals(rto.metadata, { tenantId: 'acme' })
 })
 
-Deno.test('PushDLQEntryRTO rejects a missing processType', async () => {
+Deno.test('PushDlqEntryRTO rejects a missing processType', async () => {
   await assertRejects(() =>
-    classValidation(PushDLQEntryRTO, {
+    classValidation(PushDlqEntryRTO, {
       origin: 'orders-service',
       payload: {},
       error: { name: 'E', message: 'm' },
@@ -40,8 +40,8 @@ Deno.test('PushDLQEntryRTO rejects a missing processType', async () => {
   )
 })
 
-Deno.test('ListDLQEntriesRTO validates a known status, rejects an unknown one', async () => {
-  const rto = await classValidation(ListDLQEntriesRTO, {
+Deno.test('ListDlqEntriesRTO validates a known status, rejects an unknown one', async () => {
+  const rto = await classValidation(ListDlqEntriesRTO, {
     processType: 'payment.process',
     status: 'pending',
     page: 2,
@@ -52,21 +52,21 @@ Deno.test('ListDLQEntriesRTO validates a known status, rejects an unknown one', 
   assertEquals(rto.page, 2)
   assertEquals(rto.limit, 20)
 
-  await assertRejects(() => classValidation(ListDLQEntriesRTO, { status: 'not-a-real-status' }))
+  await assertRejects(() => classValidation(ListDlqEntriesRTO, { status: 'not-a-real-status' }))
 })
 
-Deno.test('RequeueDLQEntryRTO validates optional resetAttempts', async () => {
-  const empty = await classValidation(RequeueDLQEntryRTO, {})
+Deno.test('RequeueDlqEntryRTO validates optional resetAttempts', async () => {
+  const empty = await classValidation(RequeueDlqEntryRTO, {})
   assertEquals(empty.resetAttempts, undefined)
 
-  const set = await classValidation(RequeueDLQEntryRTO, { resetAttempts: true })
+  const set = await classValidation(RequeueDlqEntryRTO, { resetAttempts: true })
   assertEquals(set.resetAttempts, true)
 })
 
-Deno.test('DiscardDLQEntryRTO validates optional reason', async () => {
-  const empty = await classValidation(DiscardDLQEntryRTO, {})
+Deno.test('DiscardDlqEntryRTO validates optional reason', async () => {
+  const empty = await classValidation(DiscardDlqEntryRTO, {})
   assertEquals(empty.reason, undefined)
 
-  const set = await classValidation(DiscardDLQEntryRTO, { reason: 'obsolete' })
+  const set = await classValidation(DiscardDlqEntryRTO, { reason: 'obsolete' })
   assertEquals(set.reason, 'obsolete')
 })

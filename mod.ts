@@ -55,24 +55,24 @@ export { createTriggersDiscoveryProvider } from 'modules/triggers/triggers-disco
  * Independent of `@zanix/asyncmq`'s own RabbitMQ-native dead-letter mechanism
  * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/dlq.md`.
  */
-export { DLQProvider, ZanixCoreDLQProvider } from 'modules/dlq/dlq.provider.ts'
+export { DlqProvider, ZanixCoreDlqProvider } from 'modules/dlq/dlq.provider.ts'
 /**
  * Business logic behind this package's own local `/admin/dlq` — see
  * `@zanix/datamaster/dlq-api`'s own `createDlqAdminController`. Exposes only
  * `push`/`get`/`list`/`requeue`/`discard`/`remove`; the lease-based
  * `claim`/`release`/`complete`/`fail` primitives stay off this surface — see
- * {@link DLQAdminService}'s own JSDoc for why.
+ * {@link DlqAdminService}'s own JSDoc for why.
  */
-export { DLQAdminService } from 'modules/dlq/dlq.service.ts'
+export { DlqAdminService } from 'modules/dlq/dlq.service.ts'
 /**
- * Builds the `DiscoveryProvider` for `/.well-known/zanix/dlq`, backed by {@link DLQProvider}. A
+ * Builds the `DiscoveryProvider` for `/.well-known/zanix/dlq`, backed by {@link DlqProvider}. A
  * future `DlqAggregator` in `@zanix/admin` (mirroring `TriggersAggregator`, not yet built) would
  * compose this the same way `defineAdminMetadata` composes {@link createTriggersDiscoveryProvider};
  * it does not author the provider itself. Scoped to unresolved (`pending`/`claimed`/`failed`)
  * entries only — see this function's own JSDoc for why.
  */
 export { createDlqDiscoveryProvider } from 'modules/dlq/dlq-discovery.provider.ts'
-/** Registers `@zanix/datamaster`'s own DLQ model — required once before `DLQProvider` resolves. */
+/** Registers `@zanix/datamaster`'s own DLQ model — required once before `DlqProvider` resolves. */
 export {
   DEFAULT_DLQ_MODEL,
   defaultLeaseTtlMs,
@@ -81,23 +81,79 @@ export {
   DLQ_MODEL_ENV,
   dlqModelName,
   isDlqResourceEnabled,
-  registerDLQModel,
+  registerDlqModel,
 } from 'modules/dlq/dlq.model.ts'
-export type { RegisterDLQModelOptions } from 'modules/dlq/dlq.model.ts'
+export type { RegisterDlqModelOptions } from 'modules/dlq/dlq.model.ts'
 export type {
-  DLQClaimOptions,
-  DLQDiscardOptions,
-  DLQEntryAttrs,
-  DLQErrorHistoryEntry,
-  DLQErrorInfo,
-  DLQFailOptions,
-  DLQLeaseOptions,
-  DLQListOptions,
-  DLQPushInput,
-  DLQRequeueOptions,
-  DLQStatus,
+  DlqClaimOptions,
+  DlqDiscardOptions,
+  DlqEntryAttrs,
+  DlqErrorHistoryEntry,
+  DlqErrorInfo,
+  DlqFailOptions,
+  DlqLeaseOptions,
+  DlqListOptions,
+  DlqPushInput,
+  DlqRequeueOptions,
+  DlqStatus,
 } from 'modules/dlq/dlq.typings.ts'
-export type { DLQPaginatedResult } from 'modules/dlq/dlq.provider.ts'
+export type { DlqPaginatedResult } from 'modules/dlq/dlq.provider.ts'
+
+// Deprecated DLQ aliases — this package used to case the `DLQ` acronym all-caps; it now
+// consistently cases it `Dlq` (see CHANGELOG's `[Unreleased]` entry). These re-export the exact
+// same bindings under their old names for one deprecation window — `Dlq...` above is the
+// recommended form; don't reach for these in new code.
+/** @deprecated Use {@link DlqProvider} instead — this alias will be removed in a future major
+ * release. */
+export { DlqProvider as DLQProvider } from 'modules/dlq/dlq.provider.ts'
+/** @deprecated Use {@link ZanixCoreDlqProvider} instead — this alias will be removed in a future
+ * major release. */
+export { ZanixCoreDlqProvider as ZanixCoreDLQProvider } from 'modules/dlq/dlq.provider.ts'
+/** @deprecated Use {@link DlqAdminService} instead — this alias will be removed in a future major
+ * release. */
+export { DlqAdminService as DLQAdminService } from 'modules/dlq/dlq.service.ts'
+/** @deprecated Use {@link registerDlqModel} instead — this alias will be removed in a future major
+ * release. */
+export { registerDlqModel as registerDLQModel } from 'modules/dlq/dlq.model.ts'
+/** @deprecated Use {@link RegisterDlqModelOptions} instead — this alias will be removed in a
+ * future major release. */
+export type { RegisterDlqModelOptions as RegisterDLQModelOptions } from 'modules/dlq/dlq.model.ts'
+/** @deprecated Use {@link DlqClaimOptions} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqClaimOptions as DLQClaimOptions } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqDiscardOptions} instead — this alias will be removed in a future
+ * major release. */
+export type { DlqDiscardOptions as DLQDiscardOptions } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqEntryAttrs} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqEntryAttrs as DLQEntryAttrs } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqErrorHistoryEntry} instead — this alias will be removed in a future
+ * major release. */
+export type { DlqErrorHistoryEntry as DLQErrorHistoryEntry } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqErrorInfo} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqErrorInfo as DLQErrorInfo } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqFailOptions} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqFailOptions as DLQFailOptions } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqLeaseOptions} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqLeaseOptions as DLQLeaseOptions } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqListOptions} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqListOptions as DLQListOptions } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqPushInput} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqPushInput as DLQPushInput } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqRequeueOptions} instead — this alias will be removed in a future
+ * major release. */
+export type { DlqRequeueOptions as DLQRequeueOptions } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqStatus} instead — this alias will be removed in a future major
+ * release. */
+export type { DlqStatus as DLQStatus } from 'modules/dlq/dlq.typings.ts'
+/** @deprecated Use {@link DlqPaginatedResult} instead — this alias will be removed in a future
+ * major release. */
+export type { DlqPaginatedResult as DLQPaginatedResult } from 'modules/dlq/dlq.provider.ts'
 
 // Data protection
 export {

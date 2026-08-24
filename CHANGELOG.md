@@ -7,6 +7,54 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Every public DLQ symbol is now consistently cased `Dlq`** (was a mix of `DLQ`/`Dlq`), converging
+  this package on a single casing for the acronym — the same inconsistency `@zanix/admin` already
+  resolved for its own `DLQAggregator`/`DLQAdminClient` (now `DlqAggregator`/`DlqAdminClient`; see
+  that package's `naming-and-structure-conventions` precedent in the `claude-skills` repo). This
+  package's own sibling symbols (`dlqModelName`, `isDlqResourceEnabled`, `createDlqAdminController`,
+  `createDlqDiscoveryProvider`) already used `Dlq`; only the ones below were still `DLQ`. `Dlq...`
+  is the recommended form going forward, from both `mod.ts` and `@zanix/datamaster/dlq-api`:
+  - `DLQProvider` → `DlqProvider`, `ZanixCoreDLQProvider` → `ZanixCoreDlqProvider`
+  - `DLQAdminService` → `DlqAdminService`
+  - `registerDLQModel` → `registerDlqModel`, `RegisterDLQModelOptions` → `RegisterDlqModelOptions`
+  - `registerDLQProvider` → `registerDlqProvider` (`@zanix/datamaster/core`)
+  - `DLQClaimOptions` → `DlqClaimOptions`, `DLQDiscardOptions` → `DlqDiscardOptions`,
+    `DLQEntryAttrs` → `DlqEntryAttrs`, `DLQErrorHistoryEntry` → `DlqErrorHistoryEntry`,
+    `DLQErrorInfo` → `DlqErrorInfo`, `DLQFailOptions` → `DlqFailOptions`, `DLQLeaseOptions` →
+    `DlqLeaseOptions`, `DLQListOptions` → `DlqListOptions`, `DLQPushInput` → `DlqPushInput`,
+    `DLQRequeueOptions` → `DlqRequeueOptions`, `DLQStatus` → `DlqStatus`, `DLQPaginatedResult` →
+    `DlqPaginatedResult`
+  - `DLQAdminControllerOptions` → `DlqAdminControllerOptions`, `DLQEntryIdParamsRTO` →
+    `DlqEntryIdParamsRTO`, `PushDLQEntryRTO` → `PushDlqEntryRTO`, `RequeueDLQEntryRTO` →
+    `RequeueDlqEntryRTO`, `DiscardDLQEntryRTO` → `DiscardDlqEntryRTO`, `ListDLQEntriesRTO` →
+    `ListDlqEntriesRTO`
+
+  **Not a breaking change** — every old `DLQ`-cased name above is kept as a deprecated re-export of
+  the exact same binding (see "Deprecated" below), so this ships as a `MINOR`, not a `MAJOR`. Unlike
+  `@zanix/admin`'s own equivalent rename (a direct, shim-less break), this package's real blast
+  radius today is small and known (`@zanix/admin`/`@zanix/core` as the only consumers,
+  `@zanix/admin` already shielded by its own `^1.5.0` range either way) — deliberately not forcing
+  another major bump for a casing-only change so soon after `@zanix/admin`'s; the real major is
+  saved for when more cleanup of this kind accumulates.
+  `DLQ_MODEL_NAME`/`DLQ_ENCRYPT_PAYLOAD`/`DLQ_DEFAULT_LEASE_MS` and their `_ENV` constants
+  (`DLQ_MODEL_ENV`, `DLQ_ENCRYPT_PAYLOAD_ENV`, `DLQ_DEFAULT_LEASE_MS_ENV`, `DEFAULT_DLQ_MODEL`) are
+  unaffected either way — they're `UPPER_SNAKE_CASE` env var constants, not PascalCase symbols, so
+  the acronym-casing rule doesn't apply to them. `@zanix/asyncmq/dlq`'s own `registerDLQProcessor`
+  is a different package's export, also unaffected.
+
+### Deprecated
+
+- **The `DLQ`-cased names listed above** (`DLQProvider`, `ZanixCoreDLQProvider`, `DLQAdminService`,
+  `registerDLQModel`, `RegisterDLQModelOptions`, `registerDLQProvider`, `DLQClaimOptions`,
+  `DLQDiscardOptions`, `DLQEntryAttrs`, `DLQErrorHistoryEntry`, `DLQErrorInfo`, `DLQFailOptions`,
+  `DLQLeaseOptions`, `DLQListOptions`, `DLQPushInput`, `DLQRequeueOptions`, `DLQStatus`,
+  `DLQPaginatedResult`, `DLQAdminControllerOptions`, `DLQEntryIdParamsRTO`, `PushDLQEntryRTO`,
+  `RequeueDLQEntryRTO`, `DiscardDLQEntryRTO`, `ListDLQEntriesRTO`) still work, unchanged, but are
+  marked `@deprecated` in their JSDoc and **will be removed in a future major release**. Migrate to
+  their `Dlq`-cased equivalent above.
+
 ## [1.5.0] - 2026-08-23
 
 ### Added

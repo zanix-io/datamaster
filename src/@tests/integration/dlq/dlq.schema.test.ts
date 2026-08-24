@@ -8,14 +8,14 @@ import { preprocessSchema } from 'mongo/processor/mod.ts'
 import { DEFAULT_CONNECTOR_KEY } from 'database/utils/constants.ts'
 import { dataProtectionGetter } from 'database/policies/protection.ts'
 import { transformByDataProtection } from 'mongo/processor/schema/transforms/data-policies.ts'
-import { registerDLQModel } from 'modules/dlq/dlq.model.ts'
+import { registerDlqModel } from 'modules/dlq/dlq.model.ts'
 import ProgramModule from 'modules/program/mod.ts'
 
 console.error = () => {}
 
 Deno.test('DLQ schema declares the claim-eligibility and processType/status indexes', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel()
+  registerDlqModel()
 
   const registered = ProgramModule.models.getModels('mongo')[0]
   const schema = new Schema(registered.definition as never, registered.options)
@@ -37,7 +37,7 @@ Deno.test('DLQ schema declares the claim-eligibility and processType/status inde
 
 Deno.test('DLQ schema uses a native, queryable Mixed payload field by default', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel()
+  registerDlqModel()
 
   const registered = ProgramModule.models.getModels('mongo')[0]
   const schema = new Schema(registered.definition as never)
@@ -70,7 +70,7 @@ Deno.test('DLQ schema encrypts/decrypts payloadRaw end-to-end with encryptPayloa
   Deno.env.set('DATA_AES_KEY', 'hqIIz+SY/gZ7C9sDWSTiCA==')
 
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({ encryptPayload: true })
+  registerDlqModel({ encryptPayload: true })
 
   const registered = ProgramModule.models.getModels('mongo')[0]
   const schema = new Schema(registered.definition as never)
@@ -106,7 +106,7 @@ Deno.test('DLQ schema: payloadFields protects one leaf, keeps its sibling querya
   Deno.env.set('DATA_AES_KEY', 'hqIIz+SY/gZ7C9sDWSTiCA==')
 
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({
+  registerDlqModel({
     payloadFields: {
       orderId: { type: String },
       creditCard: { type: String, get: dataProtectionGetter('encrypt') },
@@ -143,7 +143,7 @@ Deno.test('DLQ schema: payloadFields protects one leaf, keeps its sibling querya
   const creditCard: DecryptableObject = doc.payload.creditCard
   assertEquals(await creditCard?.decrypt?.(), '4111-1111-1111-1111')
 
-  // `transformByDataProtection` — what `DLQProvider.toEntry()` actually uses — walks every
+  // `transformByDataProtection` — what `DlqProvider.toEntry()` actually uses — walks every
   // registered protected path (however deeply nested) at once, reversing it in place, and leaves
   // the undeclared field a plain, queryable value untouched.
   const snapshot = doc.toJSON({ getters: false, transform: false })

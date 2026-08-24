@@ -59,7 +59,7 @@ function toRecord(doc: FileModelAttrs & { _id: string }): FileRecord {
 /**
  * A generic, durable registry of file records, backed by `ZanixMongoConnector`. Follows the same
  * `@Provider`/`ZanixProvider<{database: ZanixMongoConnector}>` shape as `TriggersAdminRepository`
- * (`../triggers/triggers.repository.ts`) and `DLQProvider` (`../dlq/dlq.provider.ts`).
+ * (`../triggers/triggers.repository.ts`) and `DlqProvider` (`../dlq/dlq.provider.ts`).
  *
  * `create()`/`findById()` never throw for an unexpected reason of their own (missing-id is simply
  * `undefined` for `findById`); `update()` throws `HttpError('NOT_FOUND')` for a missing id.

@@ -2,7 +2,7 @@ import { assertEquals } from '@std/assert'
 import { sanitizeMongoFilter } from 'modules/dlq/filter.ts'
 
 /**
- * Regression coverage for a confirmed risk: `DLQProvider.list()`/`claim()` merged a caller-supplied
+ * Regression coverage for a confirmed risk: `DlqProvider.list()`/`claim()` merged a caller-supplied
  * `filter` straight into a Mongo query with no `$`-operator sanitizer — a filter sourced from an
  * untrusted caller could inject `$where`/`$expr` (arbitrary query-time logic) or a same-named
  * `status`/`$or` key to widen or override the built-in scoping it's merged alongside.

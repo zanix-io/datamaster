@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from '@std/assert'
 import { HttpError } from '@zanix/errors'
-import { DLQProvider } from 'modules/dlq/dlq.provider.ts'
+import { DlqProvider } from 'modules/dlq/dlq.provider.ts'
 
 // deno-lint-ignore no-explicit-any
 type Entry = Record<string, any>
@@ -13,7 +13,7 @@ function getPath(entry: Entry, path: string): unknown {
   )
 }
 
-/** Minimal in-memory Mongo-filter matcher — supports only the shapes `DLQProvider` actually emits. */
+/** Minimal in-memory Mongo-filter matcher — supports only the shapes `DlqProvider` actually emits. */
 function matches(entry: Entry, filter: Entry): boolean {
   return Object.entries(filter).every(([key, cond]) => {
     if (key === '$or') {
@@ -89,14 +89,14 @@ function fakeThis(entries: Entry[]) {
       return Promise.resolve({ deletedCount: 1 })
     },
   }
-  const instance = Object.create(DLQProvider.prototype)
+  const instance = Object.create(DlqProvider.prototype)
   Object.defineProperty(instance, 'database', {
     value: { isReady: Promise.resolve(), getModel: () => model },
   })
   return instance
 }
 
-const provider = DLQProvider.prototype
+const provider = DlqProvider.prototype
 
 const baseInput = {
   processType: 'payment.process',
@@ -105,7 +105,7 @@ const baseInput = {
   error: { name: 'Error', message: 'boom' },
 }
 
-Deno.test('DLQProvider.push creates a pending entry with attempts: 0', async () => {
+Deno.test('DlqProvider.push creates a pending entry with attempts: 0', async () => {
   const entries: Entry[] = []
   const result = await provider.push.call(
     fakeThis(entries) as never,
@@ -119,7 +119,7 @@ Deno.test('DLQProvider.push creates a pending entry with attempts: 0', async () 
   assertEquals(result.errorHistory[0].attempt, 0)
 })
 
-Deno.test('DLQProvider.get returns a native payload as-is (default, unencrypted)', async () => {
+Deno.test('DlqProvider.get returns a native payload as-is (default, unencrypted)', async () => {
   const entries: Entry[] = [{
     _id: 'id-1',
     payload: { orderId: 'xyz' },
@@ -129,7 +129,7 @@ Deno.test('DLQProvider.get returns a native payload as-is (default, unencrypted)
   assertEquals(result.payload, { orderId: 'xyz' })
 })
 
-Deno.test('DLQProvider.get falls back to parsing payloadRaw when payload is absent', async () => {
+Deno.test('DlqProvider.get falls back to parsing payloadRaw when payload is absent', async () => {
   const entries: Entry[] = [{
     _id: 'id-1',
     payloadRaw: JSON.stringify({ orderId: 'xyz' }),
@@ -139,14 +139,14 @@ Deno.test('DLQProvider.get falls back to parsing payloadRaw when payload is abse
   assertEquals(result.payload, { orderId: 'xyz' })
 })
 
-Deno.test('DLQProvider.get throws NOT_FOUND when missing', async () => {
+Deno.test('DlqProvider.get throws NOT_FOUND when missing', async () => {
   await assertRejects(
     () => provider.get.call(fakeThis([]) as never, 'missing'),
     HttpError,
   )
 })
 
-Deno.test('DLQProvider.get decrypts payloadRaw when it is a DecryptableObject', async () => {
+Deno.test('DlqProvider.get decrypts payloadRaw when it is a DecryptableObject', async () => {
   const entries: Entry[] = [{
     _id: 'id-1',
     payloadRaw: {
@@ -158,7 +158,7 @@ Deno.test('DLQProvider.get decrypts payloadRaw when it is a DecryptableObject', 
   assertEquals(result.payload, { secret: true })
 })
 
-Deno.test('DLQProvider.list filters by processType/status/origin', async () => {
+Deno.test('DlqProvider.list filters by processType/status/origin', async () => {
   const entries: Entry[] = [
     {
       _id: '1',
@@ -182,7 +182,7 @@ Deno.test('DLQProvider.list filters by processType/status/origin', async () => {
   assertEquals(result.docs[0]._id, '1')
 })
 
-Deno.test('DLQProvider.list merges a raw filter passthrough, querying into payload', async () => {
+Deno.test('DlqProvider.list merges a raw filter passthrough, querying into payload', async () => {
   const entries: Entry[] = [
     { _id: '1', payload: { orderId: 'abc123' }, status: 'pending' },
     { _id: '2', payload: { orderId: 'other' }, status: 'pending' },
@@ -194,7 +194,7 @@ Deno.test('DLQProvider.list merges a raw filter passthrough, querying into paylo
   assertEquals(result.docs[0]._id, '1')
 })
 
-Deno.test('DLQProvider.list strips a $-operator out of a raw filter passthrough', async () => {
+Deno.test('DlqProvider.list strips a $-operator out of a raw filter passthrough', async () => {
   const entries: Entry[] = []
   const instance = fakeThis(entries)
   let capturedFilter: Entry | undefined
@@ -212,7 +212,7 @@ Deno.test('DLQProvider.list strips a $-operator out of a raw filter passthrough'
   assertEquals(capturedFilter, { 'payload.orderId': 'abc123' })
 })
 
-Deno.test('DLQProvider.list: processType/status/origin win over a filter key clash', async () => {
+Deno.test('DlqProvider.list: processType/status/origin win over a filter key clash', async () => {
   const entries: Entry[] = []
   const instance = fakeThis(entries)
   let capturedFilter: Entry | undefined
@@ -231,7 +231,7 @@ Deno.test('DLQProvider.list: processType/status/origin win over a filter key cla
   assertEquals(capturedFilter?.status, 'pending')
 })
 
-Deno.test('DLQProvider.claim atomically claims one eligible pending entry', async () => {
+Deno.test('DlqProvider.claim atomically claims one eligible pending entry', async () => {
   const entries: Entry[] = [
     { _id: '1', payloadRaw: '{}', status: 'pending', attempts: 0 },
   ]
@@ -244,7 +244,7 @@ Deno.test('DLQProvider.claim atomically claims one eligible pending entry', asyn
   assertEquals(result?.attempts, 1)
 })
 
-Deno.test('DLQProvider.claim returns null when nothing is eligible', async () => {
+Deno.test('DlqProvider.claim returns null when nothing is eligible', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -257,7 +257,7 @@ Deno.test('DLQProvider.claim returns null when nothing is eligible', async () =>
   assertEquals(result, null)
 })
 
-Deno.test('DLQProvider.claim ignores a claimed entry with an unexpired lease', async () => {
+Deno.test('DlqProvider.claim ignores a claimed entry with an unexpired lease', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -271,7 +271,7 @@ Deno.test('DLQProvider.claim ignores a claimed entry with an unexpired lease', a
   assertEquals(result, null)
 })
 
-Deno.test('DLQProvider.claim reclaims an abandoned entry (claimed, expired lease)', async () => {
+Deno.test('DlqProvider.claim reclaims an abandoned entry (claimed, expired lease)', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -286,7 +286,7 @@ Deno.test('DLQProvider.claim reclaims an abandoned entry (claimed, expired lease
   assertEquals(result?.attempts, 2)
 })
 
-Deno.test("DLQProvider.claim: a filter's status can't override built-in eligibility", async () => {
+Deno.test("DlqProvider.claim: a filter's status can't override built-in eligibility", async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -301,7 +301,7 @@ Deno.test("DLQProvider.claim: a filter's status can't override built-in eligibil
   assertEquals(result, null)
 })
 
-Deno.test('DLQProvider.claim strips a $-operator out of its filter passthrough', async () => {
+Deno.test('DlqProvider.claim strips a $-operator out of its filter passthrough', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -325,7 +325,7 @@ Deno.test('DLQProvider.claim strips a $-operator out of its filter passthrough',
   assertEquals(capturedFilter?.$where, undefined)
 })
 
-Deno.test('DLQProvider.release moves a claimed entry back to pending', async () => {
+Deno.test('DlqProvider.release moves a claimed entry back to pending', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -340,7 +340,7 @@ Deno.test('DLQProvider.release moves a claimed entry back to pending', async () 
   assertEquals(result.leaseOwner, undefined)
 })
 
-Deno.test('DLQProvider.release throws CONFLICT on a leaseOwner mismatch', async () => {
+Deno.test('DlqProvider.release throws CONFLICT on a leaseOwner mismatch', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -356,7 +356,7 @@ Deno.test('DLQProvider.release throws CONFLICT on a leaseOwner mismatch', async 
   )
 })
 
-Deno.test('DLQProvider.complete moves a claimed entry to completed', async () => {
+Deno.test('DlqProvider.complete moves a claimed entry to completed', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -369,7 +369,7 @@ Deno.test('DLQProvider.complete moves a claimed entry to completed', async () =>
   assertEquals(result.status, 'completed')
 })
 
-Deno.test('DLQProvider.complete throws CONFLICT on a leaseOwner mismatch', async () => {
+Deno.test('DlqProvider.complete throws CONFLICT on a leaseOwner mismatch', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -385,7 +385,7 @@ Deno.test('DLQProvider.complete throws CONFLICT on a leaseOwner mismatch', async
   )
 })
 
-Deno.test('DLQProvider.fail moves back to pending when attempts remain', async () => {
+Deno.test('DlqProvider.fail moves back to pending when attempts remain', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -404,7 +404,7 @@ Deno.test('DLQProvider.fail moves back to pending when attempts remain', async (
   assertEquals(result.errorHistory.length, 1)
 })
 
-Deno.test('DLQProvider.fail moves to failed once maxAttempts is reached', async () => {
+Deno.test('DlqProvider.fail moves to failed once maxAttempts is reached', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -421,7 +421,7 @@ Deno.test('DLQProvider.fail moves to failed once maxAttempts is reached', async 
   assertEquals(result.status, 'failed')
 })
 
-Deno.test('DLQProvider.fail throws CONFLICT when there is no active claim', async () => {
+Deno.test('DlqProvider.fail throws CONFLICT when there is no active claim', async () => {
   const entries: Entry[] = [{ _id: '1', payloadRaw: '{}', status: 'pending' }]
   await assertRejects(
     () =>
@@ -433,7 +433,7 @@ Deno.test('DLQProvider.fail throws CONFLICT when there is no active claim', asyn
   )
 })
 
-Deno.test('DLQProvider.requeue forces back to pending regardless of maxAttempts', async () => {
+Deno.test('DlqProvider.requeue forces back to pending regardless of maxAttempts', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -446,7 +446,7 @@ Deno.test('DLQProvider.requeue forces back to pending regardless of maxAttempts'
   assertEquals(result.attempts, 5)
 })
 
-Deno.test('DLQProvider.requeue can reset attempts back to 0', async () => {
+Deno.test('DlqProvider.requeue can reset attempts back to 0', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -459,28 +459,28 @@ Deno.test('DLQProvider.requeue can reset attempts back to 0', async () => {
   assertEquals(result.attempts, 0)
 })
 
-Deno.test('DLQProvider.requeue throws NOT_FOUND when missing', async () => {
+Deno.test('DlqProvider.requeue throws NOT_FOUND when missing', async () => {
   await assertRejects(
     () => provider.requeue.call(fakeThis([]) as never, 'missing'),
     HttpError,
   )
 })
 
-Deno.test('DLQProvider.discard closes an entry without deleting it', async () => {
+Deno.test('DlqProvider.discard closes an entry without deleting it', async () => {
   const entries: Entry[] = [{ _id: '1', payloadRaw: '{}', status: 'pending' }]
   const result = await provider.discard.call(fakeThis(entries) as never, '1')
   assertEquals(result.status, 'discarded')
   assertEquals(entries.length, 1)
 })
 
-Deno.test('DLQProvider.discard throws NOT_FOUND when missing', async () => {
+Deno.test('DlqProvider.discard throws NOT_FOUND when missing', async () => {
   await assertRejects(
     () => provider.discard.call(fakeThis([]) as never, 'missing'),
     HttpError,
   )
 })
 
-Deno.test('DLQProvider.remove deletes an existing entry', async () => {
+Deno.test('DlqProvider.remove deletes an existing entry', async () => {
   const entries: Entry[] = [{
     _id: '1',
     payloadRaw: '{}',
@@ -490,7 +490,7 @@ Deno.test('DLQProvider.remove deletes an existing entry', async () => {
   assertEquals(entries.length, 0)
 })
 
-Deno.test('DLQProvider.remove throws NOT_FOUND when missing', async () => {
+Deno.test('DlqProvider.remove throws NOT_FOUND when missing', async () => {
   await assertRejects(
     () => provider.remove.call(fakeThis([]) as never, 'missing'),
     HttpError,

@@ -7,7 +7,7 @@ import {
   DLQ_MODEL_ENV,
   dlqModelName,
   isDlqResourceEnabled,
-  registerDLQModel,
+  registerDlqModel,
 } from 'modules/dlq/dlq.model.ts'
 import ProgramModule from 'modules/program/mod.ts'
 
@@ -68,9 +68,9 @@ Deno.test('defaultLeaseTtlMs falls back to the built-in default on an invalid va
   })
 })
 
-Deno.test('registerDLQModel registers a model resolvable under dlqModelName()', () => {
+Deno.test('registerDlqModel registers a model resolvable under dlqModelName()', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel()
+  registerDlqModel()
 
   const registered = ProgramModule.models.getModels('mongo').find((m) => m.name === dlqModelName())
   assertExists(registered)
@@ -78,9 +78,9 @@ Deno.test('registerDLQModel registers a model resolvable under dlqModelName()', 
   ProgramModule.models.deleteModels('mongo')
 })
 
-Deno.test('registerDLQModel uses a native, unprotected Mixed payload field by default', () => {
+Deno.test('registerDlqModel uses a native, unprotected Mixed payload field by default', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel()
+  registerDlqModel()
 
   const registered = ProgramModule.models.getModels('mongo').find((m) => m.name === dlqModelName())
   // deno-lint-ignore no-explicit-any
@@ -91,9 +91,9 @@ Deno.test('registerDLQModel uses a native, unprotected Mixed payload field by de
   ProgramModule.models.deleteModels('mongo')
 })
 
-Deno.test('registerDLQModel switches to a protected payloadRaw string field when enabled', () => {
+Deno.test('registerDlqModel switches to a protected payloadRaw string field when enabled', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({ encryptPayload: true })
+  registerDlqModel({ encryptPayload: true })
 
   const registered = ProgramModule.models.getModels('mongo').find((m) => m.name === dlqModelName())
   // deno-lint-ignore no-explicit-any
@@ -104,10 +104,10 @@ Deno.test('registerDLQModel switches to a protected payloadRaw string field when
   ProgramModule.models.deleteModels('mongo')
 })
 
-Deno.test('registerDLQModel: DLQ_ENCRYPT_PAYLOAD env var overrides the explicit option', () => {
+Deno.test('registerDlqModel: DLQ_ENCRYPT_PAYLOAD env var overrides the explicit option', () => {
   withEnv(DLQ_ENCRYPT_PAYLOAD_ENV, 'false', () => {
     ProgramModule.models.deleteModels('mongo')
-    registerDLQModel({ encryptPayload: true })
+    registerDlqModel({ encryptPayload: true })
 
     const registered = ProgramModule.models.getModels('mongo').find((m) =>
       m.name === dlqModelName()
@@ -121,9 +121,9 @@ Deno.test('registerDLQModel: DLQ_ENCRYPT_PAYLOAD env var overrides the explicit 
   })
 })
 
-Deno.test('registerDLQModel: payloadFields declares a per-field-protectable subdocument', () => {
+Deno.test('registerDlqModel: payloadFields declares a per-field-protectable subdocument', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({
+  registerDlqModel({
     payloadFields: {
       orderId: { type: String },
       creditCard: { type: String, get: () => undefined },
@@ -140,76 +140,76 @@ Deno.test('registerDLQModel: payloadFields declares a per-field-protectable subd
   ProgramModule.models.deleteModels('mongo')
 })
 
-Deno.test('registerDLQModel: modelName option overrides the collection name', () => {
+Deno.test('registerDlqModel: modelName option overrides the collection name', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({ modelName: 'app-dlq' })
+  registerDlqModel({ modelName: 'app-dlq' })
 
   assertEquals(dlqModelName(), 'app-dlq')
   const registered = ProgramModule.models.getModels('mongo').find((m) => m.name === 'app-dlq')
   assertExists(registered)
 
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel() // reset the module-level cache for later tests in this file
+  registerDlqModel() // reset the module-level cache for later tests in this file
 })
 
-Deno.test('registerDLQModel: DLQ_MODEL_NAME env var overrides the modelName option', () => {
+Deno.test('registerDlqModel: DLQ_MODEL_NAME env var overrides the modelName option', () => {
   withEnv(DLQ_MODEL_ENV, 'env-dlq', () => {
     ProgramModule.models.deleteModels('mongo')
-    registerDLQModel({ modelName: 'app-dlq' })
+    registerDlqModel({ modelName: 'app-dlq' })
 
     assertEquals(dlqModelName(), 'env-dlq')
 
     ProgramModule.models.deleteModels('mongo')
   })
-  registerDLQModel() // reset the module-level cache for later tests in this file
+  registerDlqModel() // reset the module-level cache for later tests in this file
 })
 
-Deno.test("registerDLQModel: a later call without modelName doesn't leak a prior value", () => {
+Deno.test("registerDlqModel: a later call without modelName doesn't leak a prior value", () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({ modelName: 'app-dlq' })
+  registerDlqModel({ modelName: 'app-dlq' })
   assertEquals(dlqModelName(), 'app-dlq')
 
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel() // no modelName this time
+  registerDlqModel() // no modelName this time
   assertEquals(dlqModelName(), DEFAULT_DLQ_MODEL)
 
   ProgramModule.models.deleteModels('mongo')
 })
 
-Deno.test('registerDLQModel: defaultLeaseMs option overrides the default claim() lease', () => {
+Deno.test('registerDlqModel: defaultLeaseMs option overrides the default claim() lease', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({ defaultLeaseMs: 45_000 })
+  registerDlqModel({ defaultLeaseMs: 45_000 })
   assertEquals(defaultLeaseTtlMs(), 45_000)
 
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel() // reset the module-level cache for later tests in this file
+  registerDlqModel() // reset the module-level cache for later tests in this file
 })
 
-Deno.test('registerDLQModel: DLQ_DEFAULT_LEASE_MS env var overrides defaultLeaseMs option', () => {
+Deno.test('registerDlqModel: DLQ_DEFAULT_LEASE_MS env var overrides defaultLeaseMs option', () => {
   withEnv(DLQ_DEFAULT_LEASE_MS_ENV, '5000', () => {
     ProgramModule.models.deleteModels('mongo')
-    registerDLQModel({ defaultLeaseMs: 45_000 })
+    registerDlqModel({ defaultLeaseMs: 45_000 })
     assertEquals(defaultLeaseTtlMs(), 5000)
   })
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel() // reset the module-level cache for later tests in this file
+  registerDlqModel() // reset the module-level cache for later tests in this file
 })
 
-Deno.test("registerDLQModel: a call without defaultLeaseMs doesn't leak a prior value", () => {
+Deno.test("registerDlqModel: a call without defaultLeaseMs doesn't leak a prior value", () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({ defaultLeaseMs: 45_000 })
+  registerDlqModel({ defaultLeaseMs: 45_000 })
   assertEquals(defaultLeaseTtlMs(), 45_000)
 
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel() // no defaultLeaseMs this time
+  registerDlqModel() // no defaultLeaseMs this time
   assertEquals(defaultLeaseTtlMs(), 30_000)
 
   ProgramModule.models.deleteModels('mongo')
 })
 
-Deno.test('registerDLQModel: payloadFields takes priority over encryptPayload', () => {
+Deno.test('registerDlqModel: payloadFields takes priority over encryptPayload', () => {
   ProgramModule.models.deleteModels('mongo')
-  registerDLQModel({
+  registerDlqModel({
     encryptPayload: true,
     payloadFields: { orderId: { type: String } },
   })

@@ -245,7 +245,7 @@ commitment to having the integration available, not a soft hint.
 ## `MongoFileRepository`
 
 A generic, durable file record registry, backed by `ZanixMongoConnector`. Follows the same
-`@Provider`/`ZanixProvider` shape as `TriggersAdminRepository`/`DLQProvider` (see
+`@Provider`/`ZanixProvider` shape as `TriggersAdminRepository`/`DlqProvider` (see
 [Database](./database.md)).
 
 ```ts

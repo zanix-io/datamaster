@@ -1,14 +1,14 @@
 import type { AdaptedModel } from 'database/mod.ts'
 import type { ZanixMongoConnector } from 'database/mod.ts'
 import type {
-  DLQClaimOptions,
-  DLQDiscardOptions,
-  DLQEntryAttrs,
-  DLQFailOptions,
-  DLQLeaseOptions,
-  DLQListOptions,
-  DLQPushInput,
-  DLQRequeueOptions,
+  DlqClaimOptions,
+  DlqDiscardOptions,
+  DlqEntryAttrs,
+  DlqFailOptions,
+  DlqLeaseOptions,
+  DlqListOptions,
+  DlqPushInput,
+  DlqRequeueOptions,
 } from './dlq.typings.ts'
 
 import type { CoreModules } from '@zanix/server'
@@ -20,8 +20,8 @@ import { defaultLeaseTtlMs, dlqModelName } from './dlq.model.ts'
 import { sanitizeMongoFilter } from './filter.ts'
 
 /** Paginated `list()` result — same shape as the shared `paginate` static's own return value. */
-export type DLQPaginatedResult = {
-  docs: DLQEntryAttrs[]
+export type DlqPaginatedResult = {
+  docs: DlqEntryAttrs[]
   page: number
   limit: number
   total: number
@@ -31,7 +31,7 @@ export type DLQPaginatedResult = {
 }
 
 /** A boxed, decryptable `payloadRaw` value — what a hydrated document exposes when
- * `registerDLQModel`'s `encryptPayload` is enabled (see `createDecryptableObject`). */
+ * `registerDlqModel`'s `encryptPayload` is enabled (see `createDecryptableObject`). */
 type Decryptable = { decrypt(): Promise<string | string[]> }
 
 const isDecryptable = (value: unknown): value is Decryptable =>
@@ -40,13 +40,13 @@ const isDecryptable = (value: unknown): value is Decryptable =>
 
 /**
  * Raw document shape actually stored — one of `payload` (native, unencrypted or per-field
- * protected via `RegisterDLQModelOptions.payloadFields`) or `payloadRaw` (whole-payload encrypted
+ * protected via `RegisterDlqModelOptions.payloadFields`) or `payloadRaw` (whole-payload encrypted
  * via `encryptPayload`) is ever really present; both are typed here only because `push()` writes
  * both and lets Mongoose's own strict-mode schema binding silently drop whichever one the active
  * schema doesn't declare.
  */
-type DLQDocument =
-  & Omit<DLQEntryAttrs, 'payload' | '_id'>
+type DlqDocument =
+  & Omit<DlqEntryAttrs, 'payload' | '_id'>
   & { _id: unknown; payload?: unknown; payloadRaw?: string | Decryptable }
 
 /** Reverses every registered data-protection path (`payloadRaw`, or any nested
@@ -59,7 +59,7 @@ const dataProtectionTransform = transformByDataProtection()
  *
  * A real hydrated Mongoose document with at least one protected path (`payloadRaw`, or a
  * `payloadFields`-declared nested leaf) goes through `transformByDataProtection` — the one
- * mechanism that correctly reverses protection at any depth, so `DLQProvider` never needs to know
+ * mechanism that correctly reverses protection at any depth, so `DlqProvider` never needs to know
  * which paths were declared protected or re-resolve `encryptPayload`/`payloadFields` itself. A doc
  * with no protection configured just needs `toObject()` to materialize a plain object at all (a
  * real hydrated document doesn't expose its schema fields as plain own-enumerable properties, so a
@@ -67,7 +67,7 @@ const dataProtectionTransform = transformByDataProtection()
  * no real Mongoose schema behind it) falls through to the object itself, with a small duck-typed
  * fallback for a `payloadRaw` fixture simulating the encrypted getter directly.
  */
-const toEntry = async (doc: DLQDocument): Promise<DLQEntryAttrs> => {
+const toEntry = async (doc: DlqDocument): Promise<DlqEntryAttrs> => {
   // deno-lint-ignore no-explicit-any
   const anyDoc = doc as any
   const hasProtection = typeof anyDoc.toJSON === 'function' &&
@@ -99,18 +99,18 @@ const toEntry = async (doc: DLQDocument): Promise<DLQEntryAttrs> => {
 
   const { payload: _payload, payloadRaw: _payloadRaw, ...rest } = plain
 
-  return { ...rest, _id: String(doc._id), payload } as DLQEntryAttrs
+  return { ...rest, _id: String(doc._id), payload } as DlqEntryAttrs
 }
 
 /**
  * Empty marker contract for the `'dlq'` core-provider slot (`dlq/core.ts`) — gives
  * `@Provider({ slot: 'dlq' })`'s `instanceof` check something to validate against, and gives a
- * future alternate storage backend a declared extension point to swap in for `DLQProvider`
+ * future alternate storage backend a declared extension point to swap in for `DlqProvider`
  * (mirroring `ZanixDatabaseConnector`/`ZanixMongoConnector`'s own default-vs-contract split), same
  * pattern as `@zanix/auth`'s `ZanixCoreAuthProvider`/`@zanix/notifications`'
  * `ZanixCoreNotificationsProvider`. No behavior of its own — never instantiated directly.
  */
-export class ZanixCoreDLQProvider<T extends CoreModules = object> extends ZanixProvider<T> {}
+export class ZanixCoreDlqProvider<T extends CoreModules = object> extends ZanixProvider<T> {}
 
 /**
  * Data access and lifecycle logic for `@zanix/datamaster`'s own persisted DLQ collection
@@ -120,25 +120,25 @@ export class ZanixCoreDLQProvider<T extends CoreModules = object> extends ZanixP
  * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/dlq.md` for the distinction.
  *
  * Registered under the `'dlq'` core-provider slot (`dlq/core.ts`) — resolve it via
- * `this.providers.get(DLQProvider)` or `this.providers.get('dlq')`, both resolve the same
- * singleton. Requires `registerDLQModel()` to have run once during the app's own bootstrap.
+ * `this.providers.get(DlqProvider)` or `this.providers.get('dlq')`, both resolve the same
+ * singleton. Requires `registerDlqModel()` to have run once during the app's own bootstrap.
  */
-export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConnector }> {
+export class DlqProvider extends ZanixCoreDlqProvider<{ database: ZanixMongoConnector }> {
   /** Resolves the underlying DLQ `Model` once the connector is ready. */
-  private async model(): Promise<AdaptedModel<DLQDocument>> {
+  private async model(): Promise<AdaptedModel<DlqDocument>> {
     await this.database.isReady
-    return this.database.getModel<DLQDocument>(dlqModelName())
+    return this.database.getModel<DlqDocument>(dlqModelName())
   }
 
   /** Records a new failed item. Always starts `'pending'`, `attempts: 0`. */
-  public async push(input: DLQPushInput): Promise<DLQEntryAttrs> {
+  public async push(input: DlqPushInput): Promise<DlqEntryAttrs> {
     const Model = await this.model()
     const occurredAt = new Date()
     const payloadValue = input.payload ?? null
 
     // Writes both shapes unconditionally — safe regardless of `encryptPayload`, since Mongoose's
     // default strict-mode schema binding silently drops whichever of `payload`/`payloadRaw` the
-    // active schema doesn't declare (see `dlq.model.ts`). This is what lets `DLQProvider` stay
+    // active schema doesn't declare (see `dlq.model.ts`). This is what lets `DlqProvider` stay
     // agnostic to which mode is active, rather than re-resolving `encryptPayload` itself.
     const doc = await Model.create({
       processType: input.processType,
@@ -163,7 +163,7 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    *
    * @throws {HttpError} `NOT_FOUND` if no entry exists for `id`.
    */
-  public async get(id: string): Promise<DLQEntryAttrs> {
+  public async get(id: string): Promise<DlqEntryAttrs> {
     const Model = await this.model()
     const doc = await Model.findOne({ _id: id })
     if (!doc) {
@@ -183,7 +183,7 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    * Unindexed: a hot ad hoc query path should get its own `schema.index()` via a custom connector,
    * or promote the field to a real top-level column instead.
    */
-  public async list(options: DLQListOptions = {}): Promise<DLQPaginatedResult> {
+  public async list(options: DlqListOptions = {}): Promise<DlqPaginatedResult> {
     const Model = await this.model()
     const {
       processType,
@@ -202,7 +202,7 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
 
     const result = await Model.paginate({ filter, page, limit, sort })
     const docs = await Promise.all(
-      result.docs.map((doc) => toEntry(doc as unknown as DLQDocument)),
+      result.docs.map((doc) => toEntry(doc as unknown as DlqDocument)),
     )
 
     return { ...result, docs }
@@ -224,7 +224,7 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    * from it first (at any nesting level), and it's merged *before* `status`/`$or`/`processType` so
    * none of those can be overridden by a same-named `filter` key either.
    */
-  public async claim(options: DLQClaimOptions): Promise<DLQEntryAttrs | null> {
+  public async claim(options: DlqClaimOptions): Promise<DlqEntryAttrs | null> {
     const Model = await this.model()
     const now = new Date()
     const leaseTtlMs = options.leaseTtlMs ?? defaultLeaseTtlMs()
@@ -261,7 +261,7 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    * @throws {HttpError} `CONFLICT` if `leaseOwner` doesn't match the entry's current claim (already
    * released, reclaimed by someone else, or never claimed) — never silently no-ops.
    */
-  public release(id: string, options: DLQLeaseOptions): Promise<DLQEntryAttrs> {
+  public release(id: string, options: DlqLeaseOptions): Promise<DlqEntryAttrs> {
     return this.transitionLeasedEntry(id, options.leaseOwner, {
       $set: { status: 'pending' },
       $unset: { leaseOwner: 1, leaseExpiresAt: 1 },
@@ -275,8 +275,8 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    */
   public complete(
     id: string,
-    options: DLQLeaseOptions,
-  ): Promise<DLQEntryAttrs> {
+    options: DlqLeaseOptions,
+  ): Promise<DlqEntryAttrs> {
     return this.transitionLeasedEntry(id, options.leaseOwner, {
       $set: { status: 'completed' },
       $unset: { leaseOwner: 1, leaseExpiresAt: 1 },
@@ -292,8 +292,8 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    */
   public async fail(
     id: string,
-    options: DLQFailOptions,
-  ): Promise<DLQEntryAttrs> {
+    options: DlqFailOptions,
+  ): Promise<DlqEntryAttrs> {
     const Model = await this.model()
 
     // Read first to decide the next status from the current `attempts`/`maxAttempts` — the actual
@@ -340,8 +340,8 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    */
   public async requeue(
     id: string,
-    options: DLQRequeueOptions = {},
-  ): Promise<DLQEntryAttrs> {
+    options: DlqRequeueOptions = {},
+  ): Promise<DlqEntryAttrs> {
     const Model = await this.model()
     const doc = await Model.findOneAndUpdate(
       { _id: id },
@@ -368,8 +368,8 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
    */
   public async discard(
     id: string,
-    options: DLQDiscardOptions = {},
-  ): Promise<DLQEntryAttrs> {
+    options: DlqDiscardOptions = {},
+  ): Promise<DlqEntryAttrs> {
     const Model = await this.model()
     const doc = await Model.findOneAndUpdate(
       { _id: id },
@@ -407,7 +407,7 @@ export class DLQProvider extends ZanixCoreDLQProvider<{ database: ZanixMongoConn
     leaseOwner: string,
     // deno-lint-ignore no-explicit-any
     update: Record<string, any>,
-  ): Promise<DLQEntryAttrs> {
+  ): Promise<DlqEntryAttrs> {
     const Model = await this.model()
     const doc = await Model.findOneAndUpdate(
       { _id: id, leaseOwner, status: 'claimed' },
