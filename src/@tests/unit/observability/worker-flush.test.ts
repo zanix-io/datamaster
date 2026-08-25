@@ -59,3 +59,65 @@ Deno.test('flushBulkInWorker surfaces bulk partial failures to its caller', asyn
     restore()
   }
 })
+
+Deno.test(
+  'flushBulkInWorker honors indexInitialize: true by ensuring the index before bulkIndex',
+  async () => {
+    // Regression coverage for the worker-side analog of the `indexInitialize`-not-wired gap fixed
+    // in `flushInline` (`log-adapter.ts`): `flushBulkInWorker` used to construct its connector and
+    // call `bulkIndex()` directly, never wiring `indexInitialized` at all — `indexInitialize: true`
+    // paired with `useWorker` was silently a no-op. Fixed via the same `wireIndexInitialize`
+    // extracted in `connector.ts`.
+    const calls: { method: string }[] = []
+    const original = globalThis.fetch
+    globalThis.fetch = ((_url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET' })
+      if (init.method === 'HEAD') return Promise.resolve(new Response(null, { status: 200 }))
+      return Promise.resolve(jsonResponse({ errors: false, items: [] }))
+    }) as typeof fetch
+    try {
+      const result = await flushBulkInWorker(
+        {
+          node: 'http://localhost:9200',
+          index: { name: 'worker-logs' },
+          indexInitialize: true,
+        },
+        [{ message: 'from worker' }],
+      )
+      assertEquals(result, { errors: false, failedCount: 0 })
+      assertEquals(calls.filter((c) => c.method === 'HEAD').length, 1)
+    } finally {
+      globalThis.fetch = original
+    }
+  },
+)
+
+Deno.test(
+  'flushBulkInWorker re-checks the index on every call — no cross-call singleton to memoize against',
+  async () => {
+    // Unlike the main-thread `getConnector()` path (a reused singleton connector, memoized via a
+    // `WeakSet`), every `flushBulkInWorker` call constructs a brand-new, throwaway connector — so
+    // `ensureIndex()`'s HEAD check legitimately re-runs on each call. Still correct (idempotent,
+    // never touches an existing index) — this documents the real, structural difference rather
+    // than asserting a false "only once ever" expectation for this code path.
+    const calls: { method: string }[] = []
+    const original = globalThis.fetch
+    globalThis.fetch = ((_url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET' })
+      if (init.method === 'HEAD') return Promise.resolve(new Response(null, { status: 200 }))
+      return Promise.resolve(jsonResponse({ errors: false, items: [] }))
+    }) as typeof fetch
+    try {
+      for (let i = 0; i < 2; i++) {
+        // deno-lint-ignore no-await-in-loop
+        await flushBulkInWorker(
+          { node: 'http://localhost:9200', index: { name: 'worker-logs' }, indexInitialize: true },
+          [{ message: `call-${i}` }],
+        )
+      }
+      assertEquals(calls.filter((c) => c.method === 'HEAD').length, 2)
+    } finally {
+      globalThis.fetch = original
+    }
+  },
+)

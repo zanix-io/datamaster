@@ -55,6 +55,21 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   marked `@deprecated` in their JSDoc and **will be removed in a future major release**. Migrate to
   their `Dlq`-cased equivalent above.
 
+### Fixed
+
+- `elasticsearchLogSave`'s `indexInitialize: true` runs `ensureIndex()` (and logs success) once per
+  resolved `'search'` connector instance instead of on every buffer flush — previously it re-ran
+  (and re-logged) on every flush cycle, since the DI-resolved connector's `getConnector()` call kept
+  rewiring a fresh, non-memoized closure on top of an already-memoized one.
+- `indexInitialize: true` now also ensures the index for a caller-supplied `connector` and for a
+  `useWorker`-dispatched flush — both previously ignored the option silently, with no effect and no
+  error.
+- Writes and index-initialization checks now target the `index.name` (static or per-document
+  resolver) configured on `elasticsearchLogSave`, instead of silently falling back to the shared
+  `'search'` connector's hardcoded default index (`'zanix-logs'`) whenever no explicit `connector`
+  is supplied. Two independent `elasticsearchLogSave()` callers sharing that same connector each
+  write to their own configured index without clobbering one another.
+
 ## [1.5.0] - 2026-08-23
 
 ### Added

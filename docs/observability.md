@@ -51,7 +51,8 @@ await es.checkClusterHealth() // GET /_cluster/health — true/false, never thro
 It operates on plain `Record<string, unknown>` documents — it has no knowledge of Logger's formatted
 log shape, so it's equally usable to index any document, not just logs. Both `index()` and
 `bulkIndex()` accept a per-call `{ index }` that overrides the connector-level default for that one
-call.
+call — same shape as the connector-level default itself (a static name or a per-document resolver),
+not just a static string.
 
 ### Auth: URL-embedded vs. env var
 
@@ -98,10 +99,29 @@ resolver might produce) — repeated names are deduped before checking.
 
 Rather than calling `ensureIndex()` by hand before the first write, set `index.name` to a **static**
 string and pass `indexInitialize: true` to `elasticsearchLogSave` (see below) to have every
-`index()`/`bulkIndex()`/`refresh()` call await it automatically — each such call re-runs
-`ensureIndex`'s `HEAD` check (a `PUT` only ever happens once the index genuinely doesn't exist yet),
-so this trades a small, ongoing per-call `HEAD` request for never having to reason about ordering
-the first write after index creation yourself.
+`index()`/`bulkIndex()`/`refresh()` call await it automatically. This runs `ensureIndex()`'s `HEAD`
+check (and a `PUT` only if the index is genuinely missing) exactly once for the resolved connector's
+lifetime — the first call after enabling it pays that one round trip (and logs one success message),
+every call after that is a pure no-op, so there's no repeated `HEAD` request or repeated success log
+on later flushes. This memoization is scoped to the connector instance itself, not a shared flag —
+re-registering the `'search'` core slot with a different connector instance (see
+`registerElasticsearchConnector()`'s own doc in `observability/core.ts`) makes the newly-resolved
+connector run its own initialization fresh, rather than inheriting a previous, different instance's
+already-initialized state.
+
+> Note: this also works when you pass your own `connector` instance to `elasticsearchLogSave` (see
+> below) instead of letting it resolve the `'search'` core connector itself — `indexInitialize`
+> wires the same lazy, self-memoizing `ensureIndex()`-on-first-use onto whichever connector actually
+> reaches the flush, resolved or caller-supplied, tracked independently per connector instance.
+>
+> `useWorker` is a real exception to this: each worker-dispatched flush constructs its own throwaway
+> connector (no cross-flush singleton to memoize against inside a worker thread), so
+> `indexInitialize: true` there re-runs `ensureIndex()`'s idempotent `HEAD` check on every flush
+> instead of once for the connector's lifetime — still safe (an existing index is never touched),
+> just not the same "pays the round trip once, ever" behavior as the main-thread/caller-supplied
+> cases above. A caller-supplied `connector` can never reach the worker path at all (`connector` is
+> typed `never` whenever `useWorker` is set — a live class instance can't cross the `postMessage`
+> boundary a worker thread runs behind).
 
 ### Querying with `search()`
 
@@ -321,8 +341,26 @@ When neither an explicit `connector` nor `node`/`auth` override tells it otherwi
 `elasticsearchLogSave` reuses that same DI-registered `'search'` connector instead of constructing a
 second one — so setting `SEARCH_ENGINE`/`SEARCH_URL` once is enough for both the app's own
 DI-injected connector and its logger to share one underlying client. If no core connector is
-registered (or the app hasn't booted far enough to resolve it yet), it falls back to building a
-fresh connector from whatever options `elasticsearchLogSave` was given, exactly as before.
+registered under `'search'` — `@zanix/datamaster/core` was never imported, or `SEARCH_ENGINE` is
+unset — it throws a clear "did you forget to import `@zanix/datamaster/core`?" error instead of
+silently falling back to a standalone connector built from a possibly-unset `SEARCH_URL` (defaulting
+all the way to `http://localhost:9200`). `elasticsearchLogSave`'s own flush never propagates that
+throw to the caller — it's a fire-and-forget `SaveDataFunction`, so a failed flush logs the error
+(`'noSave'`, never persisted) and moves on — but it does surface on every single flush cycle until
+the misconfiguration is fixed, rather than succeeding silently against a connector nobody actually
+configured.
+
+That reused, DI-registered connector is a single process-wide instance — constructed once from its
+own registration, never from any one `elasticsearchLogSave()` caller's `node`/`auth`/`index`
+options. Its own default index still ends up `'zanix-logs'` when nothing configures it otherwise.
+This is never a problem for `index.name`, though: `elasticsearchLogSave` always forwards the
+`index.name` you configure as a per-call override on the actual `_bulk`/`ensureIndex()` calls it
+makes through that connector, so writes land on the index you configured, not the shared connector's
+own default — whether `index.name` is a static string or a per-document resolver function. This
+override never mutates the shared connector's own default index, which matters when more than one
+`elasticsearchLogSave()` caller (e.g. two independent `Logger` instances) reuses the same
+DI-resolved connector with different `index.name` values in the same process — each caller's writes
+go to its own configured index, never clobbering another caller's.
 
 There is currently no `meilisearchLogSave` bridge (`elasticsearchLogSave` stays
 Elasticsearch/OpenSearch-specific); resolve `MeilisearchConnector` directly via
