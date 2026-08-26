@@ -3,6 +3,13 @@
 `ZanixMongoConnector`, the `registerModel` DSL, seeders, multi-database support, multiple Mongo
 connectors, and the SQLite key-value store.
 
+`@zanix/datamaster/database` is a narrow subpath — `mongoose` is the only heavy dependency it
+genuinely needs. `redis`/`@redis/*`/`graphql` stay out of a real consumer's own installed
+dependencies, even though every provider/interactor/connector here resolves DI primitives through
+`@zanix/server`'s bare root — a cross-package guarantee that additionally depends on
+`@zanix/server`'s own currently-pinned version, same as `@zanix/datamaster/dlq`'s own equivalent
+note (see [DLQ](./dlq.md)).
+
 ## `ZanixMongoConnector`
 
 ```ts

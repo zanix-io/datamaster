@@ -53,51 +53,11 @@ export { createTriggersDiscoveryProvider } from 'modules/triggers/triggers-disco
  * Dead Letter Queue — a Mongo-backed registry of items that failed in some business process
  * (payments, webhooks, jobs, ...), for auditing/debugging/manual or programmatic retry.
  * Independent of `@zanix/asyncmq`'s own RabbitMQ-native dead-letter mechanism
- * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/dlq.md`.
+ * (`ZanixAsyncMQProvider.requeueDeadLetters`) — see `docs/dlq.md`. A consumer that only needs this
+ * surface (not the rest of this package's root) imports `@zanix/datamaster/dlq` directly instead —
+ * see that subpath's own module doc for why.
  */
-export { DlqProvider, ZanixCoreDlqProvider } from 'modules/dlq/dlq.provider.ts'
-/**
- * Business logic behind this package's own local `/admin/dlq` — see
- * `@zanix/datamaster/dlq-api`'s own `createDlqAdminController`. Exposes only
- * `push`/`get`/`list`/`requeue`/`discard`/`remove`; the lease-based
- * `claim`/`release`/`complete`/`fail` primitives stay off this surface — see
- * {@link DlqAdminService}'s own JSDoc for why.
- */
-export { DlqAdminService } from 'modules/dlq/dlq.service.ts'
-/**
- * Builds the `DiscoveryProvider` for `/.well-known/zanix/dlq`, backed by {@link DlqProvider}. A
- * future `DlqAggregator` in `@zanix/admin` (mirroring `TriggersAggregator`, not yet built) would
- * compose this the same way `defineAdminMetadata` composes {@link createTriggersDiscoveryProvider};
- * it does not author the provider itself. Scoped to unresolved (`pending`/`claimed`/`failed`)
- * entries only — see this function's own JSDoc for why.
- */
-export { createDlqDiscoveryProvider } from 'modules/dlq/dlq-discovery.provider.ts'
-/** Registers `@zanix/datamaster`'s own DLQ model — required once before `DlqProvider` resolves. */
-export {
-  DEFAULT_DLQ_MODEL,
-  defaultLeaseTtlMs,
-  DLQ_DEFAULT_LEASE_MS_ENV,
-  DLQ_ENCRYPT_PAYLOAD_ENV,
-  DLQ_MODEL_ENV,
-  dlqModelName,
-  isDlqResourceEnabled,
-  registerDlqModel,
-} from 'modules/dlq/dlq.model.ts'
-export type { RegisterDlqModelOptions } from 'modules/dlq/dlq.model.ts'
-export type {
-  DlqClaimOptions,
-  DlqDiscardOptions,
-  DlqEntryAttrs,
-  DlqErrorHistoryEntry,
-  DlqErrorInfo,
-  DlqFailOptions,
-  DlqLeaseOptions,
-  DlqListOptions,
-  DlqPushInput,
-  DlqRequeueOptions,
-  DlqStatus,
-} from 'modules/dlq/dlq.typings.ts'
-export type { DlqPaginatedResult } from 'modules/dlq/dlq.provider.ts'
+export * from 'modules/dlq/mod.ts'
 
 // Deprecated DLQ aliases — this package used to case the `DLQ` acronym all-caps; it now
 // consistently cases it `Dlq` (see CHANGELOG's `[Unreleased]` entry). These re-export the exact

@@ -16,10 +16,21 @@ application-level DLQ entry are different concepts, tracked in different places.
 // other model.defs.ts. Not something you call from main.ts, and not part of Zanix.setup(): setup()
 // only ever sets env vars (see "Configuration" below); registerDlqModel() is a real registration,
 // same as registerModel() itself.
-import { registerDlqModel } from 'jsr:@zanix/datamaster@[version]'
+import { registerDlqModel } from 'jsr:@zanix/datamaster@[version]/dlq'
 
 registerDlqModel()
 ```
+
+`@zanix/datamaster/dlq` is a narrow subpath — everything in this doc (`DlqProvider`,
+`registerDlqModel`, `DlqAdminService`, `createDlqDiscoveryProvider`, and the DLQ typings) without
+the rest of this package's root `.` (`ZanixMongoConnector`, the cache connectors, ...). This
+package's own root `.` re-exports the same bindings for backward compatibility, but a consumer that
+only needs the DLQ surface imports this subpath directly instead. This subpath's own source never
+imports anything under `@zanix/datamaster/cache` — the DLQ collection is Mongo-backed, so `mongoose`
+stays the only heavy dependency it genuinely needs. `redis`/`@redis/*`/`graphql` stay out of a real
+consumer's own installed dependencies too, even though every provider/interactor here (including
+`DlqProvider`) resolves DI primitives through `@zanix/server`'s bare root — on the `^4.0.0` line,
+that root barrel itself carries neither dependency.
 
 `DlqProvider` is registered under the `'dlq'` core-provider slot — resolve it exactly like any other
 provider, from any `ZanixInteractor`/`ZanixProvider`:
@@ -331,7 +342,7 @@ This package only authors the provider; wiring it into an HTTP surface via `@zan
 `ProgramModule.defineDiscovery` is whichever app composes it.
 
 ```ts
-import { createDlqDiscoveryProvider } from 'jsr:@zanix/datamaster@[version]'
+import { createDlqDiscoveryProvider } from 'jsr:@zanix/datamaster@[version]/dlq'
 
 ProgramModule.defineDiscovery('dlq', createDlqDiscoveryProvider())
 ```

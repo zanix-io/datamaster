@@ -148,6 +148,8 @@ protection policies, local caching utilities, such as in-memory Map for fast, et
       `ZanixElasticsearchConnector`/`MeilisearchConnector`/`elasticsearchLogSave` only.
     - `./triggers-api` → `createTriggersAdminController`, the local `/admin/triggers` HTTP surface,
       only.
+    - `./dlq` → `DlqProvider`, `registerDlqModel`, `DlqAdminService`, `createDlqDiscoveryProvider`,
+      and the DLQ typings, only — without this package's cache connectors.
     - `./dlq-api` → `createDlqAdminController`, the local `/admin/dlq` HTTP surface, only.
     - `./storage` → `S3ObjectStorage` only.
     - `./files` → `MongoFileRepository`/`registerFileModel` only.
@@ -182,7 +184,7 @@ groups the main exports by category — each links to a guide with full usage ex
 | Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject`               | [Data Protection](./docs/data-protection.md)                            |
 | Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixMemcachedConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                        | [Cache](./docs/cache.md)                                                |
 | Observability                 | `ZanixElasticsearchConnector`, `MeilisearchConnector`, `elasticsearchLogSave`                                                                                                                                       | [Observability](./docs/observability.md)                                |
-| Dead Letter Queue             | `DlqProvider`, `registerDlqModel`, `DlqAdminService`, `createDlqAdminController` (`./dlq-api`), `createDlqDiscoveryProvider` (distributed processing lives in `@zanix/asyncmq/dlq`)                                 | [DLQ](./docs/dlq.md)                                                    |
+| Dead Letter Queue             | `DlqProvider`, `registerDlqModel`, `DlqAdminService`, `createDlqAdminController` (`./dlq-api`), `createDlqDiscoveryProvider` (`./dlq`; distributed processing lives in `@zanix/asyncmq/dlq`)                        | [DLQ](./docs/dlq.md)                                                    |
 | Storage                       | `S3ObjectStorage` (`./storage`), `MongoFileRepository`, `registerFileModel` (`./files`)                                                                                                                             | [Storage](./docs/storage.md)                                            |
 | Configuration                 | Environment variables for connections and data protection                                                                                                                                                           | [Configuration](./docs/configuration.md)                                |
 
