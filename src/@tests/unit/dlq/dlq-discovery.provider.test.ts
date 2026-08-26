@@ -1,23 +1,23 @@
 import { assertEquals } from '@std/assert'
 import { ProgramModule } from '@zanix/server'
 import { createDlqDiscoveryProvider } from 'modules/dlq/dlq-discovery.provider.ts'
-import type { DLQProvider } from 'modules/dlq/dlq.provider.ts'
-import type { DLQEntryAttrs, DLQListOptions, DLQStatus } from 'modules/dlq/dlq.typings.ts'
-import type { DLQPaginatedResult } from 'modules/dlq/dlq.provider.ts'
+import type { DlqProvider } from 'modules/dlq/dlq.provider.ts'
+import type { DlqEntryAttrs, DlqListOptions, DlqStatus } from 'modules/dlq/dlq.typings.ts'
+import type { DlqPaginatedResult } from 'modules/dlq/dlq.provider.ts'
 
-/** Installs a fake `DLQProvider` behind `ProgramModule.providers.get`, restored via the returned
- * function — same technique `local-dlq.service.test.ts` uses for `DLQAdminService`'s own
+/** Installs a fake `DlqProvider` behind `ProgramModule.providers.get`, restored via the returned
+ * function — same technique `local-dlq.service.test.ts` uses for `DlqAdminService`'s own
  * `this.providers`, applied here to the shared `ProgramModule` singleton itself since
  * `createDlqDiscoveryProvider` resolves through it directly (mirroring
  * `createTriggersDiscoveryProvider`'s own deferred-resolution shape). */
-function mockDlqProvider(list: (options: DLQListOptions) => Promise<DLQPaginatedResult>) {
+function mockDlqProvider(list: (options: DlqListOptions) => Promise<DlqPaginatedResult>) {
   // `ProgramModule` itself is `Object.freeze`d (non-extensible), so a new own property can never
   // be defined directly on it — even one meant to shadow an inherited, configurable getter. The
   // real `providers` getter lives on its prototype instead, so the mock (and its restoration)
   // targets the prototype, not the frozen instance.
   const proto = Object.getPrototypeOf(ProgramModule)
   const original = Object.getOwnPropertyDescriptor(proto, 'providers')
-  const fakeProvider = { list } as unknown as DLQProvider
+  const fakeProvider = { list } as unknown as DlqProvider
   Object.defineProperty(proto, 'providers', {
     value: { get: () => fakeProvider },
     configurable: true,
@@ -33,7 +33,7 @@ function mockDlqProvider(list: (options: DLQListOptions) => Promise<DLQPaginated
   }
 }
 
-const entry = (id: string, status: DLQStatus): DLQEntryAttrs => ({
+const entry = (id: string, status: DlqStatus): DlqEntryAttrs => ({
   _id: id,
   processType: 'payment.process',
   origin: 'orders-service',
@@ -46,7 +46,7 @@ const entry = (id: string, status: DLQStatus): DLQEntryAttrs => ({
   updatedAt: new Date(),
 })
 
-const paginated = (docs: DLQEntryAttrs[]): DLQPaginatedResult => ({
+const paginated = (docs: DlqEntryAttrs[]): DlqPaginatedResult => ({
   docs,
   page: 1,
   limit: 500,
@@ -57,10 +57,10 @@ const paginated = (docs: DLQEntryAttrs[]): DLQPaginatedResult => ({
 })
 
 Deno.test('snapshot() queries pending/claimed/failed, capped + sorted by recency', async () => {
-  const calls: DLQListOptions[] = []
+  const calls: DlqListOptions[] = []
   const { restore } = mockDlqProvider((options) => {
     calls.push(options)
-    const status = options.status as DLQStatus
+    const status = options.status as DlqStatus
     return Promise.resolve(paginated([entry(`${status}-1`, status)]))
   })
 
@@ -80,7 +80,7 @@ Deno.test('snapshot() queries pending/claimed/failed, capped + sorted by recency
 })
 
 Deno.test('snapshot() never queries completed/discarded entries', async () => {
-  const queriedStatuses: (DLQStatus | undefined)[] = []
+  const queriedStatuses: (DlqStatus | undefined)[] = []
   const { restore } = mockDlqProvider((options) => {
     queriedStatuses.push(options.status)
     return Promise.resolve(paginated([]))
@@ -99,7 +99,7 @@ Deno.test('snapshot() never queries completed/discarded entries', async () => {
 
 Deno.test('snapshot() merges every status page into one flat array', async () => {
   const { restore } = mockDlqProvider((options) => {
-    const status = options.status as DLQStatus
+    const status = options.status as DlqStatus
     const docs = [entry(`${status}-a`, status), entry(`${status}-b`, status)]
     return Promise.resolve(paginated(docs))
   })

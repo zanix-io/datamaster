@@ -130,7 +130,7 @@ protection policies, local caching utilities, such as in-memory Map for fast, et
     MinIO, AWS S3 itself). Registers the `'s3'` core connector slot, the same DI mechanism
     `'database'`/`'search'` use.
   - `MongoFileRepository`: a generic, durable file record registry, following the same
-    `@Provider`/`ZanixMongoConnector` shape as `TriggersAdminRepository`/`DLQProvider`. Neither
+    `@Provider`/`ZanixMongoConnector` shape as `TriggersAdminRepository`/`DlqProvider`. Neither
     component assumes a specific file kind, processing state, or consuming domain.
   - Optional, opt-in object content encryption at rest (AES-GCM, or RSA-wrapped per-object AES keys)
     — reuses this package's own existing `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY`
@@ -148,6 +148,8 @@ protection policies, local caching utilities, such as in-memory Map for fast, et
       `ZanixElasticsearchConnector`/`MeilisearchConnector`/`elasticsearchLogSave` only.
     - `./triggers-api` → `createTriggersAdminController`, the local `/admin/triggers` HTTP surface,
       only.
+    - `./dlq` → `DlqProvider`, `registerDlqModel`, `DlqAdminService`, `createDlqDiscoveryProvider`,
+      and the DLQ typings, only — without this package's cache connectors.
     - `./dlq-api` → `createDlqAdminController`, the local `/admin/dlq` HTTP surface, only.
     - `./storage` → `S3ObjectStorage` only.
     - `./files` → `MongoFileRepository`/`registerFileModel` only.
@@ -182,7 +184,7 @@ groups the main exports by category — each links to a guide with full usage ex
 | Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject`               | [Data Protection](./docs/data-protection.md)                            |
 | Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixMemcachedConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                        | [Cache](./docs/cache.md)                                                |
 | Observability                 | `ZanixElasticsearchConnector`, `MeilisearchConnector`, `elasticsearchLogSave`                                                                                                                                       | [Observability](./docs/observability.md)                                |
-| Dead Letter Queue             | `DLQProvider`, `registerDLQModel`, `DLQAdminService`, `createDlqAdminController` (`./dlq-api`), `createDlqDiscoveryProvider` (distributed processing lives in `@zanix/asyncmq/dlq`)                                 | [DLQ](./docs/dlq.md)                                                    |
+| Dead Letter Queue             | `DlqProvider`, `registerDlqModel`, `DlqAdminService`, `createDlqAdminController` (`./dlq-api`), `createDlqDiscoveryProvider` (`./dlq`; distributed processing lives in `@zanix/asyncmq/dlq`)                        | [DLQ](./docs/dlq.md)                                                    |
 | Storage                       | `S3ObjectStorage` (`./storage`), `MongoFileRepository`, `registerFileModel` (`./files`)                                                                                                                             | [Storage](./docs/storage.md)                                            |
 | Configuration                 | Environment variables for connections and data protection                                                                                                                                                           | [Configuration](./docs/configuration.md)                                |
 
@@ -302,9 +304,9 @@ await connector['close']()
 - [Observability](./docs/observability.md) — `ZanixElasticsearchConnector` and
   `MeilisearchConnector` (both backing the same `'search'` slot — only one per deployment), and
   `elasticsearchLogSave`, the `@zanix/logger` persistence bridge to Elasticsearch/OpenSearch.
-- [DLQ](./docs/dlq.md) — `DLQProvider`, a Mongo-backed dead letter queue for failed business
+- [DLQ](./docs/dlq.md) — `DlqProvider`, a Mongo-backed dead letter queue for failed business
   processes, with atomic `claim()`-based concurrency, a local `/admin/dlq` REST API
-  (`DLQAdminService`/`createDlqAdminController`, `./dlq-api`), a `/.well-known/zanix/dlq` Discovery
+  (`DlqAdminService`/`createDlqAdminController`, `./dlq-api`), a `/.well-known/zanix/dlq` Discovery
   snapshot (`createDlqDiscoveryProvider`), and distributed processing via `@zanix/asyncmq/dlq`'s
   `registerDLQProcessor`.
 - [Storage](./docs/storage.md) — `S3ObjectStorage` (a generic S3-compatible byte store) and

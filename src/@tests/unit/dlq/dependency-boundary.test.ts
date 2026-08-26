@@ -12,11 +12,22 @@ import { assert } from '@std/assert'
  * legitimately imports `@zanix/server` (`Provider`/`Interactor`) for DI, same as every other
  * provider/interactor in this package. The boundary that matters here is direction, not presence.
  *
+ * Also guards `@zanix/datamaster/dlq`'s own entry file (`modules/dlq/mod.ts`) — the narrow subpath
+ * a consumer that only needs `DlqProvider` imports instead of this package's root `.` — never
+ * resolves anything under `modules/cache/`. Reaching Mongo (`modules/database/`) is expected: the
+ * DLQ collection is Mongo-backed. This is the local half of that subpath's own isolation guarantee;
+ * whether the `redis`/`@redis/*`/`graphql` npm packages themselves stay out of a real consumer's
+ * own `node_modules` also depends on `@zanix/server`'s own currently-pinned version (see
+ * `docs/dlq.md`) — a separate, cross-package guarantee this local-graph check can't observe on its
+ * own, so it's checked here too, directly against `@zanix/server`'s real resolved dependency graph
+ * (not this package's own source tree).
+ *
  * @module
  */
 
 const ENTRY_PROVIDER = 'src/modules/dlq/dlq.provider.ts'
 const ENTRY_SERVICE = 'src/modules/dlq/dlq.service.ts'
+const ENTRY_MOD = 'src/modules/dlq/mod.ts'
 
 interface ModuleGraph {
   code: Set<string>
@@ -51,6 +62,14 @@ function includesLocalPathSegment(specifiers: Set<string>, segment: string): boo
   return [...specifiers].some((specifier) => specifier.includes(segment))
 }
 
+/** Matches a resolved `npm:` specifier for `packageName`, tolerating the `npm:/pkg@version` and
+ * `npm:pkg@version` shapes `deno info --json` uses across scoped/unscoped packages. */
+function includesNpmPackage(specifiers: Set<string>, packageName: string): boolean {
+  return [...specifiers].some((specifier) =>
+    specifier.startsWith(`npm:/${packageName}@`) || specifier.startsWith(`npm:${packageName}@`)
+  )
+}
+
 for (const entry of [ENTRY_PROVIDER, ENTRY_SERVICE]) {
   Deno.test(
     `${entry}: never reaches back into modules/dlq/dlq-api/ (the local-api layer built ON TOP ` +
@@ -68,3 +87,48 @@ for (const entry of [ENTRY_PROVIDER, ENTRY_SERVICE]) {
     },
   )
 }
+
+Deno.test(
+  `${ENTRY_MOD}: the narrow @zanix/datamaster/dlq subpath never resolves a module under ` +
+    'modules/cache/ (the Redis/Memcached stack) — reaching modules/database/ is expected, since ' +
+    'the DLQ collection is Mongo-backed',
+  async () => {
+    const graph = await moduleGraph(ENTRY_MOD)
+    assert(
+      !includesLocalPathSegment(graph.code, '/modules/cache/'),
+      `${ENTRY_MOD} must never resolve a module under modules/cache/ as code`,
+    )
+    assert(
+      !includesLocalPathSegment(graph.type, '/modules/cache/'),
+      `${ENTRY_MOD} must never resolve a module under modules/cache/ as a type`,
+    )
+  },
+)
+
+Deno.test(
+  `${ENTRY_MOD}: never resolves the redis/@redis/* or graphql npm packages — a cross-package ` +
+    "guarantee that additionally depends on @zanix/server's own currently-pinned version (see " +
+    'docs/dlq.md)',
+  async () => {
+    const graph = await moduleGraph(ENTRY_MOD)
+    const npmPackages = [
+      'redis',
+      '@redis/client',
+      '@redis/bloom',
+      '@redis/json',
+      '@redis/search',
+      '@redis/time-series',
+      'graphql',
+    ]
+    for (const pkg of npmPackages) {
+      assert(
+        !includesNpmPackage(graph.code, pkg),
+        `${ENTRY_MOD} must never resolve npm:${pkg} as code`,
+      )
+      assert(
+        !includesNpmPackage(graph.type, pkg),
+        `${ENTRY_MOD} must never resolve npm:${pkg} as a type`,
+      )
+    }
+  },
+)

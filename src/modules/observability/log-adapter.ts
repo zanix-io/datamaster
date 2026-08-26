@@ -7,7 +7,7 @@ import type {
 
 import logger from '@zanix/logger'
 import { BulkBuffer } from './bulk-buffer.ts'
-import { getConnector, type ZanixElasticsearchConnector } from './connector.ts'
+import { getConnector, wireIndexInitialize, type ZanixElasticsearchConnector } from './connector.ts'
 import { flushBulkInWorker, workerFlushMetaUrl } from './worker-flush.ts'
 import { dispatchWorkerTask } from '@zanix/server'
 
@@ -51,6 +51,37 @@ const reportFlushFailure = (context: string, error: unknown): void => {
  * shipping: `elasticsearchLogSave` is a fire-and-forget `SaveDataFunction`, called from
  * arbitrary logging call sites that never expect it to throw). Wrapped the same way a
  * `bulkIndex()` rejection already is.
+ *
+ * A caller-supplied `connector` skips `getConnector()` entirely (that's the whole point of
+ * `connector` — reuse an already-constructed instance instead of resolving/building one). Since
+ * `wireIndexInitialize` is called directly on `connector` here too, the same way `getConnector()`
+ * calls it internally, `indexInitialize` works identically regardless of which of the two
+ * `connector` reaches this function.
+ *
+ * `bulkIndex()` is always called with an explicit `index` override sourced from
+ * `connectorOptions.index?.name`. This matters specifically for the `getConnector()` branch: the
+ * shared `'search'` singleton is constructed once, by `@zanix/server`'s DI container, from a
+ * synthetic per-lifetime context id — never from any one `elasticsearchLogSave()` caller's real
+ * options — so its own `#defaultIndex` permanently defaults to `'zanix-logs'` regardless of what
+ * any individual caller configures. Without an explicit per-call override, a write through that
+ * shared connector would always land on its own default index instead of this caller's configured
+ * one, even though `connectorOptions.index?.name` was already reaching `ensureIndex()`'s
+ * settings/mappings via `wireIndexInitialize`. Passing the override here makes the actual write
+ * target agree with whatever `ensureIndex()` is already ensuring.
+ *
+ * Passing this override is also always safe for a caller-supplied `connector` (the other branch
+ * above): that connector was already constructed directly from these same options, so its own
+ * `#defaultIndex` already resolves to the same value this override forwards — a redundant,
+ * behavior-preserving no-op there, not a special case to branch around.
+ *
+ * This is a per-call override, not a mutation of the shared connector's own `#defaultIndex` —
+ * deliberately, since `'search'` is one process-wide singleton and more than one
+ * `elasticsearchLogSave()` caller (e.g. two independent `Logger` instances, each with its own
+ * `index.name`) can realistically share it in the same process; mutating shared state on the
+ * connector itself would make the last caller's index silently win for every other caller
+ * instead. `opts.index` accepts the same shape `#defaultIndex` does (a static name or a
+ * per-document resolver — see `bulkIndex()`'s own doc), so a per-document resolver configured
+ * here is honored too, not just a static index name.
  */
 const flushInline = (
   connector: ZanixElasticsearchConnector | undefined,
@@ -61,12 +92,14 @@ const flushInline = (
 ): Promise<void> => {
   let conn: ZanixElasticsearchConnector
   try {
-    conn = connector || getConnector(connectorOptions)
+    conn = connector
+      ? wireIndexInitialize(connector, connectorOptions.indexInitialize, connectorOptions)
+      : getConnector(connectorOptions)
   } catch (e) {
     reportFlushFailure('inline', e)
     return Promise.resolve()
   }
-  return conn.bulkIndex(docs).then(
+  return conn.bulkIndex(docs, { index: connectorOptions.index?.name }).then(
     () => {},
     (e) => reportFlushFailure('inline', e),
   )

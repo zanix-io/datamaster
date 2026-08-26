@@ -401,6 +401,36 @@ Deno.test('a per-call index option overrides the connector-level default index',
   }
 })
 
+Deno.test(
+  'a per-call index option also accepts a per-document resolver function, not just a static string',
+  async () => {
+    // `bulkIndex()`'s (and `index()`'s) `opts.index` accept the same shape the connector-level
+    // default already does — a static name or a per-document resolver — so a per-call override
+    // can route different documents in the same batch to different indexes too. This is what
+    // lets `elasticsearchLogSave`'s own `flushInline` (`log-adapter.ts`) forward a
+    // function-shaped `index.name` through to the shared 'search' core connector's actual write,
+    // not just a static name.
+    const { calls, restore } = mockFetch(() => jsonResponse({ errors: false, items: [] }))
+    try {
+      const connector = new ZanixElasticsearchConnector({
+        node: 'http://localhost:9200',
+        index: { name: 'connector-default' },
+        autoInitialize: false,
+      })
+      await connector.bulkIndex(
+        [{ level: 'error' }, { level: 'info' }],
+        { index: (doc) => `logs-${(doc as { level: string }).level}` },
+      )
+
+      const body = calls[0].init.body as string
+      assertStringIncludes(body, JSON.stringify({ index: { _index: 'logs-error' } }))
+      assertStringIncludes(body, JSON.stringify({ index: { _index: 'logs-info' } }))
+    } finally {
+      restore()
+    }
+  },
+)
+
 Deno.test('index accepts a per-document resolver function', async () => {
   const { calls, restore } = mockFetch(() => jsonResponse({}))
   try {
@@ -644,6 +674,127 @@ Deno.test('getConnector() wires indexInitialized to ensureIndex when enabled', a
     restore()
   }
 })
+
+Deno.test(
+  'getConnector() only wires ensureIndex once across repeated resolutions of the same connector',
+  async () => {
+    // `flushInline()` calls `getConnector()` fresh on every flush cycle rather than once at
+    // setup, even though the resolved connector is the same reused core singleton every time —
+    // `getConnector()` must not unconditionally reassign `indexInitialized` back to a fresh
+    // "call ensureIndex() again" closure on each of those calls, which would discard the no-op
+    // the first successful run already installed.
+    const { calls, restore } = mockFetch(() => new Response(null, { status: 200 }))
+    const registered = new ZanixElasticsearchConnector({
+      node: 'http://localhost:9200',
+      autoInitialize: false,
+    })
+    const proto = Object.getPrototypeOf(ProgramModule)
+    const original = proto.getConnectors
+    proto.getConnectors = () => ({ get: () => registered })
+
+    const messages: unknown[][] = []
+    const originalSuccess = logger.success
+    logger.success = ((...args: unknown[]) => {
+      messages.push(args)
+    }) as any
+    try {
+      // Simulates 3 independent flush cycles, each re-resolving the connector via getConnector().
+      for (let i = 0; i < 3; i++) {
+        const connector = getConnector({
+          index: { name: 'logs' },
+          indexInitialize: true,
+          autoInitialize: false,
+        })
+        // deno-lint-ignore no-await-in-loop
+        const result = await connector.indexInitialized('logs')
+        assertEquals(result, true)
+      }
+
+      assertEquals(calls.length, 1)
+      assertEquals(calls[0].init.method, 'HEAD')
+      assertEquals(messages.length, 1)
+    } finally {
+      proto.getConnectors = original
+      logger.success = originalSuccess
+      restore()
+    }
+  },
+)
+
+Deno.test(
+  "getConnector()'s memoization is scoped per connector instance, not a shared module-level flag",
+  async () => {
+    // The `'search'` core slot supports being re-registered with a fresh connector instance
+    // during the app's lifetime (see `registerElasticsearchConnector()`/
+    // `registerMeilisearchConnector()`'s own doc in `observability/core.ts`, re-invoked after
+    // clearing the `'type:connector'` registry — the same swap mechanism this simulates by
+    // making `ProgramModule.getConnectors()` resolve a second, entirely distinct connector
+    // instance). `ensureIndex()` re-runs are gated per connector instance — a WeakSet keyed on
+    // the connector object, not a shared boolean — so swapping in a fresh instance (a
+    // consumer-supplied custom connector included) still runs its own initialization, and never
+    // inherits a *different* instance's already-initialized state.
+    const { calls, restore } = mockFetch(() => new Response(null, { status: 200 }))
+    const first = new ZanixElasticsearchConnector({
+      node: 'http://localhost:9200',
+      autoInitialize: false,
+    })
+    const second = new ZanixElasticsearchConnector({
+      node: 'http://localhost:9200',
+      autoInitialize: false,
+    })
+    const proto = Object.getPrototypeOf(ProgramModule)
+    const original = proto.getConnectors
+
+    const messages: unknown[][] = []
+    const originalSuccess = logger.success
+    logger.success = ((...args: unknown[]) => {
+      messages.push(args)
+    }) as any
+    try {
+      // First connector resolves and gets wired/ensured, twice in a row (2 simulated flushes).
+      proto.getConnectors = () => ({ get: () => first })
+      for (let i = 0; i < 2; i++) {
+        const connector = getConnector({
+          index: { name: 'logs' },
+          indexInitialize: true,
+          autoInitialize: false,
+        })
+        // deno-lint-ignore no-await-in-loop
+        await connector.indexInitialized('logs')
+      }
+      assertEquals(calls.length, 1)
+      assertEquals(messages.length, 1)
+
+      // The slot is now re-registered/swapped to a genuinely different connector instance
+      // (never wired before) — its own initialization must still run, exactly once, rather than
+      // silently inheriting `first`'s already-initialized state.
+      proto.getConnectors = () => ({ get: () => second })
+      for (let i = 0; i < 2; i++) {
+        const connector = getConnector({
+          index: { name: 'logs' },
+          indexInitialize: true,
+          autoInitialize: false,
+        })
+        assertEquals(connector, second)
+        // deno-lint-ignore no-await-in-loop
+        await connector.indexInitialized('logs')
+      }
+
+      // One additional real HEAD request/success log — `second`'s own, independent of `first`'s.
+      assertEquals(calls.length, 2)
+      assertEquals(messages.length, 2)
+
+      // `first` itself remains permanently memoized — swapping away from it and back doesn't
+      // resurrect repeat calls against it either.
+      assertEquals(await first.indexInitialized('logs'), true)
+      assertEquals(calls.length, 2)
+    } finally {
+      proto.getConnectors = original
+      logger.success = originalSuccess
+      restore()
+    }
+  },
+)
 
 Deno.test('getConnector() leaves indexInitialized as the default no-op when disabled', async () => {
   const { calls, restore } = mockFetch(() => new Response(null, { status: 200 }))

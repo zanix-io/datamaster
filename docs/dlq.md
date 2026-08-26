@@ -6,7 +6,7 @@ programmatic reprocessing.
 
 This is **not** `@zanix/asyncmq`'s own dead-letter mechanism
 (`ZanixAsyncMQProvider.requeueDeadLetters`), which is RabbitMQ-native (messages the broker itself
-moved to a `.dlq` queue after exhausting delivery retries). `DLQProvider` is broker-agnostic
+moved to a `.dlq` queue after exhausting delivery retries). `DlqProvider` is broker-agnostic
 persistence: useful even in apps that never touch a message queue at all. Don't confuse the two when
 looking for "why did my message end up here" — a broker-level delivery failure and an
 application-level DLQ entry are different concepts, tracked in different places.
@@ -14,18 +14,29 @@ application-level DLQ entry are different concepts, tracked in different places.
 ```ts
 // src/server/dlq.defs.ts — auto-discovered by @zanix/core's own bootstrap, same convention as any
 // other model.defs.ts. Not something you call from main.ts, and not part of Zanix.setup(): setup()
-// only ever sets env vars (see "Configuration" below); registerDLQModel() is a real registration,
+// only ever sets env vars (see "Configuration" below); registerDlqModel() is a real registration,
 // same as registerModel() itself.
-import { registerDLQModel } from 'jsr:@zanix/datamaster@[version]'
+import { registerDlqModel } from 'jsr:@zanix/datamaster@[version]/dlq'
 
-registerDLQModel()
+registerDlqModel()
 ```
 
-`DLQProvider` is registered under the `'dlq'` core-provider slot — resolve it exactly like any other
+`@zanix/datamaster/dlq` is a narrow subpath — everything in this doc (`DlqProvider`,
+`registerDlqModel`, `DlqAdminService`, `createDlqDiscoveryProvider`, and the DLQ typings) without
+the rest of this package's root `.` (`ZanixMongoConnector`, the cache connectors, ...). This
+package's own root `.` re-exports the same bindings for backward compatibility, but a consumer that
+only needs the DLQ surface imports this subpath directly instead. This subpath's own source never
+imports anything under `@zanix/datamaster/cache` — the DLQ collection is Mongo-backed, so `mongoose`
+stays the only heavy dependency it genuinely needs. `redis`/`@redis/*`/`graphql` stay out of a real
+consumer's own installed dependencies too, even though every provider/interactor here (including
+`DlqProvider`) resolves DI primitives through `@zanix/server`'s bare root — on the `^4.0.0` line,
+that root barrel itself carries neither dependency.
+
+`DlqProvider` is registered under the `'dlq'` core-provider slot — resolve it exactly like any other
 provider, from any `ZanixInteractor`/`ZanixProvider`:
 
 ```ts
-const dlq = this.providers.get(DLQProvider) // or this.providers.get('dlq')
+const dlq = this.providers.get(DlqProvider) // or this.providers.get('dlq')
 
 await dlq.push({
   processType: 'payment.process',
@@ -94,7 +105,7 @@ try {
 An entry becomes claimable again either because it's genuinely `'pending'`, or because it's
 `'claimed'` with an **expired lease** — the abandoned-worker case (a process crashed mid-processing
 without calling `release()`/`complete()`/`fail()`). `leaseOwner` is a free-form label with no
-partitioning semantics `DLQProvider` enforces — encode any convention you like in the string (e.g.
+partitioning semantics `DlqProvider` enforces — encode any convention you like in the string (e.g.
 `asyncmq:pod-3`) if you need one; the provider itself never interprets it.
 
 **Known limitation**: a `complete()`/`fail()`/`release()` call is fenced by `leaseOwner` matching,
@@ -107,7 +118,7 @@ practice.
 ## Data model
 
 ```ts
-type DLQEntryAttrs = {
+type DlqEntryAttrs = {
   _id: string
   processType: string // e.g. 'payment.process'
   origin: string // service/package that originated the failure
@@ -161,8 +172,8 @@ appropriate for every app) but one option away, reusing the same `encrypt` data-
 every other Zanix model uses — no separate mechanism, no new keys:
 
 ```ts
-registerDLQModel({ encryptPayload: true }) // symmetric (DATA_AES_KEY)
-registerDLQModel({ encryptPayload: { type: 'asymmetric' } }) // DATA_RSA_PUB / DATA_RSA_KEY
+registerDlqModel({ encryptPayload: true }) // symmetric (DATA_AES_KEY)
+registerDlqModel({ encryptPayload: { type: 'asymmetric' } }) // DATA_RSA_PUB / DATA_RSA_KEY
 ```
 
 `DLQ_ENCRYPT_PAYLOAD` (`'true'`/`'false'`), if set, always wins over the `encryptPayload` option —
@@ -172,7 +183,7 @@ lets an environment force the behavior without a code change.
 field (see "Data model" above — fully queryable). On, it's stored as a JSON-serialized, encrypted
 string instead, and **stops being queryable entirely** — the underlying `encrypt`/`decrypt`
 primitives (`utils/protection.ts`) only operate on `string | string[]`, so a `Mixed` field can't use
-them directly. `DLQProvider` exposes `payload` as a plain value either way (`push`/`get`/`list`
+them directly. `DlqProvider` exposes `payload` as a plain value either way (`push`/`get`/`list`
 handle both shapes transparently) — the trade-off only affects what you can `filter` by.
 
 ### Protecting only some fields: `payloadFields`
@@ -185,7 +196,7 @@ individual fields get `dataProtectionGetter`/`dataAccessGetter` exactly like any
 ```ts
 import { dataProtectionGetter } from 'jsr:@zanix/datamaster@[version]/database'
 
-registerDLQModel({
+registerDlqModel({
   payloadFields: {
     orderId: { type: String }, // stays queryable, unprotected
     creditCard: { type: String, get: dataProtectionGetter('encrypt') }, // protected, this leaf only
@@ -200,7 +211,7 @@ await dlq.list({ filter: { 'payload.orderId': 'abc123' } }) // still works — o
 
 Takes priority over `encryptPayload` when both are given. `push`/`get`/`list` handle this exactly
 like the whole-payload cases above — you always get plain values back, never a `DecryptableObject`
-you have to unwrap yourself; `DLQProvider` reverses every protected path (however deeply nested) via
+you have to unwrap yourself; `DlqProvider` reverses every protected path (however deeply nested) via
 the same `transformByDataProtection` mechanism the framework already uses elsewhere for
 whole-document reads. `payload` stays typed `unknown` either way — declaring `payloadFields` shapes
 the _storage schema_, not the TypeScript type `push()`/`get()` see.
@@ -227,7 +238,7 @@ instead — nested objects are still just fields, and Mongoose resolves by full 
 different branches never collide:
 
 ```ts
-registerDLQModel({
+registerDlqModel({
   payloadFields: {
     payment: {
       orderId: { type: String },
@@ -245,31 +256,31 @@ await dlq.push({ processType: 'webhook.process', payload: { webhook: { url: 'htt
 ```
 
 Nothing enforces the `processType` ↔ `payloadFields` branch correspondence — it's a convention in
-how you shape `payload` on `push()`, not something `DLQProvider` validates.
+how you shape `payload` on `push()`, not something `DlqProvider` validates.
 
 ## Configuration
 
 | Env var                | Default     | Also settable via                                                                            |
 | ---------------------- | ----------- | -------------------------------------------------------------------------------------------- |
-| `DLQ_MODEL_NAME`       | `zanix-dlq` | `registerDLQModel({ modelName })`, or `Zanix.setup({ dlq: { modelName } })` (`@zanix/core`)  |
-| `DLQ_ENCRYPT_PAYLOAD`  | off         | `registerDLQModel({ encryptPayload })`, overridden by this env var when set                  |
-| `DLQ_DEFAULT_LEASE_MS` | `30000`     | `registerDLQModel({ defaultLeaseMs })`, then per-call `claim({ leaseTtlMs })` wins over both |
+| `DLQ_MODEL_NAME`       | `zanix-dlq` | `registerDlqModel({ modelName })`, or `Zanix.setup({ dlq: { modelName } })` (`@zanix/core`)  |
+| `DLQ_ENCRYPT_PAYLOAD`  | off         | `registerDlqModel({ encryptPayload })`, overridden by this env var when set                  |
+| `DLQ_DEFAULT_LEASE_MS` | `30000`     | `registerDlqModel({ defaultLeaseMs })`, then per-call `claim({ leaseTtlMs })` wins over both |
 
-All three env vars, when set, always win over their matching `registerDLQModel` option — the same
-precedence `encryptPayload` already had. `registerDLQModel()` is required regardless (Mongoose needs
+All three env vars, when set, always win over their matching `registerDlqModel` option — the same
+precedence `encryptPayload` already had. `registerDlqModel()` is required regardless (Mongoose needs
 a concrete schema before any query against the collection works), but _how_ it's named/tuned can
 come from either source: the option when it's convenient to keep next to the rest of the model's own
 declaration, or the env var when an environment needs to override it without a code change. Because
-`registerDLQModel` is the only place that writes `modelName`/`defaultLeaseMs` for `dlqModelName()`/
+`registerDlqModel` is the only place that writes `modelName`/`defaultLeaseMs` for `dlqModelName()`/
 `defaultLeaseTtlMs()` to later resolve, there's no risk of the two drifting apart the way a naive
 per-call-site cache might.
 
-For a multi-connector app, pass the target connector class as `registerDLQModel`'s second argument —
+For a multi-connector app, pass the target connector class as `registerDlqModel`'s second argument —
 same convention as `registerModel`'s own `connector` parameter.
 
 ## Local admin API — `@zanix/datamaster/dlq-api`
 
-This package exports `DLQAdminService` as a ready-made business-logic layer over `DLQProvider`, and
+This package exports `DlqAdminService` as a ready-made business-logic layer over `DlqProvider`, and
 `createDlqAdminController` (`@zanix/datamaster/dlq-api`) as a real, authenticat**able** `/admin/dlq`
 HTTP API fronting it — built the same way `@zanix/datamaster/triggers-api` fronts
 `TriggersAdminService`, and never assuming an auth mechanism itself (`guards`/`versionProtocol` are
@@ -278,13 +289,13 @@ supplied by whoever composes it, typically `@zanix/admin`).
 ```ts
 import { createDlqAdminController } from 'jsr:@zanix/datamaster@[version]/dlq-api'
 
-const DLQAdminController = createDlqAdminController({
+const DlqAdminController = createDlqAdminController({
   guards: [jwtValidationGuard], // omit for no auth at all — this package assumes none by default
   versionProtocol: { version: 1 }, // optional, passed straight to `@Controller`
 })
 ```
 
-**Only a subset of `DLQProvider`'s methods is exposed here — deliberately, not by omission.**
+**Only a subset of `DlqProvider`'s methods is exposed here — deliberately, not by omission.**
 `push`/`get`/`list`/`requeue`/`discard`/`remove` are genuine admin/operator actions: register a
 failure, inspect one or many entries, force a retry, permanently close one, delete one. They map
 cleanly to "a human clicks a button in a REST admin panel."
@@ -296,31 +307,31 @@ fenced by a `leaseOwner` a specific worker process holds (see
 real lease to present: exposing these here would mean either faking a `leaseOwner` (which can then
 collide with, or forcibly interrupt, a genuine in-flight worker's own claim — exactly what
 `leaseOwner` fencing exists to prevent) or bypassing the fencing outright. A caller that genuinely
-needs them resolves `DLQProvider` directly via `this.providers.get(DLQProvider)`.
+needs them resolves `DlqProvider` directly via `this.providers.get(DlqProvider)`.
 
 The route prefix (`admin/dlq`) is fixed, not configurable — the same wire-protocol-contract
 reasoning `admin/triggers` follows:
 
 | Method   | Path                    | Body/Params/Query                                                                                  | Returns                     |
 | -------- | ----------------------- | -------------------------------------------------------------------------------------------------- | --------------------------- |
-| `GET`    | `admin/dlq`             | `ListDLQEntriesRTO` (`{ processType?, status?, origin?, page?, limit? }`)                          | `DLQAdminService.list()`    |
-| `GET`    | `admin/dlq/:id`         | `DLQEntryIdParamsRTO` (`{ id }`)                                                                   | `DLQAdminService.get()`     |
-| `POST`   | `admin/dlq`             | `PushDLQEntryRTO` (`{ processType, origin, processId?, payload, error, maxAttempts?, metadata? }`) | `DLQAdminService.push()`    |
-| `POST`   | `admin/dlq/:id/requeue` | `RequeueDLQEntryRTO` (`{ resetAttempts? }`) + `DLQEntryIdParamsRTO`                                | `DLQAdminService.requeue()` |
-| `POST`   | `admin/dlq/:id/discard` | `DiscardDLQEntryRTO` (`{ reason? }`) + `DLQEntryIdParamsRTO`                                       | `DLQAdminService.discard()` |
-| `DELETE` | `admin/dlq/:id`         | `DLQEntryIdParamsRTO` (`{ id }`)                                                                   | `{ deleted: id }`           |
+| `GET`    | `admin/dlq`             | `ListDlqEntriesRTO` (`{ processType?, status?, origin?, page?, limit? }`)                          | `DlqAdminService.list()`    |
+| `GET`    | `admin/dlq/:id`         | `DlqEntryIdParamsRTO` (`{ id }`)                                                                   | `DlqAdminService.get()`     |
+| `POST`   | `admin/dlq`             | `PushDlqEntryRTO` (`{ processType, origin, processId?, payload, error, maxAttempts?, metadata? }`) | `DlqAdminService.push()`    |
+| `POST`   | `admin/dlq/:id/requeue` | `RequeueDlqEntryRTO` (`{ resetAttempts? }`) + `DlqEntryIdParamsRTO`                                | `DlqAdminService.requeue()` |
+| `POST`   | `admin/dlq/:id/discard` | `DiscardDlqEntryRTO` (`{ reason? }`) + `DlqEntryIdParamsRTO`                                       | `DlqAdminService.discard()` |
+| `DELETE` | `admin/dlq/:id`         | `DlqEntryIdParamsRTO` (`{ id }`)                                                                   | `{ deleted: id }`           |
 
 `requeue`/`discard` are their own `POST` action routes rather than folded into a generic `PUT`
 update — unlike a trigger configuration entry (one mutable resource updated in place), a DLQ entry's
 admin-facing mutations are discrete lifecycle actions (retry, close), not a partial field-level edit
 of the record itself.
 
-`GET admin/dlq`'s query is deliberately narrower than `DLQProvider.list()`'s own `DLQListOptions`:
+`GET admin/dlq`'s query is deliberately narrower than `DlqProvider.list()`'s own `DlqListOptions`:
 the raw `sort`/`filter` dot-path passthrough (meant for a caller that already knows the schema it's
 querying into, e.g. `{'payload.orderId': 'x'}`) is left off this REST surface — filtering by
 `processType`/`status`/`origin` and paging covers the real "browse the queue" admin use case; a
 caller that needs `sort`/`filter`'s full expressiveness already has direct access to
-`DLQProvider`/`DLQAdminService` without going through HTTP.
+`DlqProvider`/`DlqAdminService` without going through HTTP.
 
 This package also exports `createDlqDiscoveryProvider()`, building the `DiscoveryProvider` for
 `/.well-known/zanix/dlq` — the same shape `createTriggersDiscoveryProvider` builds for
@@ -331,25 +342,25 @@ This package only authors the provider; wiring it into an HTTP surface via `@zan
 `ProgramModule.defineDiscovery` is whichever app composes it.
 
 ```ts
-import { createDlqDiscoveryProvider } from 'jsr:@zanix/datamaster@[version]'
+import { createDlqDiscoveryProvider } from 'jsr:@zanix/datamaster@[version]/dlq'
 
 ProgramModule.defineDiscovery('dlq', createDlqDiscoveryProvider())
 ```
 
-**Unlike the triggers discovery provider, this one doesn't just reuse `DLQProvider.list()`/
-`DLQAdminService.list()` unchanged.** `DiscoveryProvider.snapshot()` is documented
+**Unlike the triggers discovery provider, this one doesn't just reuse `DlqProvider.list()`/
+`DlqAdminService.list()` unchanged.** `DiscoveryProvider.snapshot()` is documented
 (`@zanix/server`'s `typings/discovery.ts`) as fine for resources confirmed to stay small (dozens–low
 thousands of items) — true for triggers (few per service), but not for DLQ entries, which can be
 numerous and keep accumulating (`remove()` is always manual — there's no TTL/auto-purge). So the
 snapshot is scoped to only `'pending'`/`'claimed'`/`'failed'` entries (the actionable backlog —
 `'completed'`/`'discarded'` are resolved history retained forever, exactly the kind of unbounded
 shape a snapshot isn't designed for), each status capped at 500 entries. A caller that wants the
-full paginated collection, including resolved entries, uses `DLQAdminService.list()`/`admin/dlq`
+full paginated collection, including resolved entries, uses `DlqAdminService.list()`/`admin/dlq`
 directly — the discovery snapshot is deliberately narrower than that.
 
 ## Distributed processing — `@zanix/asyncmq/dlq`
 
-`DLQProvider` is deliberately a **passive store**: it never claims or interprets entries on its own.
+`DlqProvider` is deliberately a **passive store**: it never claims or interprets entries on its own.
 Deciding _when_ and _how_ to reprocess belongs to a higher layer — `@zanix/datamaster` never imports
 `@zanix/asyncmq` (or knows it exists), so the actual claim/dispatch loop lives entirely in
 **`@zanix/asyncmq`**'s own `registerDLQProcessor` (`@zanix/asyncmq/dlq` — a separate subpath, so
@@ -360,7 +371,7 @@ that don't use DLQ at all):
 import { registerDLQProcessor } from 'jsr:@zanix/asyncmq@[version]/dlq'
 
 // Wherever `payment.process` reprocessing logic actually lives — typically your own app's
-// dlq.defs.ts, auto-discovered the same way registerDLQModel() is (see above):
+// dlq.defs.ts, auto-discovered the same way registerDlqModel() is (see above):
 registerDLQProcessor('payment.process', {
   name: 'reprocess-payment',
   schedule: '0,30 * * * * *', // every 30s — @zanix/asyncmq's own 6-field cron format
@@ -384,7 +395,7 @@ they're peer packages). A DLQ processor doesn't have that problem: it's normally
 own app's code, which can always import `@zanix/asyncmq` directly — so the registry/drain
 indirection was solving a problem that didn't actually exist here, at the cost of `schedule` having
 to stay a loosely-typed `string` to avoid `@zanix/datamaster` depending on `@zanix/asyncmq`'s
-contract. `@zanix/asyncmq` depending downward on `@zanix/datamaster` for `DLQProvider` (to actually
+contract. `@zanix/asyncmq` depending downward on `@zanix/datamaster` for `DlqProvider` (to actually
 claim/ complete/fail) is a perfectly valid direction — the same one `@zanix/notifications` already
 uses for its own persistence.
 

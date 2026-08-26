@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { assertEquals, assertStringIncludes } from '@std/assert'
 import { Logger } from '@zanix/logger'
+import logger from '@zanix/logger'
 import { WorkerManager } from '@zanix/workers'
 import { ProgramModule } from '@zanix/server'
 import { elasticsearchLogSave } from 'observability/log-adapter.ts'
@@ -405,3 +406,335 @@ Deno.test('reuses a provided connector instead of building a new one from option
     restore()
   }
 })
+
+Deno.test(
+  'indexInitialize: true only ensures the index (and logs success) once across many flush cycles',
+  async () => {
+    // `flushInline()` calls `getConnector()` fresh on every flush cycle (not just once at setup
+    // — see its own doc), so this deliberately drives several independent flush cycles against
+    // the *same* registered connector (the real shape `getConnector()` resolves via
+    // `ProgramModule`) rather than a single flush, to prove `ensureIndex()`/its success log don't
+    // re-run on the 2nd/3rd cycle.
+    const calls: { method: string; url: string }[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET', url: String(url) })
+      if (init.method === 'HEAD') return Promise.resolve(new Response(null, { status: 200 }))
+      return Promise.resolve(
+        new Response(JSON.stringify({ errors: false, items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }) as typeof fetch
+
+    const successMessages: unknown[][] = []
+    const originalSuccess = logger.success
+    ;(logger as any).success = (...args: unknown[]) => successMessages.push(args)
+
+    const restoreConnector = stubSearchConnector({
+      node: 'http://localhost:9200',
+      index: { name: 'logs' },
+    })
+    try {
+      const save = elasticsearchLogSave({
+        node: 'http://localhost:9200',
+        index: { name: 'logs' },
+        indexInitialize: true,
+        bulk: { maxSize: 1 },
+      })
+
+      // Three independent flush cycles, the same way three separate 5s-timer flushes would fire
+      // against the long-lived connector in a real running process.
+      for (let i = 0; i < 3; i++) {
+        save(contextFor({ timestamp: '2026-01-01T00:00:00.000Z', n: i }) as any)
+        // deno-lint-ignore no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+
+      const headCalls = calls.filter((c) => c.method === 'HEAD')
+      const bulkCalls = calls.filter((c) => c.url.includes('_bulk'))
+
+      assertEquals(headCalls.length, 1)
+      assertEquals(successMessages.length, 1)
+      assertEquals(bulkCalls.length, 3)
+    } finally {
+      globalThis.fetch = originalFetch
+      logger.success = originalSuccess
+      restoreConnector()
+    }
+  },
+)
+
+Deno.test(
+  'indexInitialize: true also ensures the index (once) for a caller-supplied connector',
+  async () => {
+    // Regression test: `flushInline()` used to only wire `indexInitialized` when it resolved a
+    // connector itself via `getConnector()` (`conn = connector || getConnector(connectorOptions)`)
+    // — a caller-supplied `connector` skipped that branch entirely, so `indexInitialize: true`
+    // paired with a caller-supplied `connector` silently had no effect. Fixed by calling
+    // `wireIndexInitialize` directly on the caller-supplied connector too.
+    const calls: { method: string; url: string }[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET', url: String(url) })
+      if (init.method === 'HEAD') return Promise.resolve(new Response(null, { status: 200 }))
+      return Promise.resolve(
+        new Response(JSON.stringify({ errors: false, items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }) as typeof fetch
+
+    const successMessages: unknown[][] = []
+    const originalSuccess = logger.success
+    ;(logger as any).success = (...args: unknown[]) => successMessages.push(args)
+
+    try {
+      const connector = new ZanixElasticsearchConnector({
+        node: 'http://localhost:9200',
+        index: { name: 'own-logs' },
+        autoInitialize: false,
+      })
+      const save = elasticsearchLogSave({
+        connector,
+        index: { name: 'own-logs' },
+        indexInitialize: true,
+        bulk: { maxSize: 1 },
+      })
+
+      // Three independent flush cycles against the SAME caller-supplied connector instance.
+      for (let i = 0; i < 3; i++) {
+        save(contextFor({ timestamp: '2026-01-01T00:00:00.000Z', n: i }) as any)
+        // deno-lint-ignore no-await-in-loop
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+
+      const headCalls = calls.filter((c) => c.method === 'HEAD')
+      const bulkCalls = calls.filter((c) => c.url.includes('_bulk'))
+
+      assertEquals(headCalls.length, 1)
+      assertEquals(successMessages.length, 1)
+      assertEquals(bulkCalls.length, 3)
+    } finally {
+      globalThis.fetch = originalFetch
+      logger.success = originalSuccess
+    }
+  },
+)
+
+Deno.test(
+  'indexInitialize wiring is scoped per connector instance, caller-supplied included',
+  async () => {
+    // A caller-supplied connector A and the DI-resolved connector B (or two independently
+    // caller-supplied instances) are each tracked independently by the shared `wiredForIndexInit`
+    // `WeakSet` in `connector.ts` — one instance's wiring/memoization never leaks onto another.
+    const calls: { method: string; url: string }[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET', url: String(url) })
+      if (init.method === 'HEAD') return Promise.resolve(new Response(null, { status: 200 }))
+      return Promise.resolve(
+        new Response(JSON.stringify({ errors: false, items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }) as typeof fetch
+
+    try {
+      // Connector A — caller-supplied.
+      const connectorA = new ZanixElasticsearchConnector({
+        node: 'http://localhost:9200',
+        index: { name: 'logs-a' },
+        autoInitialize: false,
+      })
+      const saveA = elasticsearchLogSave({
+        connector: connectorA,
+        index: { name: 'logs-a' },
+        indexInitialize: true,
+        bulk: { maxSize: 1 },
+      })
+      saveA(contextFor({ timestamp: '2026-01-01T00:00:00.000Z' }) as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      // Connector B — a distinct DI-resolved instance for a different index.
+      const connectorB = new ZanixElasticsearchConnector({
+        node: 'http://localhost:9200',
+        index: { name: 'logs-b' },
+        autoInitialize: false,
+      })
+      const restoreConnector = stubSearchConnector({
+        node: 'http://localhost:9200',
+        index: { name: 'logs-b' },
+      })
+      // Override the stub with the exact instance this test wants to assert against.
+      const proto = Object.getPrototypeOf(ProgramModule)
+      proto.getConnectors = () => ({ get: () => connectorB })
+      const saveB = elasticsearchLogSave({
+        index: { name: 'logs-b' },
+        indexInitialize: true,
+        bulk: { maxSize: 1 },
+      })
+      saveB(contextFor({ timestamp: '2026-01-01T00:00:00.000Z' }) as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      restoreConnector()
+
+      const headsForA = calls.filter((c) => c.method === 'HEAD' && c.url.includes('logs-a'))
+      const headsForB = calls.filter((c) => c.method === 'HEAD' && c.url.includes('logs-b'))
+      assertEquals(headsForA.length, 1)
+      assertEquals(headsForB.length, 1)
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  },
+)
+
+Deno.test(
+  "index.name reaches the actual _bulk write target on the DI-resolved shared connector, not just ensureIndex()'s HEAD/PUT check",
+  async () => {
+    // The shared 'search' core connector, as it's really constructed in production, gets NO real
+    // `index` option at all — `@zanix/server`'s DI container constructs the singleton from a
+    // synthetic per-lifetime context id, never from any one `elasticsearchLogSave()` caller's
+    // real options (see `getConnector()`'s own doc in `connector.ts`) — so its own
+    // `#defaultIndex` falls all the way back to the hardcoded `'zanix-logs'`. Simulated here the
+    // same way: the stub is registered with no `index` option at all, deliberately mismatched
+    // from what `elasticsearchLogSave` itself configures below.
+    const calls: { method: string; url: string; body?: string }[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET', url: String(url), body: init.body as string })
+      if (init.method === 'HEAD') return Promise.resolve(new Response(null, { status: 200 }))
+      return Promise.resolve(
+        new Response(JSON.stringify({ errors: false, items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }) as typeof fetch
+
+    const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
+    try {
+      const save = elasticsearchLogSave({
+        node: 'http://localhost:9200',
+        index: { name: 'aera-iam' },
+        indexInitialize: true,
+        bulk: { maxSize: 1 },
+      })
+      save(contextFor({ timestamp: '2026-01-01T00:00:00.000Z' }) as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const headCalls = calls.filter((c) => c.method === 'HEAD')
+      const bulkCalls = calls.filter((c) => c.url.includes('_bulk'))
+
+      // ensureIndex() targets the configured index.
+      assertEquals(headCalls.length, 1)
+      assertStringIncludes(headCalls[0].url, 'aera-iam')
+
+      // The actual write must target the SAME configured index — never the shared connector's
+      // own default ('zanix-logs').
+      assertEquals(bulkCalls.length, 1)
+      assertStringIncludes(bulkCalls[0].body ?? '', '"_index":"aera-iam"')
+      assertEquals((bulkCalls[0].body ?? '').includes('zanix-logs'), false)
+    } finally {
+      globalThis.fetch = originalFetch
+      restoreConnector()
+    }
+  },
+)
+
+Deno.test(
+  "a per-document index resolver function configured via index.name is also honored on the DI-resolved shared connector's actual _bulk write, not just a static index name",
+  async () => {
+    // `bulkIndex()`'s per-call `opts.index` override now accepts the same shape the connector's
+    // own default index does (a static name OR a per-document resolver) — this proves the
+    // resolver function case specifically, not just the static-string case the previous test
+    // covers.
+    const calls: { method: string; url: string; body?: string }[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET', url: String(url), body: init.body as string })
+      return Promise.resolve(
+        new Response(JSON.stringify({ errors: false, items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }) as typeof fetch
+
+    const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
+    try {
+      const save = elasticsearchLogSave({
+        node: 'http://localhost:9200',
+        index: { name: (doc) => `logs-${(doc as { level: string }).level}` },
+        bulk: { maxSize: 2 },
+      })
+      save(contextFor({ timestamp: '2026-01-01T00:00:00.000Z', level: 'error' }) as any)
+      save(contextFor({ timestamp: '2026-01-01T00:00:00.000Z', level: 'info' }) as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const bulkCalls = calls.filter((c) => c.url.includes('_bulk'))
+      assertEquals(bulkCalls.length, 1)
+      assertStringIncludes(bulkCalls[0].body ?? '', '"_index":"logs-error"')
+      assertStringIncludes(bulkCalls[0].body ?? '', '"_index":"logs-info"')
+    } finally {
+      globalThis.fetch = originalFetch
+      restoreConnector()
+    }
+  },
+)
+
+Deno.test(
+  "two independent elasticsearchLogSave() callers sharing the same DI-resolved 'search' singleton write to their own configured index without clobbering each other",
+  async () => {
+    // The cross-consumer scenario the issue author flagged as the reason NOT to mutate the shared
+    // connector's own `#defaultIndex` (suggested fix #3): two independent `Logger` instances
+    // (each `new Logger({storage: {save: elasticsearchLogSave({...})}})`, per that factory's own
+    // documented usage) can realistically share the single process-wide 'search' core connector
+    // singleton while configuring different `index.name` values. Both `save`s here resolve the
+    // SAME registered connector instance (one `stubSearchConnector` call, reused by both) — the
+    // real shape `getConnector()` produces for two callers in the same process.
+    const calls: { method: string; url: string; body?: string }[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = ((url: string | URL, init: RequestInit = {}) => {
+      calls.push({ method: init.method ?? 'GET', url: String(url), body: init.body as string })
+      return Promise.resolve(
+        new Response(JSON.stringify({ errors: false, items: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+    }) as typeof fetch
+
+    const restoreConnector = stubSearchConnector({ node: 'http://localhost:9200' })
+    try {
+      const saveA = elasticsearchLogSave({
+        node: 'http://localhost:9200',
+        index: { name: 'index-a' },
+        bulk: { maxSize: 1 },
+      })
+      const saveB = elasticsearchLogSave({
+        node: 'http://localhost:9200',
+        index: { name: 'index-b' },
+        bulk: { maxSize: 1 },
+      })
+
+      saveA(contextFor({ timestamp: '2026-01-01T00:00:00.000Z', from: 'a' }) as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      saveB(contextFor({ timestamp: '2026-01-01T00:00:00.000Z', from: 'b' }) as any)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const bulkCalls = calls.filter((c) => c.url.includes('_bulk'))
+      assertEquals(bulkCalls.length, 2)
+      assertStringIncludes(bulkCalls[0].body ?? '', '"_index":"index-a"')
+      assertStringIncludes(bulkCalls[1].body ?? '', '"_index":"index-b"')
+      // Neither call's write leaked onto the other's configured index.
+      assertEquals((bulkCalls[0].body ?? '').includes('index-b'), false)
+      assertEquals((bulkCalls[1].body ?? '').includes('index-a'), false)
+    } finally {
+      globalThis.fetch = originalFetch
+      restoreConnector()
+    }
+  },
+)

@@ -1,17 +1,17 @@
 import type { HandlerContext, MiddlewareGuard, VersionProtocolOption } from '@zanix/server'
 
 import { Controller, Delete, Get, Guard, Post, ZanixController } from '@zanix/server'
-import { DLQAdminService } from '../dlq.service.ts'
+import { DlqAdminService } from '../dlq.service.ts'
 import {
-  DiscardDLQEntryRTO,
-  ListDLQEntriesRTO,
-  PushDLQEntryRTO,
-  RequeueDLQEntryRTO,
+  DiscardDlqEntryRTO,
+  ListDlqEntriesRTO,
+  PushDlqEntryRTO,
+  RequeueDlqEntryRTO,
 } from './rtos/dlq.rto.ts'
-import { DLQEntryIdParamsRTO } from './rtos/local-dlq.rto.ts'
+import { DlqEntryIdParamsRTO } from './rtos/local-dlq.rto.ts'
 
 /** Options accepted by {@link createDlqAdminController}. */
-export interface DLQAdminControllerOptions {
+export interface DlqAdminControllerOptions {
   /**
    * Guards applied to every route on this controller, run in order, short-circuiting on the first
    * denial. Omitted/empty means no guard at all — this package never assumes an auth mechanism (it
@@ -33,7 +33,7 @@ export interface DLQAdminControllerOptions {
 
 /** Combines a guard list into ONE guard: runs each in order, short-circuiting on the first
  * denial. An empty/omitted list resolves to an always-allow guard — see
- * {@link DLQAdminControllerOptions.guards}'s own doc for why that's the honest default here. */
+ * {@link DlqAdminControllerOptions.guards}'s own doc for why that's the honest default here. */
 function combineGuards(guards: MiddlewareGuard[] | undefined): MiddlewareGuard {
   const list = guards ?? []
   return async (context, ...args) => {
@@ -53,7 +53,7 @@ function combineGuards(guards: MiddlewareGuard[] | undefined): MiddlewareGuard {
  *
  * Exposes only `push`/`get`/`list`/`requeue`/`discard`/`remove` — the lease-based
  * `claim`/`release`/`complete`/`fail` primitives are deliberately absent from this REST surface;
- * see {@link DLQAdminService}'s own JSDoc for the full reasoning.
+ * see {@link DlqAdminService}'s own JSDoc for the full reasoning.
  *
  * A factory rather than a plain always-decorated class — `@Controller`'s `prefix` is decorator-time
  * (static) config, and `guards`/`versionProtocol` are real runtime values this factory closes over;
@@ -62,32 +62,32 @@ function combineGuards(guards: MiddlewareGuard[] | undefined): MiddlewareGuard {
  * whichever `defineApplication(...)` scope decides this route's Application.
  */
 export function createDlqAdminController(
-  options: DLQAdminControllerOptions = {},
-): new (context: HandlerContext) => ZanixController<DLQAdminService> {
+  options: DlqAdminControllerOptions = {},
+): new (context: HandlerContext) => ZanixController<DlqAdminService> {
   const guard = combineGuards(options.guards)
 
   @Controller({
     prefix: 'admin/dlq',
-    Interactor: DLQAdminService,
+    Interactor: DlqAdminService,
     versionProtocol: options.versionProtocol,
   })
-  class _DLQAdminController extends ZanixController<DLQAdminService> {
-    @Get('', { Search: ListDLQEntriesRTO })
+  class _DlqAdminController extends ZanixController<DlqAdminService> {
+    @Get('', { Search: ListDlqEntriesRTO })
     @Guard(guard)
-    public list(ctx: HandlerContext<{ search: ListDLQEntriesRTO }>) {
+    public list(ctx: HandlerContext<{ search: ListDlqEntriesRTO }>) {
       const { processType, status, origin, page, limit } = ctx.payload.search
       return this.interactor.list({ processType, status, origin, page, limit })
     }
 
-    @Get(':id', { Params: DLQEntryIdParamsRTO })
+    @Get(':id', { Params: DlqEntryIdParamsRTO })
     @Guard(guard)
-    public get(ctx: HandlerContext<{ params: DLQEntryIdParamsRTO }>) {
+    public get(ctx: HandlerContext<{ params: DlqEntryIdParamsRTO }>) {
       return this.interactor.get(ctx.payload.params.id)
     }
 
-    @Post('', { Body: PushDLQEntryRTO })
+    @Post('', { Body: PushDlqEntryRTO })
     @Guard(guard)
-    public push(ctx: HandlerContext<{ body: PushDLQEntryRTO }>) {
+    public push(ctx: HandlerContext<{ body: PushDlqEntryRTO }>) {
       const { processType, origin, processId, payload, error, maxAttempts, metadata } =
         ctx.payload.body
       return this.interactor.push({
@@ -101,35 +101,35 @@ export function createDlqAdminController(
       })
     }
 
-    @Post(':id/requeue', { Body: RequeueDLQEntryRTO, Params: DLQEntryIdParamsRTO })
+    @Post(':id/requeue', { Body: RequeueDlqEntryRTO, Params: DlqEntryIdParamsRTO })
     @Guard(guard)
     public requeue(
-      ctx: HandlerContext<{ body: RequeueDLQEntryRTO; params: DLQEntryIdParamsRTO }>,
+      ctx: HandlerContext<{ body: RequeueDlqEntryRTO; params: DlqEntryIdParamsRTO }>,
     ) {
       return this.interactor.requeue(ctx.payload.params.id, {
         resetAttempts: ctx.payload.body.resetAttempts,
       })
     }
 
-    @Post(':id/discard', { Body: DiscardDLQEntryRTO, Params: DLQEntryIdParamsRTO })
+    @Post(':id/discard', { Body: DiscardDlqEntryRTO, Params: DlqEntryIdParamsRTO })
     @Guard(guard)
     public discard(
-      ctx: HandlerContext<{ body: DiscardDLQEntryRTO; params: DLQEntryIdParamsRTO }>,
+      ctx: HandlerContext<{ body: DiscardDlqEntryRTO; params: DlqEntryIdParamsRTO }>,
     ) {
       return this.interactor.discard(ctx.payload.params.id, {
         reason: ctx.payload.body.reason,
       })
     }
 
-    @Delete(':id', { Params: DLQEntryIdParamsRTO })
+    @Delete(':id', { Params: DlqEntryIdParamsRTO })
     @Guard(guard)
     public async remove(
-      ctx: HandlerContext<{ params: DLQEntryIdParamsRTO }>,
+      ctx: HandlerContext<{ params: DlqEntryIdParamsRTO }>,
     ) {
       await this.interactor.remove(ctx.payload.params.id)
       return { deleted: ctx.payload.params.id }
     }
   }
 
-  return _DLQAdminController
+  return _DlqAdminController
 }

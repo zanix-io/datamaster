@@ -2,7 +2,7 @@ import { isPlainObject } from '@zanix/helpers'
 
 /**
  * Strips every `$`-prefixed key from a raw filter object, recursively (plain objects and arrays of
- * objects alike) — a caller-supplied `filter` (`DLQListOptions.filter` / `DLQClaimOptions.filter`)
+ * objects alike) — a caller-supplied `filter` (`DlqListOptions.filter` / `DlqClaimOptions.filter`)
  * is documented as a dot-path equality lookup (e.g. `{ 'payload.orderId': 'abc123' }`), never a
  * place to hand the query engine raw Mongo operators. Left unsanitized, a `filter` sourced from an
  * untrusted caller (a host app's own HTTP layer, forwarding query-string filters) would let an

@@ -47,7 +47,7 @@ export interface RegisterFileModelOptions {
 /**
  * Registers `@zanix/datamaster`'s own generic files model (`zanix-files` by default, or
  * `FILE_MODEL_NAME`/{@link RegisterFileModelOptions.modelName}) — required once, in the app's own
- * bootstrap, before `MongoFileRepository` can resolve it (mirrors `registerDLQModel`'s own usage).
+ * bootstrap, before `MongoFileRepository` can resolve it (mirrors `registerDlqModel`'s own usage).
  *
  * `_id` is declared explicitly as a `String` rather than left as Mongoose's default `ObjectId` — a
  * caller assigns the record's id up front (matching the object storage key's own identity) rather

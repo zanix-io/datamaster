@@ -113,9 +113,17 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
     this.name = this.coreDisplayName('elastic search core')
   }
 
-  /** Resolves the target index name for a given document, per the `index` option/argument. */
-  #indexFor(doc: Record<string, unknown>, index?: string): string {
-    if (index) return index
+  /**
+   * Resolves the target index name for a given document, per the `index` option/argument — which,
+   * same as the connector-level default, may itself be a static name or a per-document resolver
+   * (see `bulkIndex()`'s own doc for why a call-level override needs the same shape as the
+   * connector-level default, not just a static string).
+   */
+  #indexFor(
+    doc: Record<string, unknown>,
+    index?: string | ((doc: Record<string, unknown>) => string),
+  ): string {
+    if (index) return typeof index === 'function' ? index(doc) : index
     return typeof this.#defaultIndex === 'function' ? this.#defaultIndex(doc) : this.#defaultIndex
   }
 
@@ -134,7 +142,7 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
   /** Indexes a single document via `POST /{index}/_doc`. */
   public override async index(
     doc: Record<string, unknown>,
-    opts: { index?: string } = {},
+    opts: { index?: string | ((doc: Record<string, unknown>) => string) } = {},
   ): Promise<void> {
     const index = this.#indexFor(doc, opts.index)
     await this.indexInitialized(index)
@@ -144,7 +152,7 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
   }
 
   /**
-   * Ensures that the configured static index exists, creating it with the provided settings and
+   * Ensures that the given index (or indexes) exists, creating it with the provided settings and
    * mappings when necessary.
    *
    * Uses `HEAD /{index}` as a lightweight existence check before creating the index with
@@ -156,12 +164,15 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
    * only allows certain settings to be configured at index creation time (for example,
    * `number_of_shards`), so relying on automatic index creation may lock in undesired defaults.
    *
-   * The default index must be a static string value. Dynamic index resolvers are supported for
-   * document indexing through `index()`/`bulkIndex()`, but cannot be resolved here because there
-   * is no document available to evaluate the resolver function against.
+   * Takes an already-resolved index name (or names) rather than a resolver function — unlike
+   * `index()`/`bulkIndex()`, which accept a per-document resolver (see their own `opts.index`
+   * doc), there is no document here to evaluate one against, so a caller (or `indexInitialized`'s
+   * own wiring — see `wireIndexInitialize` below) must resolve any function-shaped `index` option
+   * down to concrete name(s) before calling this. Does not itself validate or throw on a
+   * function-shaped input; passing one here would just be coerced to a string at the HTTP layer.
    *
-   * @param options - Index creation options including OpenSearch settings and mappings.
-   * @throws If the configured default index is not a static index name.
+   * @param index - The already-resolved index name(s) to ensure exist.
+   * @param opts - Index creation options including OpenSearch settings and mappings.
    */
   public async ensureIndex(
     index: string | string[],
@@ -202,10 +213,17 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
    * The bulk endpoint responds `200` even when individual documents fail (e.g. a mapping
    * conflict) — those are reported per-item in the response body, not via the HTTP status, so
    * this inspects `items[].index.error` rather than relying on the request not having thrown.
+   *
+   * `opts.index` accepts the same shape as the connector-level default (a static name or a
+   * per-document resolver) — not just a static string — so a caller overriding the index for a
+   * single call can still target a different index per document within that same batch. This is
+   * what lets `elasticsearchLogSave`'s own `flushInline` (`log-adapter.ts`) forward the caller's
+   * configured `index.name` as a per-call override, whether that's a static name or a resolver
+   * function, without ever touching this connector's own default index.
    */
   public override async bulkIndex(
     docs: Record<string, unknown>[],
-    opts: { index?: string } = {},
+    opts: { index?: string | ((doc: Record<string, unknown>) => string) } = {},
   ): Promise<BulkIndexResult> {
     if (!docs.length) return { errors: false, failedCount: 0 }
 
@@ -298,11 +316,65 @@ export class ZanixElasticsearchConnector extends ZanixSearchConnector {
 }
 
 /**
+ * Connectors {@link wireIndexInitialize} has already wired an `indexInitialized` closure onto.
+ * `getConnector()` itself runs on every flush cycle (`flushInline()` calls it fresh each time —
+ * see its own doc), even though the connector it resolves is the same reused core singleton every
+ * time (see `getConnector()`'s own doc below). Without this guard, every one of those calls would
+ * unconditionally reassign `indexInitialized` back to a brand-new "call `ensureIndex()` again"
+ * closure — even after a previous call already replaced it with the permanent no-op below —
+ * silently undoing that memoization and re-running `ensureIndex()` (and its success log) on every
+ * flush cycle instead of once. A `WeakSet` keyed on the connector instance makes the wiring itself
+ * idempotent regardless of how many times {@link wireIndexInitialize} runs against the same
+ * instance — reached both from `getConnector()` (a DI-resolved connector) and directly from a
+ * caller-supplied connector (`log-adapter.ts`'s `flushInline`) — without adding any public API
+ * surface to `ZanixElasticsearchConnector` for what's purely this bookkeeping's own concern.
+ */
+const wiredForIndexInit = new WeakSet<ZanixElasticsearchConnector>()
+
+/**
+ * Wires `indexInitialized` (see {@link ZanixElasticsearchConnector.indexInitialized}) onto the
+ * given connector instance so it lazily `ensureIndex()`s before first use, driven by
+ * `indexInitialize` — the shared "wire it, at most once, self-memoizing" logic behind
+ * `getConnector()`'s own resolution of the `'search'` core connector, extracted so it applies
+ * equally to a connector `getConnector()` resolves AND to a caller-supplied connector instance
+ * that never goes through `getConnector()` at all (see `log-adapter.ts`'s `flushInline`, which
+ * calls this directly on a `connector` option instead).
+ *
+ * Wired at most once per connector instance (see `wiredForIndexInit` above) and self-memoizing to
+ * a permanent no-op after its first successful run, so a connector whose index has already been
+ * ensured never re-runs `ensureIndex()` (or logs a duplicate success message) on a later call.
+ * A no-op (returns `connector` unchanged) when `indexInitialize` is falsy or the connector was
+ * already wired.
+ *
+ * @param connector - The connector instance to wire (or leave untouched).
+ * @param indexInitialize - Whether to wire `ensureIndex()`-on-first-use at all.
+ * @param connectorOptions - Supplies the `index` settings/mappings forwarded to `ensureIndex()`.
+ */
+export const wireIndexInitialize = (
+  connector: ZanixElasticsearchConnector,
+  indexInitialize: boolean | undefined,
+  connectorOptions: Pick<ElasticsearchConnectorOptions, 'index'>,
+): ZanixElasticsearchConnector => {
+  if (indexInitialize && !wiredForIndexInit.has(connector)) {
+    wiredForIndexInit.add(connector)
+    connector.indexInitialized = async (index) => {
+      const result = await connector.ensureIndex(index, connectorOptions.index)
+      // Self-memoize: once the index is confirmed ensured, every later call (this or any later
+      // flush cycle reusing this same connector) is a pure no-op — no repeat HTTP round trips,
+      // no repeat success log.
+      connector.indexInitialized = () => Promise.resolve(true)
+      return result
+    }
+  }
+
+  return connector
+}
+
+/**
  * Resolves the `'search'` core connector — the same shared instance any other
  * `this.connectors.get('search')`/`this.getProviderConnector('search')` call in the process
- * resolves, reused rather than duplicated. Optionally wires `indexInitialized` (see
- * {@link ZanixElasticsearchConnector.indexInitialized}) to lazily `ensureIndex()` before first
- * use, driven by `connectorOptions.index`.
+ * resolves, reused rather than duplicated. Optionally wires `indexInitialized` via
+ * {@link wireIndexInitialize}, driven by `indexInitialize`/`connectorOptions.index`.
  *
  * @throws If nothing is registered under `'search'` in this process — no silent fallback
  *   construction; see this function's own inline doc for why a fallback would be actively
@@ -329,9 +401,5 @@ export const getConnector = (
     ZanixElasticsearchConnector
   >('search')
 
-  if (indexInitialize) {
-    connector.indexInitialized = (index) => connector.ensureIndex(index, connectorOptions.index)
-  }
-
-  return connector
+  return wireIndexInitialize(connector, indexInitialize, connectorOptions)
 }

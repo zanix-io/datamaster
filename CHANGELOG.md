@@ -5,7 +5,109 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] - 2026-08-25
+
+### Added
+
+- **New `@zanix/datamaster/dlq` subpath** — `DlqProvider`, `ZanixCoreDlqProvider`,
+  `DlqAdminService`, `createDlqDiscoveryProvider`, `registerDlqModel` and its supporting constants,
+  and every DLQ typing, without this package's cache connectors. A consumer that only needs the DLQ
+  provider (e.g. `@zanix/asyncmq`'s own DLQ integration) no longer has to import this package's root
+  `.`, which also re-exports the full `cache`/`database` module graphs. This package's root `.`
+  still re-exports the same bindings, delegating to this subpath internally, so existing imports
+  from the root are unaffected.
+
+- **Every public DLQ symbol is now consistently cased `Dlq`** (was a mix of `DLQ`/`Dlq`), converging
+  this package on a single casing for the acronym — the same inconsistency `@zanix/admin` already
+  resolved for its own `DLQAggregator`/`DLQAdminClient` (now `DlqAggregator`/`DlqAdminClient`; see
+  that package's `naming-and-structure-conventions` precedent in the `claude-skills` repo). This
+  package's own sibling symbols (`dlqModelName`, `isDlqResourceEnabled`, `createDlqAdminController`,
+  `createDlqDiscoveryProvider`) already used `Dlq`; only the ones below were still `DLQ`. `Dlq...`
+  is the recommended form going forward, from both `mod.ts` and `@zanix/datamaster/dlq-api`:
+  - `DLQProvider` → `DlqProvider`, `ZanixCoreDLQProvider` → `ZanixCoreDlqProvider`
+  - `DLQAdminService` → `DlqAdminService`
+  - `registerDLQModel` → `registerDlqModel`, `RegisterDLQModelOptions` → `RegisterDlqModelOptions`
+  - `registerDLQProvider` → `registerDlqProvider` (`@zanix/datamaster/core`)
+  - `DLQClaimOptions` → `DlqClaimOptions`, `DLQDiscardOptions` → `DlqDiscardOptions`,
+    `DLQEntryAttrs` → `DlqEntryAttrs`, `DLQErrorHistoryEntry` → `DlqErrorHistoryEntry`,
+    `DLQErrorInfo` → `DlqErrorInfo`, `DLQFailOptions` → `DlqFailOptions`, `DLQLeaseOptions` →
+    `DlqLeaseOptions`, `DLQListOptions` → `DlqListOptions`, `DLQPushInput` → `DlqPushInput`,
+    `DLQRequeueOptions` → `DlqRequeueOptions`, `DLQStatus` → `DlqStatus`, `DLQPaginatedResult` →
+    `DlqPaginatedResult`
+  - `DLQAdminControllerOptions` → `DlqAdminControllerOptions`, `DLQEntryIdParamsRTO` →
+    `DlqEntryIdParamsRTO`, `PushDLQEntryRTO` → `PushDlqEntryRTO`, `RequeueDLQEntryRTO` →
+    `RequeueDlqEntryRTO`, `DiscardDLQEntryRTO` → `DiscardDlqEntryRTO`, `ListDLQEntriesRTO` →
+    `ListDlqEntriesRTO`
+
+  **Not a breaking change** — every old `DLQ`-cased name above is kept as a deprecated re-export of
+  the exact same binding (see "Deprecated" below), so this ships as a `MINOR`, not a `MAJOR`. Unlike
+  `@zanix/admin`'s own equivalent rename (a direct, shim-less break), this package's real blast
+  radius today is small and known (`@zanix/admin`/`@zanix/core` as the only consumers,
+  `@zanix/admin` already shielded by its own `^1.5.0` range either way) — deliberately not forcing
+  another major bump for a casing-only change so soon after `@zanix/admin`'s; the real major is
+  saved for when more cleanup of this kind accumulates.
+  `DLQ_MODEL_NAME`/`DLQ_ENCRYPT_PAYLOAD`/`DLQ_DEFAULT_LEASE_MS` and their `_ENV` constants
+  (`DLQ_MODEL_ENV`, `DLQ_ENCRYPT_PAYLOAD_ENV`, `DLQ_DEFAULT_LEASE_MS_ENV`, `DEFAULT_DLQ_MODEL`) are
+  unaffected either way — they're `UPPER_SNAKE_CASE` env var constants, not PascalCase symbols, so
+  the acronym-casing rule doesn't apply to them. `@zanix/asyncmq/dlq`'s own `registerDLQProcessor`
+  is a different package's export, also unaffected.
+
+### Deprecated
+
+- **The `DLQ`-cased names listed above** (`DLQProvider`, `ZanixCoreDLQProvider`, `DLQAdminService`,
+  `registerDLQModel`, `RegisterDLQModelOptions`, `registerDLQProvider`, `DLQClaimOptions`,
+  `DLQDiscardOptions`, `DLQEntryAttrs`, `DLQErrorHistoryEntry`, `DLQErrorInfo`, `DLQFailOptions`,
+  `DLQLeaseOptions`, `DLQListOptions`, `DLQPushInput`, `DLQRequeueOptions`, `DLQStatus`,
+  `DLQPaginatedResult`, `DLQAdminControllerOptions`, `DLQEntryIdParamsRTO`, `PushDLQEntryRTO`,
+  `RequeueDLQEntryRTO`, `DiscardDLQEntryRTO`, `ListDLQEntriesRTO`) still work, unchanged, but are
+  marked `@deprecated` in their JSDoc and **will be removed in a future major release**. Migrate to
+  their `Dlq`-cased equivalent above.
+
+### Fixed
+
+- `elasticsearchLogSave`'s `indexInitialize: true` runs `ensureIndex()` (and logs success) once per
+  resolved `'search'` connector instance instead of on every buffer flush — previously it re-ran
+  (and re-logged) on every flush cycle, since the DI-resolved connector's `getConnector()` call kept
+  rewiring a fresh, non-memoized closure on top of an already-memoized one.
+- `indexInitialize: true` now also ensures the index for a caller-supplied `connector` and for a
+  `useWorker`-dispatched flush — both previously ignored the option silently, with no effect and no
+  error.
+- Writes and index-initialization checks now target the `index.name` (static or per-document
+  resolver) configured on `elasticsearchLogSave`, instead of silently falling back to the shared
+  `'search'` connector's hardcoded default index (`'zanix-logs'`) whenever no explicit `connector`
+  is supplied. Two independent `elasticsearchLogSave()` callers sharing that same connector each
+  write to their own configured index without clobbering one another.
+- Every subpath (`/database`, `/dlq`, `/cache`, `/sqlite`, `/observability`, ...) no longer pulls
+  `redis`/`@redis/*`/`graphql` transitively through `@zanix/server`'s bare root when it has no
+  business needing them — `/database`/`/dlq`/`/sqlite`/`/observability` previously did, purely as a
+  side effect of `@zanix/server`'s own then-current pinned version. New `deno info --json`-based
+  regression guards (`src/@tests/unit/database/dependency-boundary.test.ts`, and an added case in
+  `src/@tests/unit/dlq/dependency-boundary.test.ts`) assert this stays true.
+
+- **`@zanix/datamaster/core` no longer materializes `@aws-sdk/client-s3` for a consumer that never
+  sets `S3_ENDPOINT`.** `storage/core.ts`'s `registerS3Connector()` used to gate only the `'s3'`
+  connector CLASS behind `Deno.env.has('S3_ENDPOINT')` — its top-level
+  `import { S3ObjectStorage }
+  from './connector.ts'` ran unconditionally, so `./connector.ts`'s
+  own `@aws-sdk/client-s3` import resolved for every `/core` consumer regardless of whether
+  S3-compatible object storage was ever configured. Object storage is a much rarer, opt-in
+  capability than the Mongo/Redis wiring `/core` otherwise exists for (both `@zanix/admin` and
+  `@zanix/core` use `/core` purely for that wiring, never S3), so this was pure unavoidable cost for
+  most `/core` consumers. `registerS3Connector()` is now async: it checks `S3_ENDPOINT` first, and
+  only then lazily `import()`s `./connector.ts` (via a non-literal specifier, so Deno's static
+  dependency-graph analysis doesn't follow it either) before declaring the `@Connector`-decorated
+  class. `storage/core.ts`'s own module-level auto-run uses a real top-level `await`, so anything
+  that reaches this file — including `/core`'s own `export * from 'storage/core.ts'` — only finishes
+  evaluating once the `'s3'` slot registration has actually completed, same as before.
+  **`registerS3Connector`'s exported signature changes from `(): void` to `(): Promise<void>`** —
+  the one real, narrow public API change here; any caller re-registering it after a registry reset
+  must now `await` it. The standalone `@zanix/datamaster/storage` subpath (a consumer explicitly
+  wanting `S3ObjectStorage`) is completely unaffected — it still imports `./connector.ts` eagerly
+  and unconditionally, exactly as before. New `deno info --json`-based regression guards
+  (`src/@tests/unit/storage/dependency-boundary.test.ts`) assert `/core` and `storage/core.ts` never
+  resolve `@aws-sdk/client-s3` while `/storage` still does; a companion test
+  (`src/@tests/unit/storage/env-gate-sync.test.ts`) guards the literal `S3_ENDPOINT` duplication the
+  fix's env-check-before-import required.
 
 ## [1.5.0] - 2026-08-23
 

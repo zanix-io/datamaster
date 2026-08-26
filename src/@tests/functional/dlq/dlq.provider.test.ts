@@ -1,7 +1,7 @@
 import { assertEquals, assertNotEquals } from '@std/assert'
 import { DropCollection, getDB, ignore, sanitize } from '../../(setup)/mongo/connector.ts'
-import { registerDLQModel } from 'modules/dlq/dlq.model.ts'
-import { DLQProvider } from 'modules/dlq/dlq.provider.ts'
+import { registerDlqModel } from 'modules/dlq/dlq.model.ts'
+import { DlqProvider } from 'modules/dlq/dlq.provider.ts'
 import { dataProtectionGetter } from 'database/policies/protection.ts'
 import type { ZanixMongoConnector } from 'database/mod.ts'
 
@@ -9,21 +9,21 @@ console.error = () => {}
 
 // `defineModels` consumes (and clears) the registered-models bucket per connector construction —
 // see `mongo/connector/models.ts`'s own doc comment ("clears the 'models' metadata to avoid
-// redefinition"). So `registerDLQModel()` must run fresh right before each `getDB()` call, not once
+// redefinition"). So `registerDlqModel()` must run fresh right before each `getDB()` call, not once
 // at module scope — mirrors `functional/mongo/models/data-model.test.ts`'s own per-test
 // `registerModel(...)` pattern for the same reason.
 
 // deno-lint-ignore no-explicit-any
 const providerFor = (db: ZanixMongoConnector): any => {
-  const instance = Object.create(DLQProvider.prototype)
+  const instance = Object.create(DlqProvider.prototype)
   Object.defineProperty(instance, 'database', { value: db })
   return instance
 }
 
 /** Connects, drops any leftover `zanix-dlq` collection from a previous run, and returns both the
- * connector and a `DLQProvider` bound to it — every test starts from a clean collection. */
+ * connector and a `DlqProvider` bound to it — every test starts from a clean collection. */
 const freshProvider = async () => {
-  registerDLQModel()
+  registerDlqModel()
   const db = await getDB()
   await DropCollection(db.getModel('zanix-dlq'), db)
   return { db, provider: providerFor(db) }
@@ -36,7 +36,7 @@ const teardown = async (db: ZanixMongoConnector) => {
 
 Deno.test({
   ...sanitize,
-  name: 'DLQProvider full lifecycle against a real Mongo connection',
+  name: 'DlqProvider full lifecycle against a real Mongo connection',
   fn: async () => {
     const { db, provider } = await freshProvider()
 
@@ -115,7 +115,7 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
-  name: 'DLQProvider.release lets a different worker reclaim the entry',
+  name: 'DlqProvider.release lets a different worker reclaim the entry',
   fn: async () => {
     const { db, provider } = await freshProvider()
 
@@ -151,7 +151,7 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
-  name: 'DLQProvider.claim is safe under concurrent claimers — exactly one succeeds',
+  name: 'DlqProvider.claim is safe under concurrent claimers — exactly one succeeds',
   fn: async () => {
     const { db, provider } = await freshProvider()
 
@@ -189,7 +189,7 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
-  name: 'DLQProvider.claim reclaims an abandoned entry once its lease expires',
+  name: 'DlqProvider.claim reclaims an abandoned entry once its lease expires',
   fn: async () => {
     const { db, provider } = await freshProvider()
 
@@ -225,9 +225,9 @@ Deno.test({
 Deno.test({
   ...sanitize,
   name:
-    "DLQProvider.claim uses registerDLQModel's defaultLeaseMs when no per-call leaseTtlMs is given",
+    "DlqProvider.claim uses registerDlqModel's defaultLeaseMs when no per-call leaseTtlMs is given",
   fn: async () => {
-    registerDLQModel({ defaultLeaseMs: 2_000 })
+    registerDlqModel({ defaultLeaseMs: 2_000 })
     const db = await getDB()
     await DropCollection(db.getModel('zanix-dlq'), db)
     const provider = providerFor(db)
@@ -256,7 +256,7 @@ Deno.test({
     } finally {
       await DropCollection(db.getModel('zanix-dlq'), db)
       await db['close']()
-      registerDLQModel() // reset the module-level cache for later tests in this process
+      registerDlqModel() // reset the module-level cache for later tests in this process
     }
   },
   ignore,
@@ -264,7 +264,7 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
-  name: 'DLQProvider.list queries into payload sub-fields via a real Mongo dot-notation filter',
+  name: 'DlqProvider.list queries into payload sub-fields via a real Mongo dot-notation filter',
   fn: async () => {
     const { db, provider } = await freshProvider()
 
@@ -302,10 +302,10 @@ Deno.test({
 
 Deno.test({
   ...sanitize,
-  name: 'DLQProvider push/get round-trips a payloadFields-protected leaf via real Mongo',
+  name: 'DlqProvider push/get round-trips a payloadFields-protected leaf via real Mongo',
   fn: async () => {
     Deno.env.set('DATA_AES_KEY', 'hqIIz+SY/gZ7C9sDWSTiCA==')
-    registerDLQModel({
+    registerDlqModel({
       payloadFields: {
         orderId: { type: String },
         creditCard: { type: String, get: dataProtectionGetter('encrypt') },

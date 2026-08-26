@@ -31,7 +31,7 @@
       ".dist"
     ],
     "plugins": [
-      "jsr:@zanix/utils@^3.0.0/linter/deno-zanix-plugin"
+      "jsr:@zanix/utils@^4.0.0/linter/deno-zanix-plugin"
     ],
     "report": "pretty"
   },
@@ -53,13 +53,13 @@
     "@aws-sdk/client-s3": "npm:@aws-sdk/client-s3@^3.700.0",
     "@std/assert": "jsr:@std/assert@0.224",
     "@std/path": "jsr:@std/path@0.224",
-    "@zanix/workers": "jsr:@zanix/utils@^3.0.0/workers",
-    "@zanix/errors": "jsr:@zanix/utils@^3.0.0/errors",
-    "@zanix/logger": "jsr:@zanix/utils@^3.0.0/logger",
-    "@zanix/types": "jsr:@zanix/utils@^3.0.0/types",
-    "@zanix/helpers": "jsr:@zanix/utils@^3.0.0/helpers",
-    "@zanix/validator": "jsr:@zanix/utils@^3.0.0/validator",
-    "@zanix/server": "jsr:@zanix/server@^3.0.0",
+    "@zanix/workers": "jsr:@zanix/utils@^4.0.0/workers",
+    "@zanix/errors": "jsr:@zanix/utils@^4.0.0/errors",
+    "@zanix/logger": "jsr:@zanix/utils@^4.0.0/logger",
+    "@zanix/types": "jsr:@zanix/utils@^4.0.0/types",
+    "@zanix/helpers": "jsr:@zanix/utils@^4.0.0/helpers",
+    "@zanix/validator": "jsr:@zanix/utils@^4.0.0/validator",
+    "@zanix/server": "jsr:@zanix/server@^4.0.0",
     "modules/": "./src/modules/",
     "shared/": "./src/shared/",
     "typings/": "./src/typings/",
@@ -82,6 +82,7 @@
     "./core": "./src/modules/core.ts",
     "./sqlite": "./src/modules/database/sqlite.ts",
     "./triggers-api": "./src/modules/triggers/triggers-api/mod.ts",
+    "./dlq": "./src/modules/dlq/mod.ts",
     "./dlq-api": "./src/modules/dlq/dlq-api/mod.ts",
     "./storage": "./src/modules/storage/mod.ts",
     "./files": "./src/modules/files/mod.ts"

@@ -1,18 +1,18 @@
 import { assertEquals } from '@std/assert'
-import { DLQAdminService } from 'modules/dlq/dlq.service.ts'
-import type { DLQProvider } from 'modules/dlq/dlq.provider.ts'
+import { DlqAdminService } from 'modules/dlq/dlq.service.ts'
+import type { DlqProvider } from 'modules/dlq/dlq.provider.ts'
 
-function fakeService(provider: Partial<DLQProvider>) {
-  const instance = Object.create(DLQAdminService.prototype)
+function fakeService(provider: Partial<DlqProvider>) {
+  const instance = Object.create(DlqAdminService.prototype)
   Object.defineProperty(instance, 'providers', {
     value: { get: () => provider },
   })
   return instance
 }
 
-Deno.test('DLQAdminService delegates every exposed method to DLQProvider', async () => {
+Deno.test('DlqAdminService delegates every exposed method to DlqProvider', async () => {
   const calls: unknown[] = []
-  const provider: Partial<DLQProvider> = {
+  const provider: Partial<DlqProvider> = {
     push: (input) => (calls.push(['push', input]), Promise.resolve({} as never)),
     get: (id) => (calls.push(['get', id]), Promise.resolve({} as never)),
     list: (options) => (calls.push(['list', options]), Promise.resolve({} as never)),
@@ -26,7 +26,7 @@ Deno.test('DLQAdminService delegates every exposed method to DLQProvider', async
     ) => (calls.push(['discard', id, options]), Promise.resolve({} as never)),
     remove: (id) => (calls.push(['remove', id]), Promise.resolve()),
   }
-  const service: DLQAdminService = fakeService(provider)
+  const service: DlqAdminService = fakeService(provider)
 
   const pushInput = {
     processType: 'payment.process',
@@ -51,8 +51,8 @@ Deno.test('DLQAdminService delegates every exposed method to DLQProvider', async
   ])
 })
 
-Deno.test('DLQAdminService has no claim/release/complete/fail — lease primitives stay off', () => {
-  const service = DLQAdminService.prototype as unknown as Record<string, unknown>
+Deno.test('DlqAdminService has no claim/release/complete/fail — lease primitives stay off', () => {
+  const service = DlqAdminService.prototype as unknown as Record<string, unknown>
   assertEquals(typeof service.claim, 'undefined')
   assertEquals(typeof service.release, 'undefined')
   assertEquals(typeof service.complete, 'undefined')

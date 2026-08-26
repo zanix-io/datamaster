@@ -7,7 +7,7 @@ import { BaseRTO, IsString } from '@zanix/validator'
  * aggregator's own equivalent (which would also need a `serviceId` to resolve which service to
  * call).
  */
-export class DLQEntryIdParamsRTO extends BaseRTO {
+export class DlqEntryIdParamsRTO extends BaseRTO {
   @IsString({ expose: true })
   accessor id!: string
 }

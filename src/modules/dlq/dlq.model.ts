@@ -1,16 +1,16 @@
 import type { MongoModelDefinition } from 'mongo/typings/models.ts'
 import type { MongoSchemaDefinition } from 'mongo/typings/schema.ts'
-import type { DLQEntryAttrs } from './dlq.typings.ts'
+import type { DlqEntryAttrs } from './dlq.typings.ts'
 import type { EncryptSettings } from 'typings/protection.ts'
 
 import { registerModel } from 'database/defs/models.ts'
 import { dataProtectionGetter } from 'database/policies/protection.ts'
 
-/** Env var naming the DLQ collection, in place of {@link RegisterDLQModelOptions}. Also settable
+/** Env var naming the DLQ collection, in place of {@link RegisterDlqModelOptions}. Also settable
  * from `@zanix/core`'s `Zanix.setup({ dlq: { modelName } })`, mirroring `TRIGGERS_MODEL_NAME`. */
 export const DLQ_MODEL_ENV = 'DLQ_MODEL_NAME'
 /** Env var toggling `payloadRaw` encryption — `'true'`/`'false'`. Always wins over
- * {@link RegisterDLQModelOptions.encryptPayload} when set, so an environment can force the
+ * {@link RegisterDlqModelOptions.encryptPayload} when set, so an environment can force the
  * behavior without a code change. */
 export const DLQ_ENCRYPT_PAYLOAD_ENV = 'DLQ_ENCRYPT_PAYLOAD'
 /** Env var for the default `claim()` lease duration, in ms. An explicit `claim({ leaseTtlMs })`
@@ -23,7 +23,7 @@ export const DEFAULT_DLQ_MODEL = 'zanix-dlq'
 /**
  * Whether the DLQ resource is configured in this deployment — `true` once `DLQ_MODEL_NAME` is set,
  * the deployment's own opt-in signal (this model has no auto-registration to check instead — see
- * {@link registerDLQModel}'s own doc). Doesn't guarantee `registerDLQModel()` was actually called:
+ * {@link registerDlqModel}'s own doc). Doesn't guarantee `registerDlqModel()` was actually called:
  * env var presence alone can't know that, and this package exposes no stronger "was it registered"
  * query yet — a known, documented gap (`@zanix/admin`'s own `metadata.ts` mirrors this exact
  * signal for its `/admin/dlq` REST gating, inheriting the same limitation rather than a new one).
@@ -34,10 +34,10 @@ export const isDlqResourceEnabled = (): boolean => !!Deno.env.get(DLQ_MODEL_ENV)
 const DEFAULT_LEASE_MS = 30_000
 
 /**
- * What the most recent `registerDLQModel()` call was given for `modelName`/`defaultLeaseMs` —
- * `undefined` for whichever option that call omitted. `registerDLQModel` is the *only* place that
+ * What the most recent `registerDlqModel()` call was given for `modelName`/`defaultLeaseMs` —
+ * `undefined` for whichever option that call omitted. `registerDlqModel` is the *only* place that
  * writes these (never `dlqModelName`/`defaultLeaseTtlMs` themselves), so there's exactly one source
- * of truth to drift from — unlike a naive per-call-site cache, calling `registerDLQModel()` again
+ * of truth to drift from — unlike a naive per-call-site cache, calling `registerDlqModel()` again
  * (e.g. once per test, or once per connector) always reflects that exact call's own options, never
  * a stale value left over from an earlier one.
  */
@@ -46,8 +46,8 @@ let registeredDefaultLeaseMs: number | undefined
 
 /**
  * Resolves the effective DLQ collection name: `DLQ_MODEL_NAME` always wins when set (same
- * precedence as {@link RegisterDLQModelOptions.encryptPayload}), then `registerDLQModel`'s own
- * `modelName` option, then the built-in default. Requires `registerDLQModel()` to have already run
+ * precedence as {@link RegisterDlqModelOptions.encryptPayload}), then `registerDlqModel`'s own
+ * `modelName` option, then the built-in default. Requires `registerDlqModel()` to have already run
  * for the `modelName` option to have taken effect — see that function's own doc.
  */
 export const dlqModelName = (): string =>
@@ -55,7 +55,7 @@ export const dlqModelName = (): string =>
 
 /**
  * Resolves the default `claim()` lease duration (ms): a per-call `leaseTtlMs` always wins over all
- * of this, then `DLQ_DEFAULT_LEASE_MS`, then `registerDLQModel`'s own `defaultLeaseMs` option, then
+ * of this, then `DLQ_DEFAULT_LEASE_MS`, then `registerDlqModel`'s own `defaultLeaseMs` option, then
  * the built-in 30s default. An invalid/non-positive env value falls back the same way a missing one
  * would, rather than throwing.
  */
@@ -68,7 +68,7 @@ export const defaultLeaseTtlMs = (): number => {
   return registeredDefaultLeaseMs ?? DEFAULT_LEASE_MS
 }
 
-export type RegisterDLQModelOptions = {
+export type RegisterDlqModelOptions = {
   /**
    * Overrides the DLQ collection name for this registration — `zanix-dlq` otherwise. `DLQ_MODEL_NAME`,
    * when set, always wins over this (same precedence as {@link encryptPayload}), so an environment
@@ -94,7 +94,7 @@ export type RegisterDLQModelOptions = {
    * `Mixed` field — full Mongo queryability, including dot-notation into sub-fields
    * (`{'payload.orderId': 'x'}`). **On**, `payload` is stored as a JSON-serialized, encrypted string
    * (`payloadRaw`) instead — the underlying `encrypt`/`decrypt` primitives (`utils/protection.ts`)
-   * only operate on `string | string[]`, so a `Mixed` field can't use them directly. `DLQProvider`
+   * only operate on `string | string[]`, so a `Mixed` field can't use them directly. `DlqProvider`
    * handles both shapes transparently (`push`/`get`/`list` always expose `payload` as a plain
    * value); only the storage layer differs.
    *
@@ -116,7 +116,7 @@ export type RegisterDLQModelOptions = {
    * ```ts
    * import { dataProtectionGetter } from '@zanix/datamaster/database'
    *
-   * registerDLQModel({
+   * registerDlqModel({
    *   payloadFields: {
    *     orderId: { type: String }, // stays queryable, unprotected
    *     creditCard: { type: String, get: dataProtectionGetter('encrypt') }, // protected, this leaf only
@@ -128,7 +128,7 @@ export type RegisterDLQModelOptions = {
 }
 
 /** Resolves whether/how to protect `payloadRaw`, applying the env-var-wins-over-option precedence
- * documented on {@link RegisterDLQModelOptions.encryptPayload}. */
+ * documented on {@link RegisterDlqModelOptions.encryptPayload}. */
 const resolveEncryptPayload = (
   explicit?: boolean | EncryptSettings,
 ): EncryptSettings | false => {
@@ -140,9 +140,9 @@ const resolveEncryptPayload = (
 
 /**
  * Registers `@zanix/datamaster`'s own DLQ model (`zanix-dlq` by default, or `DLQ_MODEL_NAME`/
- * {@link RegisterDLQModelOptions.modelName}) — required once, in the app's own bootstrap, before
- * `DLQProvider` can resolve it (mirrors `registerModel`'s own usage — nothing auto-registers this
- * as a side effect of importing `DLQProvider`, to avoid double-registration risk for
+ * {@link RegisterDlqModelOptions.modelName}) — required once, in the app's own bootstrap, before
+ * `DlqProvider` can resolve it (mirrors `registerModel`'s own usage — nothing auto-registers this
+ * as a side effect of importing `DlqProvider`, to avoid double-registration risk for
  * multi-connector apps). Registration itself isn't optional — Mongoose needs a concrete schema for
  * the collection before any query against it will work — but *how* it's named/tuned is: through
  * this call's own `options`, or through the env vars, whichever fits the deployment.
@@ -155,19 +155,19 @@ const resolveEncryptPayload = (
  *
  * @param connector - An already-`@Connector`-decorated class for a non-default Mongo connector.
  * Omit for the default connector — see `registerModel`'s own `connector` parameter.
- * @param options - See {@link RegisterDLQModelOptions}.
+ * @param options - See {@link RegisterDlqModelOptions}.
  *
  * @example
  * ```ts
- * import { registerDLQModel } from '@zanix/datamaster'
+ * import { registerDlqModel } from '@zanix/datamaster'
  *
- * registerDLQModel() // default connector, no payload encryption
- * registerDLQModel({ encryptPayload: true })
- * registerDLQModel({ modelName: 'app-dlq', defaultLeaseMs: 60_000 })
+ * registerDlqModel() // default connector, no payload encryption
+ * registerDlqModel({ encryptPayload: true })
+ * registerDlqModel({ modelName: 'app-dlq', defaultLeaseMs: 60_000 })
  * ```
  */
-export const registerDLQModel = (
-  options: RegisterDLQModelOptions = {},
+export const registerDlqModel = (
+  options: RegisterDlqModelOptions = {},
   // deno-lint-ignore ban-types
   connector: Function | undefined = undefined,
 ): void => {
@@ -175,14 +175,14 @@ export const registerDLQModel = (
   registeredDefaultLeaseMs = options.defaultLeaseMs
   const encryptPayload = resolveEncryptPayload(options.encryptPayload)
 
-  const definition: MongoModelDefinition<DLQEntryAttrs>['definition'] = {
+  const definition: MongoModelDefinition<DlqEntryAttrs>['definition'] = {
     processType: { type: String, required: true },
     origin: { type: String, required: true },
     processId: { type: String },
     // A declared `payloadFields` subdocument (individually protectable per-field); else native
     // `Mixed` (fully queryable) when unencrypted; else a protected JSON string when encrypted — see
-    // `RegisterDLQModelOptions`'s own docs on `payloadFields`/`encryptPayload` for the full
-    // rationale. `DLQProvider` duck-types on which of `payload`/`payloadRaw` Mongoose actually
+    // `RegisterDlqModelOptions`'s own docs on `payloadFields`/`encryptPayload` for the full
+    // rationale. `DlqProvider` duck-types on which of `payload`/`payloadRaw` Mongoose actually
     // persisted (strict-mode schema binding silently drops whichever field isn't declared here), so
     // it never needs to resolve this configuration independently and can't drift from what this
     // schema actually did.
@@ -223,9 +223,9 @@ export const registerDLQModel = (
     leaseOwner: { type: String },
     leaseExpiresAt: { type: Date },
     metadata: { type: Object },
-  } as MongoModelDefinition<DLQEntryAttrs>['definition']
+  } as MongoModelDefinition<DlqEntryAttrs>['definition']
 
-  registerModel<DLQEntryAttrs>({
+  registerModel<DlqEntryAttrs>({
     name: dlqModelName(),
     definition,
     options: { timestamps: true },
