@@ -143,6 +143,10 @@ protection policies, local caching utilities, such as in-memory Map for fast, et
     narrower entrypoints exist for consumers who prefer to scope their imports:
 
     - `./cache` → cache systems only.
+    - `./cache/types` → `ZanixRedisConnectorLike`/`ZanixRedisClientLike` type-only contracts, for a
+      consumer that only needs `ZanixRedisConnector`'s shape (e.g. as a generic type parameter) and
+      never the real class — a plain type-only import from `./cache` still resolves the real class's
+      own module, `redis` value import included; this subpath doesn't.
     - `./database` → database connectors only.
     - `./observability` →
       `ZanixElasticsearchConnector`/`MeilisearchConnector`/`elasticsearchLogSave` only.
@@ -182,7 +186,7 @@ groups the main exports by category — each links to a guide with full usage ex
 | SQLite (KV store)             | `ZanixKVStoreConnector`, `LocalSQLite`                                                                                                                                                                              | [Database](./docs/database.md#sqlite-key-value-store)                   |
 | Transforms & schema utilities | `transformRecursively`, `transformDeepByPaths`, `transformShallowByPaths`, `transformByDataAccess`, `transformByDataProtection`, `getAllSubschemas`, `findPathsWithAccessorsDeep`                                   | [Transforms](./docs/transforms.md)                                      |
 | Data protection               | `dataProtectionGetter`, `dataAccessGetter`, `dataPoliciesGetter`, `datamasterEncrypt`/`Decrypt`/`Mask`/`Unmask`/`Hash`, `createDecryptableObject`, `createUnmaskableObject`, `createVerifiableObject`               | [Data Protection](./docs/data-protection.md)                            |
-| Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixMemcachedConnector`, `ZanixQLRUConnector`, `scanKeys`                                                                                                        | [Cache](./docs/cache.md)                                                |
+| Cache                         | `ZanixCacheCoreProvider`, `ZanixRedisConnector`, `ZanixMemcachedConnector`, `ZanixQLRUConnector`, `scanKeys`, `ZanixRedisConnectorLike`/`ZanixRedisClientLike` (`./cache/types`)                                    | [Cache](./docs/cache.md)                                                |
 | Observability                 | `ZanixElasticsearchConnector`, `MeilisearchConnector`, `elasticsearchLogSave`                                                                                                                                       | [Observability](./docs/observability.md)                                |
 | Dead Letter Queue             | `DlqProvider`, `registerDlqModel`, `DlqAdminService`, `createDlqAdminController` (`./dlq-api`), `createDlqDiscoveryProvider` (`./dlq`; distributed processing lives in `@zanix/asyncmq/dlq`)                        | [DLQ](./docs/dlq.md)                                                    |
 | Storage                       | `S3ObjectStorage` (`./storage`), `MongoFileRepository`, `registerFileModel` (`./files`)                                                                                                                             | [Storage](./docs/storage.md)                                            |
