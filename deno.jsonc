@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -78,6 +78,7 @@
     ".": "./mod.ts",
     "./database": "./src/modules/database/mod.ts",
     "./cache": "./src/modules/cache/mod.ts",
+    "./cache/types": "./src/modules/cache/typings/mod.ts",
     "./observability": "./src/modules/observability/mod.ts",
     "./core": "./src/modules/core.ts",
     "./sqlite": "./src/modules/database/sqlite.ts",
