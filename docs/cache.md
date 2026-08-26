@@ -160,38 +160,6 @@ A thin delegate to an internal, per-instance keyed lock manager (single process,
 distributed across replicas): only one call for the same key runs at a time on this provider
 instance; other keys run fully in parallel.
 
-## Type-only Cache (Redis) contracts (`./cache/types`)
-
-```ts
-import type {
-  ZanixRedisClientLike,
-  ZanixRedisConnectorLike,
-} from 'jsr:@zanix/datamaster@[version]/cache/types'
-
-class MyService {
-  constructor(private readonly cache: ZanixRedisConnectorLike<string>) {}
-}
-```
-
-A consumer that only needs `ZanixRedisConnector`'s shape as a TYPE — a generic type parameter, a
-constructor argument annotation — never the real class, imports from this subpath instead of
-`./cache` or the root package. A plain
-`import type { ZanixRedisConnector } from '@zanix/datamaster/cache'` still resolves that class's own
-defining module to type-check it, and that module has a real, unconditional `redis` value import —
-so even a type-only import pulls `redis` into a consumer's dependency graph.
-`ZanixRedisConnectorLike`/`ZanixRedisClientLike` describe the same public surface structurally, with
-zero import of `redis` (or `mongoose`/`@aws-sdk/client-s3`) anywhere in this subpath's own module
-graph.
-
-`ZanixRedisConnectorLike` covers
-`set`/`get`/`has`/`delete`/`clear`/`size`/`keys`/`values`/`getClient`/
-`isHealthy`/`isReady`/`ttl`/`maxOffsetSeconds`/`minTTLForOffset` — the same public surface
-`ZanixRedisConnector` exposes. `ZanixRedisClientLike` mirrors the subset of the underlying Redis
-client's own methods (`set`/`incr`/`sAdd`/`sRem`/`sMembers`/`eval`, plus
-`connect`/`duplicate`/`subscribe`/`publish`/ `unsubscribe`/`close` for Pub/Sub and connection
-management) that `getClient()`'s return type can be narrowed to, for code that needs to reach past
-the connector for a raw command.
-
 ## See also
 
 - [Configuration](./configuration.md) — `REDIS_URI`, `LOCAL_CACHE_MAX_ITEMS`.

@@ -5,19 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [1.8.0] - 2026-08-26
-
-### Added
-
-- **`@zanix/datamaster/triggers-api` now also exports `TriggersAdminRepository`,
-  `TriggersAdminService`, and `createTriggersDiscoveryProvider`** — previously only available from
-  the bare `@zanix/datamaster` root, which also bundles cache/storage/observability. A consumer that
-  composes its own extension on this local API (e.g. `@zanix/admin`'s cross-service triggers
-  aggregation, which reads these classes directly) can now reach the CRUD data-access layer without
-  resolving anything outside `/triggers-api`'s own reachable graph — this subpath already imports
-  `TriggersAdminService` internally to build its own controller, so the new exports add nothing to
-  what it already resolves.
-
 ## [1.7.0] - 2026-08-25
 
 ### Added
