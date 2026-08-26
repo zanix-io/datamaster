@@ -3,10 +3,7 @@
 name: Publish
 
 on:
-  # Run on push or PRs to main branch
-  pull_request:
-    branches:
-      - master
+  # Run on push to main branch
   push:
     branches:
       - master
@@ -24,60 +21,6 @@ jobs:
     permissions:
       contents: read # Allows reading of the repository's contents.
       id-token: write # Allows the creation of an ID token for authentication with JSR.
-
-    services:
-      mongo:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd="mongosh --eval 'db.runCommand({ ping: 1 })'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      redis:
-        image: redis:7
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-      memcached:
-        image: memcached:1
-        ports:
-          - 11211:11211
-
-      opensearch:
-        image: opensearchproject/opensearch:2
-        ports:
-          - 9200:9200
-        env:
-          discovery.type: 'single-node'
-          DISABLE_SECURITY_PLUGIN: 'true'
-          OPENSEARCH_JAVA_OPTS: '-Xms512m -Xmx512m'
-        options: >-
-          --health-cmd="curl -sf http://localhost:9200/_cluster/health || exit 1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
-      # Unlike SeaweedFS below, this image's default entrypoint runs the server directly with no
-      # extra args needed — a plain `services:` block works, same as mongo/redis/opensearch above.
-      meilisearch:
-        image: getmeili/meilisearch:v1.11
-        ports:
-          - 7700:7700
-        env:
-          MEILI_NO_ANALYTICS: 'true'
-        options: >-
-          --health-cmd="curl -sf http://localhost:7700/health || exit 1"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
 
     steps:
       - name: Checkout code
@@ -131,5 +74,5 @@ jobs:
         # skip-on-failure behavior above — that default only holds as long as `publish` keeps its
         # own `if:` unset; an `always()`/similar override on the JOB (e.g. added later to get
         # diagnostics on a failing run) would silently defeat it without this STEP-level check.
-        if: success() && needs.ci.result == 'success' && github.event_name == 'push'
+        if: success() && needs.ci.result == 'success'
         run: deno publish
