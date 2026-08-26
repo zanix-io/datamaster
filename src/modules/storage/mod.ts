@@ -15,8 +15,10 @@ export {
   S3_ENCRYPT_VERSION_ENV,
   S3_ENDPOINT_ENV,
   S3_SECRET_KEY_ENV,
-  S3ObjectStorage,
-} from './connector.ts'
+} from './s3-env.ts'
+
+export { S3ObjectStorage } from './connector.ts'
+
 export type {
   DataPolicyVersion,
   EncryptSettings,
