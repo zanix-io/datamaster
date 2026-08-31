@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.8.1] - 2026-08-31
+
+### Fixed
+
+- **`upsertManyById`/`seedManyByIdIfMissing`'s bulk path no longer silently resolves with zero
+  writes when a document's `id` can't cast to the model's `_id` type** (e.g. a non-hex string
+  against an `ObjectId` `_id`) — it now rejects with a `MongooseBulkWriteError`, matching
+  `upsertById`'s existing single-document behavior. Other, validly-cast documents in the same batch
+  still get written first.
+
 ## [1.8.0] - 2026-08-26
 
 ### Added
