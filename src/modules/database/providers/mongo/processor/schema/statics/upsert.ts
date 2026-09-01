@@ -29,6 +29,15 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  * that would just fail identically on retry) — logging exactly which operations never landed
  * either way, so an operator investigating doesn't have to reconstruct that from a generic driver
  * exception.
+ *
+ * The immediate-rethrow path also covers `MongooseBulkWriteError` (thrown when the caller passes
+ * `throwOnValidationError: true`, as `upsertManyById` does): mongoose casts/validates each op
+ * client-side before it ever reaches the server, and a cast/validation failure (e.g. an `_id`
+ * string that can't cast to ObjectId) is deterministic — it fails identically on every retry, so
+ * this correctly never retries it. Unlike a real `MongoBulkWriteError`, it carries no
+ * `.writeErrors` (its per-operation detail is on `.validationErrors` instead), so it's treated the
+ * same as a connection failure here: surfaced immediately after any valid operations in the batch
+ * have already been written.
  */
 async function bulkWriteWithRetry(
   model: any,
@@ -113,7 +122,10 @@ export async function upsertById(
 /**
  * Finds multiple documents by their `_id` and update or creates them if they do not exist.
  *
- * This method performs a `bulkWrite` for each object.
+ * This method performs a `bulkWrite` for each object. Like {@link upsertById}, a document whose
+ * `_id` can't be cast (e.g. a non-hex string against an `ObjectId` `_id`) rejects rather than
+ * being silently dropped — mongoose still writes every other, validly-cast document in the batch
+ * first, then throws for the ones that failed to cast.
  *
  * @this {AdaptedModel} The Mongoose model.
  * @param {DataObject[]} data - Array of documents to insert if missing.
@@ -170,5 +182,12 @@ export async function upsertManyById(
   await bulkWriteWithRetry(this, ops, {
     ordered: false,
     writeConcern: { w: 'majority' },
+    // Without this, mongoose silently drops operations that fail client-side casting/validation
+    // (e.g. an `_id` string that can't cast to ObjectId) and, if EVERY op in the batch failed that
+    // way, resolves with a synthetic zero-write success instead of surfacing anything — the caller
+    // can't tell that apart from a legitimate no-op. Setting this makes mongoose throw a
+    // `MongooseBulkWriteError` for those cast/validation failures instead, matching what
+    // `upsertById`'s own `updateOne` already does (it throws `CastError` in the same situation).
+    throwOnValidationError: true,
   })
 }

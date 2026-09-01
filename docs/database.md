@@ -166,6 +166,10 @@ Pass `{ useDataPolicies: false }` when the seed data is **already** protected (e
 from a production database, with masked/encrypted values and their version prefix already baked in,
 like `'v0:...'`) — otherwise the setter would protect an already-protected value a second time.
 
+`seedManyByIdIfMissing` rejects if any document's `id` can't cast to the model's `_id` type (e.g. a
+non-hex string against an `ObjectId` `_id`) — the other, validly-cast documents in the same call
+still get written first. This matches `seedByIdIfMissing`'s own behavior for a single document.
+
 Skip execution globally with the `DATABASE_SEEDERS` environment variable — see
 [Configuration](./configuration.md).
 

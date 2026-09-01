@@ -210,3 +210,50 @@ Deno.test('upsertManyById: an error with no per-op writeErrors is never retried'
   )
   assertEquals(calls, 1) // no retry attempted — this error would fail identically every time
 })
+
+Deno.test('upsertManyById: passes throwOnValidationError so cast failures reject instead of resolving silently', async () => {
+  const model = buildFakeModel()
+
+  await upsertManyById.call(model as any, [{ id: '1', name: 'A' }, {
+    id: '2',
+    name: 'B',
+  }])
+
+  assertEquals(model.calls[0].op, 'bulkWrite')
+  assertEquals(model.calls[0].options.throwOnValidationError, true)
+})
+
+Deno.test(
+  'upsertManyById: a MongooseBulkWriteError (every op failed to cast) rejects and is never retried',
+  async () => {
+    // mongoose's `bulkWrite` with `throwOnValidationError: true` throws a `MongooseBulkWriteError`
+    // for client-side cast/validation failures — it carries no `.writeErrors` (only a real
+    // server-side `MongoBulkWriteError` does), so the retry logic treats it like any other
+    // non-per-op error: surface it immediately, never retry it.
+    let calls = 0
+    const model = buildFakeModelWithBulkWrite(() => {
+      calls++
+      const error: any = new Error(
+        'bulkWrite failed with 2 Mongoose validation errors: Cast to ObjectId failed, Cast to ObjectId failed',
+      )
+      error.name = 'MongooseBulkWriteError'
+      error.validationErrors = [
+        { index: 0, error: new Error('Cast to ObjectId failed') },
+        { index: 1, error: new Error('Cast to ObjectId failed') },
+      ]
+      // no `.writeErrors` — this is the real, confirmed shape of MongooseBulkWriteError
+      return Promise.reject(error)
+    })
+
+    await assertRejects(
+      () =>
+        upsertManyById.call(model as any, [
+          { id: 'not-a-valid-object-id', name: 'A' },
+          { id: 'also-not-valid', name: 'B' },
+        ]),
+      Error,
+      'Mongoose validation errors',
+    )
+    assertEquals(calls, 1) // no retry attempted — a cast failure fails identically every time
+  },
+)
