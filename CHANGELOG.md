@@ -24,8 +24,6 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
   Both root barrels still re-export the same bindings, so existing imports are unaffected.
 
-## [1.8.1] - 2026-08-31
-
 ### Fixed
 
 - **`upsertManyById`/`seedManyByIdIfMissing`'s bulk path no longer silently resolves with zero
