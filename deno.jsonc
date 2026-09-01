@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true
@@ -83,8 +83,10 @@
     "./core": "./src/modules/core.ts",
     "./sqlite": "./src/modules/database/sqlite.ts",
     "./triggers-api": "./src/modules/triggers/triggers-api/mod.ts",
+    "./triggers-api/rtos": "./src/modules/triggers/triggers-api/rtos/mod.ts",
     "./dlq": "./src/modules/dlq/mod.ts",
     "./dlq-api": "./src/modules/dlq/dlq-api/mod.ts",
+    "./dlq-api/rtos": "./src/modules/dlq/dlq-api/rtos/mod.ts",
     "./storage": "./src/modules/storage/mod.ts",
     "./files": "./src/modules/files/mod.ts"
   },

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-31
+
+### Added
+
+- **New `@zanix/datamaster/triggers-api/rtos` and `@zanix/datamaster/dlq-api/rtos` subpaths** —
+  lightweight, RTO-only barrels with no data-access dependency, for a consumer that only needs the
+  validation classes:
+  - `./triggers-api/rtos` re-exports `CreateTriggerRTO`, `UpdateTriggerRTO`, and
+    `TriggerModelParamsRTO` without pulling in `TriggersAdminRepository`/`TriggersAdminService`
+    (and, through them, `mongoose`/`mongodb`) the way the root `./triggers-api` barrel does — useful
+    for a consumer with no database of its own, such as an SSR app that only validates trigger
+    payloads.
+  - `./dlq-api/rtos` re-exports `DlqEntryIdParamsRTO`, `DiscardDlqEntryRTO`, `ListDlqEntriesRTO`,
+    `PushDlqEntryRTO`, and `RequeueDlqEntryRTO` without pulling in `DlqAdminService`/`DlqProvider`/
+    `createDlqAdminController` (and, through them, `@zanix/server`'s full webserver bootstrap
+    machinery) the way the root `./dlq-api` barrel does.
+
+  Both root barrels still re-export the same bindings, so existing imports are unaffected.
+
 ## [1.8.1] - 2026-08-31
 
 ### Fixed
