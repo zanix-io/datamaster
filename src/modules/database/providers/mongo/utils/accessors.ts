@@ -16,14 +16,26 @@ export function findPathsWithAccessorsDeep(
 ): AccessorsInfo {
   const { getters = {}, setters = {} } = result as AccessorsInfo
 
-  if (parentPath.endsWith('.$*')) parentPath = parentPath.slice(0, -3)
+  // Mongoose marks a Map's per-key (synthetic) schema path with a trailing
+  // `.$*` segment. We reuse that same marker to track whether the schema
+  // being iterated right now was reached through an ITERABLE container
+  // (an array of subdocuments, or a Map) — the only case where a `.*.`
+  // wildcard segment belongs in the paths we build below. A singular
+  // embedded (sub)document has nothing to iterate, so its fields must be
+  // joined with a plain `.` instead.
+  const parentIsIterable = parentPath.endsWith('.$*')
+  if (parentIsIterable) parentPath = parentPath.slice(0, -3)
 
   // Iterate over each path in the schema
   for (const path in schema.paths) {
     const pathObj = schema.paths[path]
 
-    // Build the full path dynamically; include parent path if provided
-    const fullPath = parentPath ? `${parentPath}.*.${path}` : path
+    // Build the full path dynamically; include parent path if provided.
+    // Only insert the `.*.` wildcard when the parent container is iterable —
+    // otherwise this is a plain embedded object and the paths join directly.
+    const fullPath = parentPath
+      ? (parentIsIterable ? `${parentPath}.*.${path}` : `${parentPath}.${path}`)
+      : path
 
     // If the current path has getters, add it to the result array
     if (pathObj.getters?.length) {
@@ -38,9 +50,14 @@ export function findPathsWithAccessorsDeep(
 
     // If the current path is an embedded subdocument, recurse into it
     if ('schema' in pathObj && pathObj.schema) {
+      // Arrays of subdocuments are iterable but (unlike Maps) mongoose gives
+      // them no synthetic `.$*` path of their own — mark the recursive call
+      // ourselves so the next level knows to insert the wildcard segment.
+      const nextParentPath = pathObj.instance === 'Array' ? `${fullPath}.$*` : fullPath
+
       findPathsWithAccessorsDeep(
         pathObj.schema,
-        fullPath,
+        nextParentPath,
         { getters, setters } as never,
       )
     }

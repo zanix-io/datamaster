@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-09-03
+
+### Fixed
+
+- **A protected field (`dataProtectionGetter`/`dataAccessGetter`) inside a plain embedded
+  (non-array) subdocument could crash `.save()` and `toJSON()`/`toObject()`** with
+  `TypeError:
+  Cannot use 'in' operator to search for '<field>' in <value>`.
+  `findPathsWithAccessorsDeep` registered the field's path with a `.*.` wildcard segment (meant for
+  arrays of subdocuments and Maps) even when the parent was a singular embedded object with nothing
+  to iterate; the shallow path transform then tried to iterate that plain object's own value as if
+  it were a collection. Plain embedded (sub)documents now resolve to a direct dot-notated path
+  instead.
+
 ## [1.9.0] - 2026-08-31
 
 ### Added
