@@ -101,3 +101,50 @@ Deno.test('Find paths deep with accessors', () => {
     'friends',
   ])
 })
+
+Deno.test('Find paths deep with accessors on a plain (non-array) embedded subdocument', () => {
+  // Regression test: a singular embedded subdocument (not an array of
+  // subdocuments) has nothing to iterate, so its nested paths must join with
+  // a plain `.` instead of the `.*.` wildcard reserved for arrays/Maps.
+  const addressSchema = new Schema({
+    recipientName: {
+      type: String,
+      get: (value: any) => `${value} (altered)`,
+      set: (value: any) => value,
+    },
+    street: String,
+    // A nested singular embedded doc, to confirm multiple plain levels chain
+    // correctly (no wildcard at any level).
+    geo: new Schema({
+      zip: {
+        type: String,
+        get: (value: any) => value,
+      },
+    }),
+    // An array nested inside a singular embedded doc, to confirm the
+    // transition back to wildcard mode still works past a plain level.
+    tags: [
+      new Schema({
+        value: {
+          type: String,
+          get: (value: any) => value,
+        },
+      }),
+    ],
+  })
+
+  const shipmentSchema = new Schema({
+    address: addressSchema,
+  })
+
+  const { getters, setters } = findPathsWithAccessorsDeep(shipmentSchema)
+
+  assertEquals(Object.keys(getters), [
+    'address.recipientName',
+    'address.geo.zip',
+    'address.tags.*.value',
+  ])
+  assertEquals(Object.keys(setters), [
+    'address.recipientName',
+  ])
+})

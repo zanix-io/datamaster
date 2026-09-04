@@ -43,6 +43,17 @@ const userSchema = new Schema({
       },
     }),
   },
+  // Regression: a plain (non-array) embedded subdocument with a protected field.
+  // `findPathsWithAccessorsDeep` used to register this as `address.*.recipientName`
+  // (a wildcard meant for arrays/Maps), which made `.save()` throw with
+  // "Cannot use 'in' operator to search for 'recipientName' in <value>".
+  address: new Schema({
+    recipientName: {
+      type: String,
+      get: dataProtectionGetter('mask'),
+    },
+    street: String,
+  }),
 })
 
 Deno.test({
@@ -67,6 +78,10 @@ Deno.test({
         emails: {
           value: 'pepito.perez@email.com',
         },
+      },
+      address: {
+        recipientName: 'Camila Rojas',
+        street: 'Calle 123',
       },
     })
 
@@ -110,6 +125,12 @@ Deno.test({
     const secret: DecryptableObject = userSaved.secret
     assert(json.secret && (json.secret !== 'my secret'))
     assertEquals(await secret?.decrypt?.(), 'my secret')
+
+    const recipientName: UnmaskableObject = userSaved.address?.recipientName
+    assert(recipientName)
+    assertEquals(recipientName.unmask?.(), 'Camila Rojas')
+    assert(json.address.recipientName !== 'Camila Rojas')
+    assert(json.address.street === 'Calle 123')
 
     Deno.env.delete('DATA_SECRET_KEY')
 

@@ -93,6 +93,10 @@ jobs:
       # - name: Check for circular-import hazards
       #   run: deno run -A jsr:@zanix/cli check-cycles
 
+      # Temporarily disabled: @zanix/cli check-duplicates has not been published yet.
+      # - name: Check for duplicate '@zanix/*' dependencies
+      #   run: deno run -A jsr:@zanix/cli check-duplicates
+
       # SeaweedFS isn't started via `services:` like mongo/redis/opensearch above — its image's
       # default CMD is a bare shell with no server args baked in (`docker run chrislusf/seaweedfs
       # server -s3` — the S3 gateway needs those args explicitly), and GitHub Actions `services:`
