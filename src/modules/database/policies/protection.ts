@@ -176,10 +176,8 @@ export const dataProtectionSetterDefinition = (
  * - **Symmetric encryption:** `DATA_AES_KEY_V1`, `DATA_AES_KEY_V2`, etc.
  * - **Asymmetric encryption:** `DATA_RSA_PUB_V1`, `DATA_RSA_PUB_V2`, etc.
  *
- * If no version is provided (defaults to **v0**), which uses non-suffixed environment variables:
- * - For symmetric encryption → uses `DATA_AES_KEY`
- * - For asymmetric encryption → uses `DATA_RSA_PUB`, `DATA_RSA_KEY`
- * - For masking → uses `DATA_SECRET_KEY` or `DATA_AES_KEY`
+ * If no version is provided, it defaults to **v0** — the non-suffixed variable names already
+ * listed under "Environment Variable Usage" above.
  *
  * ---
  * ### ⚠️ Warnings
