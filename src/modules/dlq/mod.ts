@@ -64,6 +64,7 @@ export {
   DLQ_ENCRYPT_PAYLOAD_ENV,
   DLQ_MODEL_ENV,
   dlqModelName,
+  isDlqModelRegistered,
   isDlqResourceEnabled,
   registerDlqModel,
 } from './dlq.model.ts'

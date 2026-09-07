@@ -267,16 +267,48 @@ how you shape `payload` on `push()`, not something `DlqProvider` validates.
 | `DLQ_DEFAULT_LEASE_MS` | `30000`     | `registerDlqModel({ defaultLeaseMs })`, then per-call `claim({ leaseTtlMs })` wins over both |
 
 All three env vars, when set, always win over their matching `registerDlqModel` option — the same
-precedence `encryptPayload` already had. `registerDlqModel()` is required regardless (Mongoose needs
-a concrete schema before any query against the collection works), but _how_ it's named/tuned can
-come from either source: the option when it's convenient to keep next to the rest of the model's own
-declaration, or the env var when an environment needs to override it without a code change. Because
-`registerDlqModel` is the only place that writes `modelName`/`defaultLeaseMs` for `dlqModelName()`/
-`defaultLeaseTtlMs()` to later resolve, there's no risk of the two drifting apart the way a naive
-per-call-site cache might.
+precedence `encryptPayload` already had. Registration itself (Mongoose needs a concrete schema
+before any query against the collection works) either happens automatically, once `DLQ_MODEL_NAME`
+is set — see "Auto-registration" below — or via an explicit `registerDlqModel()` call; either way,
+_how_ it's named/tuned can come from either source: the option when it's convenient to keep next to
+the rest of the model's own declaration, or the env var when an environment needs to override it
+without a code change. Because `registerDlqModel` is the only place that writes
+`modelName`/`defaultLeaseMs` for `dlqModelName()`/`defaultLeaseTtlMs()` to later resolve, there's no
+risk of the two drifting apart the way a naive per-call-site cache might.
 
 For a multi-connector app, pass the target connector class as `registerDlqModel`'s second argument —
-same convention as `registerModel`'s own `connector` parameter.
+same convention as `registerModel`'s own `connector` parameter. This is also the one case that still
+requires an explicit call regardless of `DLQ_MODEL_NAME` — see below.
+
+## Auto-registration
+
+Setting `DLQ_MODEL_NAME` — directly, or via the same-named setup option in `@zanix/core` (which only
+ever sets this env var; it doesn't call anything in this package) — is, by itself, enough to get
+`registerDlqModel()` called for you: `ZanixMongoConnector`'s default-connector instance calls it
+during its own `initialize()`, before that connector binds its models. No `defs.ts`/bootstrap call
+needed for the common case. Three conditions gate this, all necessary:
+
+1. **`DLQ_MODEL_NAME` must actually be set.** Unlike the persisted-triggers model (on by default),
+   DLQ registration stays fully opt-in — nothing registers if this env var was never set.
+2. **Only the default Mongo connector auto-registers it.** DLQ is one app-global queue, not a
+   per-connector resource the way triggers genuinely is — auto-registering it against every active
+   connector in a multi-connector app would produce duplicate/conflicting registrations. Hosting DLQ
+   on a non-default connector still means calling `registerDlqModel(options, connector)` explicitly.
+3. **An explicit call already made during the app's own bootstrap always wins.** Bootstrap runs
+   before `Zanix.start()` instantiates connectors, so if the app already called `registerDlqModel()`
+   itself — e.g. because it needs `payloadFields`, which has no env var equivalent — the auto-hook
+   detects this and never re-registers, so it can never silently discard those options.
+
+This requires an actual instance in the default Mongo connector slot to exist — either `MONGO_URI`
+set (so this package's own `registerMongoConnector()` auto-installs one), or the app's own
+`@Connector('database') class extends ZanixMongoConnector {}` (which doesn't itself depend on
+`MONGO_URI` for the slot registration, only for the connector's own connection string). This isn't a
+new requirement this introduces: an app setting `DLQ_MODEL_NAME` because it wants the (Mongo-backed)
+DLQ module already needs a real Mongo connection through one of those two paths regardless. The
+symmetric edge case — an app running entirely on custom connectors in slots other than `'database'`,
+with none in the default slot — means auto-registration never fires even with `DLQ_MODEL_NAME` set;
+that's the same limit `registerDlqModel()` already has without an explicit `connector` argument, not
+a new gap.
 
 ## Local admin API — `@zanix/datamaster/dlq-api`
 

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2026-09-07
+
+### Fixed
+
+- **`registerDlqModel()` required an explicit call even after `DLQ_MODEL_NAME` was already set**
+  (directly, or via `@zanix/core`'s `Zanix.setup({ dlq: {...} })`, which only ever sets that same
+  env var) — an app that opted into DLQ this way but forgot the separate call ended up with the
+  resource "enabled" per `isDlqResourceEnabled()` (the same signal `@zanix/admin`'s `/admin/dlq`
+  gating already relies on) while the underlying Mongo collection was never actually registered,
+  failing at first real use. `ZanixMongoConnector` now auto-registers the DLQ model against the
+  default connector as soon as `DLQ_MODEL_NAME` resolves to a value, the same connector-init timing
+  `registerTriggersModel()` already uses for triggers — gated so it never fires for a non-default
+  connector and never overrides an app's own explicit `registerDlqModel(options)` call. New
+  `isDlqModelRegistered()` export exposes whether that call has already run.
+
 ## [1.9.1] - 2026-09-03
 
 ### Fixed

@@ -18,6 +18,7 @@ import { createDatabase, postBindModel, preprocessSchema } from '../processor/mo
 import { type Mongoose, Schema, type SchemaOptions } from 'mongoose'
 import { defineModelBySchema, defineModels } from './models.ts'
 import { loadPersistedTriggersOnStart } from './triggers.ts'
+import { autoRegisterDlqModelOnStart } from './dlq.ts'
 import { runSeedersOnStart } from './seeders.ts'
 import { HttpError, InternalError } from '@zanix/errors'
 import logger from '@zanix/logger'
@@ -123,6 +124,11 @@ const pollIntervalFromEnv = (): number | false => {
  *   `docs/triggers.md`'s "Keeping the registry fresh" section). Unset, `'false'`, or a
  *   non-positive/non-numeric value all disable polling.
  * - **TRIGGERS_CHANGE_STREAM**: Set to `'true'` to enable, in place of `triggersChangeStream`.
+ * - **DLQ_MODEL_NAME**: Not a constructor option — has no matching field on this class. When set
+ *   (there's no default; unlike the vars above, this one is opt-in), this connector auto-registers
+ *   `@zanix/datamaster`'s own DLQ model (`registerDlqModel`) the first time it's the default
+ *   connector (`resolvedConnectorKey === 'database'`) and no explicit `registerDlqModel()` call has
+ *   already run — see `dlq.ts`'s `autoRegisterDlqModelOnStart` for the full guard conditions.
  *
  * @class ZanixMongoConnector
  * @template T
@@ -442,6 +448,11 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
       const dbConfig = { ...this.#config }
       dbConfig.dbName = dbConfig.dbName || this.defaultDbName
 
+      // Must run before `defineModels()` (not after `connect()`, unlike `loadPersistedTriggersOnStart`
+      // below) — DLQ registration is just an in-memory schema registration, not a query against an
+      // already-connected collection, so registering it here lets `defineModels()` bind it in the
+      // same pass as every other model, with no second pass needed. See `dlq.ts`'s own JSDoc.
+      autoRegisterDlqModelOnStart.call(this)
       defineModels.call(this)
 
       await this.#database.connect(this.#uri, dbConfig)

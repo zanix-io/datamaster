@@ -22,13 +22,26 @@ export const DEFAULT_DLQ_MODEL = 'zanix-dlq'
 
 /**
  * Whether the DLQ resource is configured in this deployment — `true` once `DLQ_MODEL_NAME` is set,
- * the deployment's own opt-in signal (this model has no auto-registration to check instead — see
- * {@link registerDlqModel}'s own doc). Doesn't guarantee `registerDlqModel()` was actually called:
- * env var presence alone can't know that, and this package exposes no stronger "was it registered"
- * query yet — a known, documented gap (`@zanix/admin`'s own `metadata.ts` mirrors this exact
- * signal for its `/admin/dlq` REST gating, inheriting the same limitation rather than a new one).
+ * the deployment's own opt-in signal. This is also the exact condition
+ * `mongo/connector/dlq.ts`'s `autoRegisterDlqModelOnStart` gates on, so setting this env var (or the
+ * equivalent `@zanix/core` setup option that sets it) against the default Mongo connector is enough
+ * to get {@link registerDlqModel} called automatically — see that function's own doc for when an
+ * explicit call is still required, and {@link isDlqModelRegistered} for whether one already ran.
+ * Doesn't, by itself, guarantee `registerDlqModel()` was actually called: env var presence alone
+ * can't know that on its own — `@zanix/admin`'s own `metadata.ts` mirrors this exact signal for its
+ * `/admin/dlq` REST gating, inheriting the same caveat rather than a new one.
  */
 export const isDlqResourceEnabled = (): boolean => !!Deno.env.get(DLQ_MODEL_ENV)
+
+/**
+ * Whether {@link registerDlqModel} has already run at least once in this process — set as the very
+ * first thing that function does, before any of its own option resolution. This is what lets
+ * `mongo/connector/dlq.ts`'s `autoRegisterDlqModelOnStart` avoid calling `registerDlqModel()` a
+ * second time (and silently discarding an app's own explicit `payloadFields`/`defaultLeaseMs`/etc.)
+ * when the app's own bootstrap already registered it before the connector initialized — an explicit
+ * call always runs first, since app bootstrap runs before `Zanix.start()` instantiates connectors.
+ */
+export const isDlqModelRegistered = (): boolean => dlqModelRegistered
 /** Default `claim()` lease duration (ms) when neither a per-call option nor
  * `DLQ_DEFAULT_LEASE_MS` is set. */
 const DEFAULT_LEASE_MS = 30_000
@@ -43,6 +56,9 @@ const DEFAULT_LEASE_MS = 30_000
  */
 let registeredModelName: string | undefined
 let registeredDefaultLeaseMs: number | undefined
+/** Backs {@link isDlqModelRegistered} — set `true` as the first line of {@link registerDlqModel},
+ * never reset afterward (there's no matching "unregister"). */
+let dlqModelRegistered = false
 
 /**
  * Resolves the effective DLQ collection name: `DLQ_MODEL_NAME` always wins when set (same
@@ -140,12 +156,33 @@ const resolveEncryptPayload = (
 
 /**
  * Registers `@zanix/datamaster`'s own DLQ model (`zanix-dlq` by default, or `DLQ_MODEL_NAME`/
- * {@link RegisterDlqModelOptions.modelName}) — required once, in the app's own bootstrap, before
- * `DlqProvider` can resolve it (mirrors `registerModel`'s own usage — nothing auto-registers this
- * as a side effect of importing `DlqProvider`, to avoid double-registration risk for
- * multi-connector apps). Registration itself isn't optional — Mongoose needs a concrete schema for
- * the collection before any query against it will work — but *how* it's named/tuned is: through
- * this call's own `options`, or through the env vars, whichever fits the deployment.
+ * {@link RegisterDlqModelOptions.modelName}) — before `DlqProvider` can resolve it (mirrors
+ * `registerModel`'s own usage). Registration itself isn't optional — Mongoose needs a concrete
+ * schema for the collection before any query against it will work — but *how* it's named/tuned is:
+ * through this call's own `options`, or through the env vars, whichever fits the deployment.
+ *
+ * **Auto-registered against the default Mongo connector** as soon as `DLQ_MODEL_NAME` is set (see
+ * {@link isDlqResourceEnabled}) — directly, or via the equivalent `@zanix/core` setup option that
+ * sets that same env var — by `mongo/connector/dlq.ts`'s `autoRegisterDlqModelOnStart`, run once per
+ * connector `initialize()`, before that connector's models are bound. This requires an actual
+ * instance in the default Mongo connector slot to exist at all (either `MONGO_URI` set, so
+ * `registerMongoConnector()`'s own `core.ts` auto-installs one, or an app's own
+ * `@Connector('database') class extends ZanixMongoConnector {}`) — not a new restriction this
+ * introduces, just the preexisting requirement for using the (Mongo-backed) DLQ module at all.
+ *
+ * An explicit call to this function is still required for either of two cases the auto-hook
+ * deliberately doesn't cover:
+ * - **A non-default connector** — DLQ is a single, app-global resource (one queue), unlike
+ *   per-connector resources such as triggers, so the auto-hook only ever targets the default
+ *   connector; hosting DLQ on a custom connector still means calling this explicitly with that
+ *   connector's own class as `connector`.
+ * - **Options the env vars don't cover** — {@link RegisterDlqModelOptions.payloadFields} has no env
+ *   var equivalent, so declaring per-field payload protection still requires an explicit call.
+ *
+ * An explicit call made during the app's own bootstrap (which runs before `Zanix.start()`
+ * instantiates connectors) always wins over the auto-hook — see {@link isDlqModelRegistered}, which
+ * the hook checks before ever calling this itself, so it never re-runs registration or silently
+ * discards options an app already passed in.
  *
  * Also the sole place `modelName`/`defaultLeaseMs` are recorded for `dlqModelName()`/
  * `defaultLeaseTtlMs()` to later resolve (see those functions) — so a call that omits one of them
@@ -171,6 +208,7 @@ export const registerDlqModel = (
   // deno-lint-ignore ban-types
   connector: Function | undefined = undefined,
 ): void => {
+  dlqModelRegistered = true
   registeredModelName = options.modelName
   registeredDefaultLeaseMs = options.defaultLeaseMs
   const encryptPayload = resolveEncryptPayload(options.encryptPayload)
