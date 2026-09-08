@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.9.3] - 2026-09-08
+
+### Fixed
+
+- **`getModel()` threw `ERR_MONGO_MODEL_NOT_FOUND` for a model that genuinely WAS registered via
+  `registerModel`, on any `routes: false`/operations-only Zanix App.** `defineModels()` — the step
+  that actually binds every registered schema into a real, queryable model — normally runs as a side
+  effect of the connector's own `initialize()`, which a REST-serving app's readiness/health checks
+  happen to trigger well before any repository is built; an operations-only app has no such trigger,
+  so its first repository (constructed and calling `getModel()` synchronously, in the same tick the
+  connector itself gets resolved) could see no models bound yet and fail. `getModel()` now detects a
+  model registered for the current connector but not yet bound and binds it synchronously on the
+  spot, closing the ordering gap instead of requiring every caller to `await isReady` first.
+
 ## [1.9.2] - 2026-09-07
 
 ### Fixed

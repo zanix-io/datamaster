@@ -387,10 +387,27 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     }
 
     if (!hasSchema) {
-      const registeredFor = ProgramModule.models.findRegisteredConnectors(
+      const registeredConnectors = ProgramModule.models.findRegisteredConnectors(
         'mongo',
         name,
       )
+
+      // Registered for THIS connector, but `defineModels()` — the step that actually binds every
+      // `registerModel()`-registered schema into a real, queryable model — hasn't run yet. That
+      // normally happens as a side effect of `initialize()` (scheduled at construction, or awaited
+      // early via `isReady`), but nothing guarantees either ran before the first `getModel()` call
+      // on every possible boot path (e.g. a `routes: false`/operations-only app, whose own boot
+      // sequence never happens to touch `isReady`). Binding synchronously here — safe and
+      // idempotent, see `bindModel`'s own `existingModel` check above — closes that ordering gap
+      // instead of requiring every caller to `await isReady` before its first `getModel()` call.
+      if (registeredConnectors.some((entry) => entry.key === this.resolvedConnectorKey)) {
+        defineModels.call(this)
+
+        const boundModel = this.#database.models[name] as Model<Attrs>
+        if (boundModel) return postBindModel(boundModel)
+      }
+
+      const registeredFor = registeredConnectors
         .filter((entry) => entry.key !== this.resolvedConnectorKey)
 
       if (registeredFor.length) {
