@@ -184,9 +184,17 @@ await rotateEncryptionKeys(storage, { useWorker: 'persisted' })
 Three generic `ObjectStorage` combinators — none of them S3-specific, and none of them assume
 anything about what's being stored:
 
-- **`createLocalFilesystemObjectStorage(rootDir)`** — a real, disk-backed `ObjectStorage`. Not the
-  intended production store; exists for local development with zero external infra, and as the local
-  half of the fallback below.
+- **`createLocalFilesystemObjectStorage(rootDir, options?)`** — a real, disk-backed `ObjectStorage`.
+  Not the intended production store; exists for local development with zero external infra, and as
+  the local half of the fallback below. `options.encrypt` (`StorageEncryptSettings`), when set,
+  encrypts bytes at rest via the same `encryptBytes`/`decryptBytes` mechanism `S3ObjectStorage` uses
+  (`'symmetric'`/`'asymmetric'`, `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY`, key-version rotation
+  — see [above](#encrypting-object-content-at-rest)); the encryption version and, for `'asymmetric'`
+  objects, the wrapped per-object AES key are stored in the object's own sidecar `.meta.json` file —
+  the local-disk equivalent of the S3 object metadata `S3ObjectStorage` carries the same fields as.
+  Omitted (the default): bytes are written and read back exactly as given. Unlike `S3ObjectStorage`,
+  there is no env-var fallback for this option — this factory is always called with explicit
+  arguments, never through a zero-config DI path that would need one.
 - **`createFallbackObjectStorage(primary, fallback, ensureSynced?)`** — wraps two `ObjectStorage`s:
   `put()` always writes to `primary` only; `get()`/`exists()` try `primary` first, falling back to
   `fallback` on a miss; `delete()` removes from both. Exists for one real scenario: `primary`

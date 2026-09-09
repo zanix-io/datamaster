@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-09-09
+
+### Added
+
+- **`createLocalFilesystemObjectStorage` accepts an optional second `options.encrypt` argument**
+  (`storage`), encrypting bytes at rest — the same opt-in shape `S3ObjectStorage`'s `encrypt` option
+  has (`{ type: 'symmetric' | 'asymmetric', version? }`), reusing the same `encryptBytes`/
+  `decryptBytes` mechanism and `DATA_AES_KEY`/`DATA_RSA_PUB`/`DATA_RSA_KEY` key-resolution
+  convention. The encryption version and, for `'asymmetric'` objects, the wrapped per-object AES key
+  are stored in the object's own sidecar `.meta.json` file, next to its `contentType`/`size`/
+  `checksum` — the local-disk equivalent of the S3 object metadata `S3ObjectStorage` carries the
+  same fields as. A missing required key throws rather than silently storing plaintext, matching
+  `S3ObjectStorage`'s own fail-closed behavior. Omitted (the default): bytes are written and read
+  back exactly as given, unchanged from before this option existed. Unlike `S3ObjectStorage`, there
+  is no env-var fallback for this option — this factory is always called with explicit arguments,
+  never through a zero-config DI path that would need one.
+
 ## [1.9.3] - 2026-09-08
 
 ### Fixed

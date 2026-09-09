@@ -1,6 +1,6 @@
 {
   "name": "@zanix/datamaster",
-  "version": "1.9.3",
+  "version": "1.10.0",
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true

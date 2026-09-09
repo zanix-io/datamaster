@@ -1,4 +1,5 @@
-import { assert, assertEquals, assertRejects } from '@std/assert'
+import { assert, assertEquals, assertNotEquals, assertRejects } from '@std/assert'
+import { generateRSAKeys } from '@zanix/helpers'
 import { createLocalFilesystemObjectStorage } from 'storage/local-filesystem-object-storage.ts'
 
 /**
@@ -6,6 +7,11 @@ import { createLocalFilesystemObjectStorage } from 'storage/local-filesystem-obj
  * implementation, ported from `@zanix/space`'s own `LocalFilesystemAssetStorage`. Exercises the
  * `ObjectStorage` contract directly (put/get round-trip, missing key, idempotent delete, nested
  * keys), against a real temp directory — no mocks needed, this adapter has no network dependency.
+ *
+ * The `options.encrypt` cases below mirror `s3-object-storage.test.ts`'s own encryption
+ * assertions (real ciphertext on disk, a real round-trip, and the same `DATA_AES_KEY`/
+ * `DATA_RSA_PUB`/`DATA_RSA_KEY` env vars) — this adapter reuses `encryptBytes`/`decryptBytes`
+ * directly, so the same behavior is expected here.
  */
 
 Deno.test(
@@ -113,6 +119,139 @@ Deno.test(
       }
     } finally {
       await Deno.remove(dir, { recursive: true })
+    }
+  },
+)
+
+Deno.test(
+  'createLocalFilesystemObjectStorage: omitting options.encrypt writes the exact plaintext ' +
+    'bytes to disk, unchanged from before the option existed',
+  async () => {
+    const dir = await Deno.makeTempDir()
+    try {
+      const storage = createLocalFilesystemObjectStorage(dir)
+      const bytes = new TextEncoder().encode('never encrypted')
+      await storage.put('objects/plain/data', bytes, { contentType: 'text/plain' })
+
+      const onDisk = await Deno.readFile(`${dir}/objects/plain/data`)
+      assertEquals(onDisk, bytes, 'expected the raw file on disk to be the exact plaintext bytes')
+
+      const found = await storage.get('objects/plain/data')
+      assert(found, 'expected the object to be found')
+      assertEquals(new Uint8Array(await new Response(found.stream).arrayBuffer()), bytes)
+    } finally {
+      await Deno.remove(dir, { recursive: true })
+    }
+  },
+)
+
+Deno.test(
+  'createLocalFilesystemObjectStorage with symmetric encryption stores ciphertext, never the ' +
+    'plaintext bytes, on disk, and round-trips',
+  async () => {
+    Deno.env.set('DATA_AES_KEY', 'a-test-symmetric-key-value')
+    const dir = await Deno.makeTempDir()
+    try {
+      const storage = createLocalFilesystemObjectStorage(dir, { encrypt: { type: 'symmetric' } })
+      const plaintext = new TextEncoder().encode('sensitive voice memo bytes')
+      await storage.put('objects/enc/data', plaintext, { contentType: 'audio/wav' })
+
+      const onDisk = await Deno.readFile(`${dir}/objects/enc/data`)
+      assertNotEquals(
+        onDisk,
+        plaintext,
+        'expected the raw file on disk to be ciphertext, never the plaintext',
+      )
+
+      const fetched = await storage.get('objects/enc/data')
+      assert(fetched, 'expected the object to be found')
+      const roundTripped = new Uint8Array(await new Response(fetched.stream).arrayBuffer())
+      assertEquals(roundTripped, plaintext)
+    } finally {
+      await Deno.remove(dir, { recursive: true })
+      Deno.env.delete('DATA_AES_KEY')
+    }
+  },
+)
+
+Deno.test(
+  'createLocalFilesystemObjectStorage with symmetric encryption enabled but no DATA_AES_KEY ' +
+    'configured fails closed, never silently storing plaintext',
+  async () => {
+    Deno.env.delete('DATA_AES_KEY')
+    const dir = await Deno.makeTempDir()
+    try {
+      const storage = createLocalFilesystemObjectStorage(dir, { encrypt: { type: 'symmetric' } })
+      await assertRejects(
+        () => storage.put('objects/enc/data', new Uint8Array([1, 2, 3]), { contentType: 'x' }),
+        Error,
+        'DATA_AES_KEY',
+      )
+      assertEquals(await storage.exists('objects/enc/data'), false)
+    } finally {
+      await Deno.remove(dir, { recursive: true })
+    }
+  },
+)
+
+Deno.test(
+  'createLocalFilesystemObjectStorage with asymmetric encryption wraps a random per-object AES ' +
+    'key with RSA and round-trips',
+  async () => {
+    const { publicKey, privateKey } = await generateRSAKeys()
+    Deno.env.set('DATA_RSA_PUB', btoa(publicKey))
+    Deno.env.set('DATA_RSA_KEY', btoa(privateKey))
+    const dir = await Deno.makeTempDir()
+    try {
+      const storage = createLocalFilesystemObjectStorage(dir, { encrypt: { type: 'asymmetric' } })
+      const plaintext = new TextEncoder().encode('sensitive video bytes')
+      await storage.put('objects/enc/data', plaintext, { contentType: 'video/mp4' })
+
+      const onDisk = await Deno.readFile(`${dir}/objects/enc/data`)
+      assertNotEquals(onDisk, plaintext)
+
+      const sidecar = JSON.parse(await Deno.readTextFile(`${dir}/objects/enc/data.meta.json`))
+      assert(
+        sidecar.encryption?.['wrapped-key'],
+        'expected a wrapped per-object AES key in the sidecar metadata',
+      )
+
+      const fetched = await storage.get('objects/enc/data')
+      assert(fetched, 'expected the object to be found')
+      const roundTripped = new Uint8Array(await new Response(fetched.stream).arrayBuffer())
+      assertEquals(roundTripped, plaintext)
+    } finally {
+      await Deno.remove(dir, { recursive: true })
+      Deno.env.delete('DATA_RSA_PUB')
+      Deno.env.delete('DATA_RSA_KEY')
+    }
+  },
+)
+
+Deno.test(
+  'createLocalFilesystemObjectStorage.get: an encryption-enabled instance correctly reads a ' +
+    'genuinely unencrypted object stored alongside real encrypted ones, without corrupting it',
+  async () => {
+    Deno.env.set('DATA_AES_KEY', 'a-test-symmetric-key-value')
+    const dir = await Deno.makeTempDir()
+    try {
+      const plain = createLocalFilesystemObjectStorage(dir)
+      const rawPlaintext = new TextEncoder().encode('this one was never encrypted')
+      await plain.put('objects/mixed/plain', rawPlaintext, { contentType: 'x' })
+
+      const encrypted = createLocalFilesystemObjectStorage(dir, {
+        encrypt: { type: 'symmetric' },
+      })
+      const fetchedPlain = await encrypted.get('objects/mixed/plain')
+      assert(fetchedPlain, 'expected the unencrypted object to be found')
+      assertEquals(
+        new Uint8Array(await new Response(fetchedPlain.stream).arrayBuffer()),
+        rawPlaintext,
+        'expected the unencrypted object to be returned as-is, never run through decryptBytes',
+      )
+    } finally {
+      await Deno.remove(dir, { recursive: true })
+      Deno.env.delete('DATA_AES_KEY')
     }
   },
 )
