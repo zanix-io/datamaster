@@ -17,6 +17,16 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   nothing). Covers both real shapes seen so far — a single-field "set once" claim, and a "push once
   per unique pair" claim on an array field via `$not`/`$elemMatch`. Exported as `AtomicClaimResult`
   (`database` subpath).
+- **`conditional` data access strategy** (`database` — `dataAccessGetter`/`dataPoliciesGetter`) — a
+  fourth field-access strategy alongside `internal`/`private`/`protected`, for a field visible to
+  its own document's owner and, on top of that, to any other authenticated viewer an explicit grant
+  approves — never to any other session by default. `settings.ownerField` (defaults to `'userId'`)
+  names the document path holding the owner's id; `settings.resolveGrant`, called synchronously with
+  `{ documentId, viewerId, field }`, decides whether a non-owner viewer is granted access. Omitting
+  `resolveGrant` means the field is never shared with anyone but its owner. See
+  [Access strategies](./docs/data-protection.md#access-strategies-dataaccessgetter) for the full
+  behavior table and the synchronous-only rationale. Exported as `ConditionalDataAccessConfig`/
+  `ConditionalDataSettings` (`database` subpath).
 
 ## [1.10.0] - 2026-09-09
 

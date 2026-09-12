@@ -53,7 +53,9 @@ export const dataPoliciesGetter = (
   const dataAccess = (typeof access === 'string') ? { strategy: access } : access
   const dataProtection = normalizeDataProtection(protection)
 
-  const accessor: SchemaAccessor = (value, options) => {
+  // A `function` (not an arrow) so Mongoose's own getter invocation binds `this` to the
+  // document/subdocument scope — see the same note on `dataAccessGetter`'s own accessor.
+  const accessor: SchemaAccessor = function (this: Record<string, unknown>, value, options) {
     // If `useDataAccessGet` is defined, it returns the `dataAccessGetter` function.
     // This is defined and used by the **access transformer** (e.g., during the `toJSON` transformation)
     // to retrieve the data from the appropriate source.
@@ -61,7 +63,10 @@ export const dataPoliciesGetter = (
     // ensuring that the data access behavior is reset for future use.
     if (Program.asyncContext.getStore()?.useDataAccessGet) {
       const processedValue = baseGetter(value, options)
-      return dataAccessGetterDefinition(dataAccess, processedValue)
+      return dataAccessGetterDefinition(dataAccess, processedValue, undefined, {
+        doc: this,
+        path: options?.path,
+      })
     }
 
     const processedValue = dataProtectionGetterDefinition(

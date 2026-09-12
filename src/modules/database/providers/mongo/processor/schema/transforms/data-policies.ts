@@ -32,6 +32,10 @@ export const transformByDataAccess = (
   return (doc, ret, options?: { userSession: Session; json?: boolean }) => {
     const { userSession: session, json } = options || {}
 
+    const statics = doc.schema.statics as unknown as SchemaStatics
+    const dataAccess = statics._getDataAccess()
+    const allowedPaths = statics._getDataAccessPaths()
+
     // When `userSession` is managed through `AsyncLocalStorage` (ALS),
     // and `userSession` is not provided manually, the object is serialized
     // using `toJSON` with data access getters enabled.
@@ -59,15 +63,12 @@ export const transformByDataAccess = (
 
       return tranformData
     }
-    const statics = doc.schema.statics as unknown as SchemaStatics
-    const dataAccess = statics._getDataAccess()
-    const allowedPaths = statics._getDataAccessPaths()
 
     return transformShallowByPaths(ret, {
       deleteMetadata,
       allowedPaths,
       transform: (value, path) => {
-        return dataAccessGetterDefinition(dataAccess[path], value, session)
+        return dataAccessGetterDefinition(dataAccess[path], value, session, { doc, path })
       },
     })
   }

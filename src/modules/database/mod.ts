@@ -139,6 +139,10 @@ export type {
   AccessStrategies,
   /** Group of all available data access settings by strategy. */
   AccessStrategiesSettings,
+  /** Access configuration for the 'conditional' strategy. */
+  ConditionalDataAccessConfig,
+  /** Conditional data access settings: who owns the field, and how a non-owner can be granted access. */
+  ConditionalDataSettings,
   /** Configuration for a single data access strategy. */
   DataAccessBaseConfig,
   /** Union of all single-strategy data access configurations. */

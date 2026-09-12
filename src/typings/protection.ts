@@ -165,12 +165,41 @@ export type PrivateDataSettings = never
 export type InternalDataSettings = never
 
 /**
+ * Conditional data access settings.
+ *
+ * Defines who counts as the field's owner, and how a non-owner viewer can be granted access.
+ */
+export type ConditionalDataSettings = {
+  /**
+   * The document path holding the id of the field's owner.
+   *
+   * @default 'userId'
+   */
+  ownerField?: string
+  /**
+   * Checks whether `viewerId` currently holds an explicit grant to see `field` on `documentId`.
+   * Called only for an authenticated viewer that isn't the field's owner. Omitting it means only
+   * the owner ever sees the field — no other viewer can ever be granted access.
+   *
+   * Called synchronously — Mongoose applies schema getters (and this package's own `toJSON`/
+   * `toObject` transform pipeline) without awaiting them. A grant check backed by a live lookup
+   * (a database query, a remote call, ...) needs to run ahead of time, with `resolveGrant` only
+   * reading its outcome from an already-populated, request-scoped cache.
+   */
+  resolveGrant?: (
+    context: { documentId: unknown; viewerId: string; field: string },
+  ) => boolean
+}
+
+/**
  * Group of all available data access settings by strategy.
  *
  * Possible values:
  *   `protected`: The field is visible to authenticated users, and may be partially masked for anonymous users.
  *   `private`: The field is not shown at all to anonymous users and is only visible to authenticated users.
  *   `internal`: The field is not exposed to users at all.
+ *   `conditional`: The field is visible to its own owner, and to any other authenticated viewer an
+ *     explicit grant approves; every other viewer (including anonymous ones) never sees it.
  */
 export type AccessStrategiesSettings = {
   /** The field is visible to authenticated users, and may be partially masked for anonymous users */
@@ -179,6 +208,8 @@ export type AccessStrategiesSettings = {
   private: PrivateDataSettings
   /** The field is not exposed to users at all. */
   internal: InternalDataSettings
+  /** The field is visible to its own owner, and to any other viewer an explicit grant approves. */
+  conditional: ConditionalDataSettings
 }
 
 /**
@@ -204,20 +235,26 @@ export type PrivateDataAccessConfig = DataAccessBaseConfig<'private'>
 export type InternalDataAccessConfig = DataAccessBaseConfig<'internal'>
 /** Access configuration for the 'protected' strategy. */
 export type ProtectedDataAccessConfig = DataAccessBaseConfig<'protected'>
+/** Access configuration for the 'conditional' strategy. */
+export type ConditionalDataAccessConfig = DataAccessBaseConfig<'conditional'>
 
 /** Union of all single-strategy configurations */
 export type DataAccessConfig =
   | PrivateDataAccessConfig
   | ProtectedDataAccessConfig
   | InternalDataAccessConfig
+  | ConditionalDataAccessConfig
 
 /**
  * Defines access to a data field.
  *
  * If the strategy is 'protected', it may include options like virtual masking.
+ * If the strategy is 'conditional', it may include an owner field and a grant resolver.
  * Possible values:
  *   `protected`: The field is visible to authenticated users, and may be partially masked for anonymous users.
  *   `private`: The field is not shown at all to anonymous users and is only visible to authenticated users.
  *   `internal`: The field is not exposed to users at all.
+ *   `conditional`: The field is visible to its own owner, and to any other authenticated viewer an
+ *     explicit grant approves.
  */
 export type DataFieldAccess = AccessStrategies | DataAccessConfig

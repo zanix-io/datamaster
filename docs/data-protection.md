@@ -116,6 +116,22 @@ const schema = {
       settings: { virtualMask: { endBefore: '@' } },
     }),
   },
+  shippingAddress: {
+    type: String,
+    // Only `doc.userId` ever sees it — no `resolveGrant` means no other viewer is ever granted access.
+    get: dataAccessGetter({ strategy: 'conditional' }),
+  },
+  socialLinks: {
+    type: String,
+    get: dataAccessGetter({
+      strategy: 'conditional',
+      // `sharingGrants` is a synchronous, request-scoped lookup populated ahead of time (e.g. by
+      // a guard that queries the real grants store once per request) — see below for why.
+      settings: {
+        resolveGrant: ({ documentId, viewerId }) => sharingGrants.isGranted(documentId, viewerId),
+      },
+    }),
+  },
 }
 ```
 
@@ -123,15 +139,50 @@ Access strategies decide **whether a field is visible at all**, based on the cur
 session (read from ALS via `ProgramModule.asyncContext`). Behavior differs per strategy in a way
 that's easy to get wrong from the names alone:
 
-| Strategy    | No session | Anonymous session                                  | Authenticated session                                |
-| ----------- | ---------- | -------------------------------------------------- | ---------------------------------------------------- |
-| `internal`  | Removed    | Removed                                            | **Removed** — never rendered, regardless of session. |
-| `private`   | Removed    | Removed                                            | Shown as-is (no masking).                            |
-| `protected` | Removed    | **Shown, but masked** using `virtualMask` settings | Shown as-is (no masking).                            |
+| Strategy      | No session | Anonymous session                                  | Authenticated session                                                            |
+| ------------- | ---------- | -------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `internal`    | Removed    | Removed                                            | **Removed** — never rendered, regardless of session.                             |
+| `private`     | Removed    | Removed                                            | Shown as-is (no masking).                                                        |
+| `protected`   | Removed    | **Shown, but masked** using `virtualMask` settings | Shown as-is (no masking).                                                        |
+| `conditional` | Removed    | Removed                                            | Shown to the field's owner; to anyone else only if `resolveGrant` approves them. |
 
-Only `protected` accepts `settings` (`virtualMask`, a `MaskingBaseOptions`-like shape); its masking
-always runs with `algorithm: 'hard'` regardless of what you pass — other options (`endBefore`,
-`startAfter`, ...) still apply. `internal` and `private` don't take settings.
+Only `protected` accepts `virtualMask` (a `MaskingBaseOptions`-like shape); its masking always runs
+with `algorithm: 'hard'` regardless of what you pass — other options (`endBefore`, `startAfter`,
+...) still apply. `internal` and `private` don't take settings.
+
+### The `conditional` strategy
+
+`conditional` covers a field visible to its own document's owner and, on top of that, to whichever
+other viewers hold an explicit grant — never to any other authenticated session by default:
+
+```ts
+type ConditionalDataSettings = {
+  ownerField?: string // document path holding the owner's id — defaults to 'userId'
+  resolveGrant?: (context: { documentId: unknown; viewerId: string; field: string }) => boolean
+}
+```
+
+The field's owner is found by comparing the session's `subject` (falling back to its `id`) against
+`doc[ownerField]`. A non-owner viewer only sees the field when `resolveGrant` is configured and
+resolves truthily — `@zanix/datamaster` calls it, but never stores or looks up a grant itself; the
+grants themselves (a table, a cache, a remote check, ...) are entirely up to the model owner.
+Omitting `resolveGrant` means the field is never shared with anyone but its owner, which is exactly
+the shape a field that must never be granted to anyone else needs — no separate strategy or
+workaround required.
+
+`resolveGrant` is always called synchronously, and must return a plain `boolean` — Mongoose applies
+schema getters without awaiting them, and this package's own `toJSON`/`toObject` transform pipeline
+doesn't await an individual field's transform either. A grant check backed by a live lookup (a
+database query, a remote call, ...) needs to run ahead of time — typically once per request in a
+guard, caching its result somewhere `resolveGrant` can read synchronously — rather than querying
+inline every time the field is read.
+
+`ownerField` is read off whichever document/subdocument scope directly owns the field — for a field
+inside an array of subdocuments, that's the subdocument itself, not the parent document, so
+`ownerField` must resolve on that same scope. This works through direct field access
+(`doc.someField`) as well as `toJSON()`/`toObject()`; the rare case where no document scope is
+reachable at all logs a `DATA_ACCESS_CONDITIONAL_NO_CONTEXT` warning and hides the field rather than
+guessing.
 
 ## Combining both (`dataPoliciesGetter`)
 

@@ -32,6 +32,7 @@ import { InternalError } from '@zanix/errors'
  * registerModel({
  *   name: 'test', // supports multi-DB notation: 'database:test' (also valid in population refs)
  *   definition: {
+ *     userId: { type: String }, // the document's owner — `conditional`'s default `ownerField`
  *     name: {
  *       type: String,
  *       unique: true,
@@ -40,6 +41,25 @@ import { InternalError } from '@zanix/errors'
  *     description: {
  *       type: String,
  *       get: dataAccessGetter({ strategy: 'private' }),
+ *     },
+ *     shippingAddress: {
+ *       type: String,
+ *       // Visible only to the document's own `userId`; no `resolveGrant` means no other viewer
+ *       // is ever granted access, regardless of session type.
+ *       get: dataAccessGetter({ strategy: 'conditional' }),
+ *     },
+ *     socialLinks: {
+ *       type: String,
+ *       // Visible to `userId`, and to any other authenticated viewer `resolveGrant` approves.
+ *       // `resolveGrant` runs synchronously — back it with an already-populated, request-scoped
+ *       // lookup (e.g. grants fetched once per request into a cache), not a live query.
+ *       get: dataAccessGetter({
+ *         strategy: 'conditional',
+ *         settings: {
+ *           resolveGrant: ({ documentId, viewerId, field }) =>
+ *             sharingGrantsCache.has(`${documentId}:${viewerId}:${field}`),
+ *         },
+ *       }),
  *     },
  *     ssn: {
  *       type: String,
