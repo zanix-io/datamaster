@@ -4,6 +4,7 @@ import type { MaskingBaseOptions } from '@zanix/types'
 import type { ClientSession, Document } from 'mongoose'
 import type { DataObject } from 'database/typings/models.ts'
 import type { AdaptedModel } from './models.ts'
+import type { AtomicClaimResult } from 'mongo/processor/schema/statics/atomic-claim.ts'
 import type {
   DataAccessConfig,
   DataPolicyVersion,
@@ -205,6 +206,27 @@ export type SchemaStatics = {
     fields: string[],
     conditions?: Record<string, unknown>,
   ): Record<string, unknown>
+
+  /**
+   * Runs a "claim this, but only if no one already has" write and its own race-loss recovery as
+   * one atomic-then-verify step. See `atomic-claim.ts`'s own doc for the full rationale and real
+   * examples this generalizes.
+   *
+   * @this {AdaptedModel} The bound Mongoose model.
+   * @param filter - The write's own filter, including whatever anti-race condition makes a second,
+   * concurrent claim attempt match nothing.
+   * @param update - The write to apply once `filter` matches.
+   * @param options.identity - A bare, unconditional lookup (e.g. `{ _id: id }`) used only when the
+   * write above returns nothing, to find out who actually won. Omit to skip that lookup.
+   *
+   * @returns {Promise<AtomicClaimResult<T>>} Whether this call won, and the resulting document.
+   */
+  atomicClaim<T = Record<string, unknown>>(
+    this: AdaptedModel,
+    filter: Record<string, unknown>,
+    update: Record<string, unknown>,
+    options?: { identity?: Record<string, unknown> },
+  ): Promise<AtomicClaimResult<T>>
 
   /**
    * Initiates a transaction on the schema with commit and abort capabilities.

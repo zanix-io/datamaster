@@ -9,6 +9,7 @@ import { readBatch, readCursor, readDocuments, readFind } from './find.ts'
 import { paginate, paginateCursor } from './pagination.ts'
 import { protectedBulkWrite } from './bulk-write.ts'
 import { buildSearchFilter } from './search.ts'
+import { atomicClaim } from './atomic-claim.ts'
 
 /**
  * @function statics
@@ -71,4 +72,6 @@ export const statics = (
   schema.statics.paginateCursor = paginateCursor
 
   schema.statics.buildSearchFilter ??= buildSearchFilter
+
+  schema.statics.atomicClaim ??= atomicClaim
 }

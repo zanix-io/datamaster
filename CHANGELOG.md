@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-09-12
+
+### Added
+
+- **`Model.atomicClaim(filter, update, options?)`** (`database` — new Mongoose model static) —
+  generalizes the "claim this, but only if no one already has" pattern two consumer repositories had
+  independently hand-rolled (correctly, but twice): an atomic `findOneAndUpdate` whose own `filter`
+  already encodes "not claimed yet", plus the race-loss recovery a real caller of this pattern needs
+  anyway (`options.identity`, re-fetching to see who actually won when this call's own write matched
+  nothing). Covers both real shapes seen so far — a single-field "set once" claim, and a "push once
+  per unique pair" claim on an array field via `$not`/`$elemMatch`. Exported as `AtomicClaimResult`
+  (`database` subpath).
+
 ## [1.10.0] - 2026-09-09
 
 ### Added

@@ -331,6 +331,36 @@ const filter = Model.buildSearchFilter(query, ['name', 'legalName', 'taxId'], {
 await Model.find(filter)
 ```
 
+### Claiming something exactly once, race-safe: `Model.atomicClaim`
+
+"Reclaim this, but only if no one already has" — a first write wins, and a concurrent second one
+must find out whether it actually lost, or is just racing its own retry. `atomicClaim` wraps this in
+one call: an atomic `findOneAndUpdate` whose own `filter` already encodes "not claimed yet", plus
+the race-loss recovery (`options.identity`) most callers of this pattern need anyway.
+
+```ts
+// Claim a single field, once.
+const { claimed, document } = await Gesture.atomicClaim(
+  { _id: id, recipientUserId: { $exists: false } },
+  { recipientUserId: callerId },
+  { identity: { _id: id } },
+)
+if (!document || (document.recipientUserId && document.recipientUserId !== callerId)) {
+  throw new HttpError('FORBIDDEN', { message: 'Already claimed by another session.' })
+}
+
+// Claim once per unique pair, appended to an array.
+await Event.atomicClaim(
+  { _id: id, interestActions: { $not: { $elemMatch: { fromId, toId } } } },
+  { $push: { interestActions: action } },
+  { identity: { _id: id } },
+)
+```
+
+`claimed` is `true` only for the call whose own write actually landed. On a lost race, `document` is
+the CURRENT document under `options.identity` — omit `identity` to skip that lookup entirely and
+treat any lost race as `{ claimed: false, document: null }`.
+
 ## See also
 
 - [Triggers](./triggers.md) — `extensions.triggers`, reactive actions tied to the model lifecycle.
