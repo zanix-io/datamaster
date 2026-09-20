@@ -46,6 +46,7 @@ per-deployment than in code — the explicit option always wins if both are set:
 | Option                 | Env var                  |
 | ---------------------- | ------------------------ |
 | `uri`                  | `MONGO_URI`              |
+| `config.dbName`        | `MONGO_DB_NAME`          |
 | `seedModel`            | `SEED_MODEL_NAME`        |
 | `triggersModel`        | `TRIGGERS_MODEL_NAME`    |
 | `triggersPollInterval` | `TRIGGERS_POLL_INTERVAL` |

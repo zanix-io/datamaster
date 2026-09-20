@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`MONGO_DB_NAME`** env var: names the database `ZanixMongoConnector` uses, in place of the
+  default derived from the project's `deno.json` `name`. The `config.dbName` option wins over it. It
+  makes two deployments of the same project keep separate data, and a test run use a disposable
+  database, without a code change.
+
 ## [1.11.0] - 2026-09-12
 
 ### Added

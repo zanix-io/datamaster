@@ -30,6 +30,7 @@ import { sanitizeConnectionUri } from 'utils/sanitize-uri.ts'
  * Exported so other packages (e.g. a general config bootstrap) can set/read them without
  * redefining the literal strings. */
 export const MONGO_URI_ENV = 'MONGO_URI'
+export const MONGO_DB_NAME_ENV = 'MONGO_DB_NAME'
 export const SEED_MODEL_ENV = 'SEED_MODEL_NAME'
 export const TRIGGERS_MODEL_ENV = 'TRIGGERS_MODEL_NAME'
 export const TRIGGERS_POLL_INTERVAL_ENV = 'TRIGGERS_POLL_INTERVAL'
@@ -116,6 +117,10 @@ const pollIntervalFromEnv = (): number | false => {
  * rule `MONGO_URI` already follows for `uri`):
  * - **MONGO_URI**: Optional. If set, this URI will be used as the default MongoDB connection string.
  *   Example: `MONGO_URI="mongodb://localhost:27017/my_database"`
+ * - **MONGO_DB_NAME**: Optional. Names the database this connector uses, in place of the default
+ *   derived from the project's own name (`deno.json`'s `name`). It is what lets two deployments of
+ *   the same project keep separate data, and a test run use a disposable database. The
+ *   `config.dbName` option wins over it.
  * - **SEED_MODEL_NAME**: Names the internal seed-tracking model in place of `seedModel`. The
  *   literal string `'false'` disables it, same as passing `seedModel: false`.
  * - **TRIGGERS_MODEL_NAME**: Names the internal persisted triggers model in place of
@@ -148,6 +153,11 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   #uri: string
   #database: Mongoose
   #config: MongoConnectorOptions['config']
+  /**
+   * Name of the database this connector uses: `config.dbName` when passed, else `MONGO_DB_NAME`
+   * (env var), else the default derived from the project's own name.
+   */
+  protected dbName: string
   /** Whether the connection URI points to a replica set or sharded cluster. */
   private isReplicaSet?: boolean
   /** The connector's display name, used in logs. */
@@ -237,6 +247,8 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
     this.isReplicaSet = this.#uri?.includes('replicaSet=') ||
       this.#uri?.includes('mongodb+srv://')
     this.#config = options.config
+    this.dbName = options.config?.dbName || Deno.env.get(MONGO_DB_NAME_ENV) ||
+      this.defaultDbName
     this.seederModel = options.seedModel ??
       modelNameFromEnv(SEED_MODEL_ENV, 'zanix-seeders')
     this.triggersModel = options.triggersModel ??
@@ -463,7 +475,7 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
   protected async initialize() {
     try {
       const dbConfig = { ...this.#config }
-      dbConfig.dbName = dbConfig.dbName || this.defaultDbName
+      dbConfig.dbName = this.dbName
 
       // Must run before `defineModels()` (not after `connect()`, unlike `loadPersistedTriggersOnStart`
       // below) — DLQ registration is just an in-memory schema registration, not a query against an
