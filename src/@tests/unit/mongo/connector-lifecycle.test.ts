@@ -99,7 +99,11 @@ Deno.test('initialize sanitizes a credential-bearing URI, logged exactly once', 
 
 Deno.test('close logs an error and does not throw when disconnect() rejects', async () => {
   const db = new ZanixMongoConnector({ seedModel: false }) as any
-  await db['initialize']()
+  // `isReady`, not a second manual `initialize()` call — the constructor already starts its own
+  // automatic connect in the background (`ZanixConnector`'s own `attemptInitialize`); calling
+  // `initialize()` again here would race it, same real failure `initialize sanitizes a
+  // credential-bearing URI, logged exactly once`'s own comment documents for the identical shape.
+  await db.isReady
 
   const originalDisconnect = Mongoose.prototype.disconnect
   Mongoose.prototype.disconnect = () => Promise.reject(new Error('disconnect failed'))
@@ -117,7 +121,9 @@ Deno.test('close sanitizes a credential-bearing URI in disconnect() failures', a
   // credential-leak risk `initialize()`'s own sanitization already guards against, just on the
   // opposite end of the connection's lifecycle.
   const db = new ZanixMongoConnector({ seedModel: false }) as any
-  await db['initialize']()
+  // See the identical `isReady`-not-`initialize()` comment above — avoids racing the
+  // constructor's own automatic connect.
+  await db.isReady
 
   const originalDisconnect = Mongoose.prototype.disconnect
   const credentialBearingMessage =
