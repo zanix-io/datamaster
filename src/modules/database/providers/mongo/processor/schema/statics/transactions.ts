@@ -1,8 +1,30 @@
 import type { BaseCustomSchema } from 'mongo/typings/schema.ts'
-import type { Document, SaveOptions } from 'mongoose'
+import type { ClientSession, Document, SaveOptions } from 'mongoose'
 
 import logger from '@zanix/logger'
 import { HttpError } from '@zanix/errors'
+
+/** MongoDB's own documented retry pattern for a transaction commit: `commitTransaction()` can
+ * fail with one of these labels on a genuinely transient server-side condition (e.g. two
+ * transactions racing to implicitly create the same brand-new collection) — the driver's own
+ * guidance is to retry the commit itself, not treat it as a real failure on the first try. */
+const RETRYABLE_COMMIT_LABELS = ['TransientTransactionError', 'UnknownTransactionCommitResult']
+
+const MAX_COMMIT_ATTEMPTS = 3
+
+/** Commits `session`, retrying up to {@linkcode MAX_COMMIT_ATTEMPTS} times while the driver
+ * itself labels the failure retryable (see {@linkcode RETRYABLE_COMMIT_LABELS}) — any other
+ * error, or the last attempt, is re-thrown to the caller's own catch. */
+const commitWithRetry = async (session: ClientSession, attempt = 1): Promise<void> => {
+  try {
+    await session.commitTransaction()
+  } catch (e) {
+    const labels = (e as { errorLabels?: string[] }).errorLabels ?? []
+    const retryable = RETRYABLE_COMMIT_LABELS.some((label) => labels.includes(label))
+    if (!retryable || attempt >= MAX_COMMIT_ATTEMPTS) throw e
+    await commitWithRetry(session, attempt + 1)
+  }
+}
 
 /**
  * Adds transaction handling to a Mongoose schema, allowing for the use of MongoDB transactions.
@@ -62,7 +84,7 @@ export const transactions = (schema: BaseCustomSchema): void => {
         return false
       }
       try {
-        await session.commitTransaction()
+        await commitWithRetry(session)
         await session.endSession()
         return true
       } catch (e) {
@@ -74,7 +96,11 @@ export const transactions = (schema: BaseCustomSchema): void => {
             source: 'zanix',
           },
         })
-        await session.abortTransaction()
+        // A commit failure can be ambiguous to the driver itself (e.g. a transient write-concern
+        // timeout) — it may already treat the session as committed, in which case this abort
+        // throws too ('Cannot call abortTransaction after calling commitTransaction'). The
+        // commit already failed either way, so that throw must never escape uncaught here.
+        await session.abortTransaction().catch(() => {})
         await session.endSession()
         return false
       }
