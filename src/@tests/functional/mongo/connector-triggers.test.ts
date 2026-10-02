@@ -1018,6 +1018,20 @@ Deno.test({
       TriggersModel = db.getModel<TriggersModelAttrs>(triggersModelName)
       Model = db.getModel<any>(targetModelName, new Schema({ str: String }))
 
+      // This scenario only exercises against a STANDALONE Mongo — the Node driver's own
+      // `TopologyDescription.type` is `'Single'` for one, `'ReplicaSetWithPrimary'`/
+      // `'ReplicaSetNoPrimary'`/`'Sharded'` for anything else. Against a replica set, Change
+      // Streams work normally (nothing to degrade from), so the real behavior this test is about
+      // never has anything to observe — skip cleanly rather than failing on a premise this Mongo
+      // instance doesn't meet.
+      if (Model.isReplicaSet()) {
+        logger.debug(
+          "Skipping 'triggersChangeStream degrades gracefully...': this Mongo instance's own " +
+            `topology is not 'Single' (standalone) — nothing to degrade from.`,
+        )
+        return
+      }
+
       // The test Mongo instance is a standalone server (no replica set) — `Model.watch()` doesn't
       // throw synchronously for this; MongoDB rejects the underlying $changeStream command
       // asynchronously, moments later, surfacing as an 'error' event on the stream. Either way,

@@ -486,6 +486,16 @@ export class ZanixMongoConnector extends ZanixDatabaseConnector {
 
       await this.#database.connect(this.#uri, dbConfig)
 
+      // The constructor's own `isReplicaSet` guess (a URI string check) misses a replica set
+      // reached through a bare `mongodb://host` with neither marker — the driver's own
+      // discovered topology, once connected, is the real signal. `topology` has no public type
+      // of its own, hence the narrow cast.
+      const client = this.#database.connection.getClient() as unknown as {
+        topology?: { description?: { type?: string } }
+      }
+      const topologyType = client.topology?.description?.type
+      if (topologyType) this.isReplicaSet = topologyType !== 'Single'
+
       await loadPersistedTriggersOnStart.call(this)
 
       await runSeedersOnStart.call(this)
