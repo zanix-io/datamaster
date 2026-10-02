@@ -22,6 +22,34 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   before — this is purely additive. See
   [Dot-path fields](./docs/triggers.md#dot-path-fields-fieldthe--prefixed-cross-field-value).
 
+### Fixed
+
+- **`ZanixMongoConnector.isReplicaSet`** was a syntactic check on the connection URI alone
+  (`replicaSet=`/`mongodb+srv://`) — it missed a replica set reached through a bare `mongodb://host`
+  with neither marker, incorrectly rejecting `Model.startTransaction()` on a real replica set with
+  `MONGODB_UNSUPPORTED_TRANSACTIONS`. Once connected, `initialize()` now overwrites it with the
+  driver's own discovered topology (`'Single'` vs. anything else) — the real, authoritative signal,
+  correct in both directions.
+- **`transactions.ts`'s `startTransaction`** could abort a transaction's own first write when it
+  implicitly created a brand-new collection, racing another operation doing the same server-side
+  (`Collection namespace ... is already in use`) — sometimes surfacing much later, at commit, as the
+  session's own transaction already aborted. Fixed at the root: the collection is now created (a
+  no-op if it already exists) before the transaction starts. `commit()` also now retries
+  `commitTransaction()` itself up to twice more on a driver-labeled `TransientTransactionError`/
+  `UnknownTransactionCommitResult` (MongoDB's own documented retry guidance), and its own abort
+  fallback no longer lets `abortTransaction()` throw uncaught when the driver already considers the
+  session committed.
+- Two `connector-lifecycle.test.ts` cases (`close` logging/sanitizing a `disconnect()` failure)
+  called `initialize()` manually right after construction, racing `ZanixConnector`'s own automatic
+  background connect — against a real MongoDB with a slower, multi-step handshake (a replica set,
+  rather than a fast standalone connect), the race could corrupt the connection's own auth-mechanism
+  resolution (`MongoInvalidArgumentError: authMechanism undefined not supported`). Both now await
+  `isReady` instead, same as the sibling test right above them already does.
+- `triggersChangeStream degrades gracefully... against a standalone Mongo` now checks the real
+  driver topology (`client.topology.description.type`) and skips cleanly when it isn't `'Single'` —
+  this scenario is only meaningful against a standalone server (Change Streams work normally on a
+  replica set, so there is nothing to degrade from there).
+
 ## [1.11.0] - 2026-09-12
 
 ### Added

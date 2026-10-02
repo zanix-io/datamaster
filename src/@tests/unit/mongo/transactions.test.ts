@@ -44,6 +44,7 @@ const buildFakeModel = (isReplicaSet: boolean, session: any) => {
     statics: { isReplicaSet: () => isReplicaSet },
     create: originalCreate,
     startSession: () => Promise.resolve(session),
+    createCollection: () => Promise.resolve(),
     saveCalls,
   })
 
@@ -51,6 +52,7 @@ const buildFakeModel = (isReplicaSet: boolean, session: any) => {
     statics: { isReplicaSet: () => boolean }
     create: typeof originalCreate
     startSession: () => Promise<any>
+    createCollection: () => Promise<void>
     saveCalls: unknown[]
   }
 }
