@@ -146,6 +146,90 @@ Deno.test('validateConditions "$field" prefix compares against another field', (
   )
 })
 
+Deno.test('validateConditions "field" resolves a dot-separated nested path', () => {
+  assertEquals(
+    validateConditions({ address: { city: 'Mexico City' } }, [
+      { field: 'address.city', op: '=', value: 'Mexico City' },
+    ]),
+    true,
+  )
+  assertEquals(
+    validateConditions({ address: { city: 'Guadalajara' } }, [
+      { field: 'address.city', op: '=', value: 'Mexico City' },
+    ]),
+    false,
+  )
+})
+
+Deno.test(
+  'validateConditions "field" nested path short-circuits to undefined on a missing intermediate segment',
+  () => {
+    assertEquals(
+      validateConditions({}, [
+        { field: 'address.city', op: '=', value: '!$undefined' },
+      ]),
+      true,
+    )
+    assertEquals(
+      validateConditions({ address: null }, [
+        { field: 'address.city', op: '=', value: '!$undefined' },
+      ]),
+      true,
+    )
+  },
+)
+
+Deno.test(
+  'validateConditions expresses a "field transitioned to X" check via a nested "_old.field" path',
+  () => {
+    // The real motivating shape: a post-updated trigger's `data` carries the current document's
+    // fields at the top level, plus the entire previous document under `_old` (see
+    // `triggersMiddleware` in `mongo/processor/triggers/mod.ts`). A dot-path condition reaches
+    // `_old`'s own nested fields, letting `and` express "now Y, but wasn't Y before" declaratively.
+    const conditions = [{
+      and: [
+        { field: 'deliveryStatus', op: '=' as const, value: 'pending-address' },
+        { field: '_old.deliveryStatus', op: '!=' as const, value: 'pending-address' },
+      ],
+    }]
+    assertEquals(
+      validateConditions({
+        deliveryStatus: 'pending-address',
+        _old: { deliveryStatus: 'processing' },
+      }, conditions),
+      true,
+    )
+    assertEquals(
+      validateConditions({
+        deliveryStatus: 'pending-address',
+        _old: { deliveryStatus: 'pending-address' },
+      }, conditions),
+      false,
+    )
+  },
+)
+
+Deno.test('validateConditions "$field" prefix resolves a dot-separated nested path', () => {
+  assertEquals(
+    validateConditions({
+      deliveryStatus: 'processing',
+      _old: { deliveryStatus: 'pending-address' },
+    }, [
+      { field: 'deliveryStatus', op: '!=', value: '$_old.deliveryStatus' },
+    ]),
+    true,
+  )
+  assertEquals(
+    validateConditions({
+      deliveryStatus: 'pending-address',
+      _old: { deliveryStatus: 'pending-address' },
+    }, [
+      { field: 'deliveryStatus', op: '!=', value: '$_old.deliveryStatus' },
+    ]),
+    false,
+  )
+})
+
 Deno.test('validateConditions throws on an unsupported operator', () => {
   const error = assertThrows(
     () =>

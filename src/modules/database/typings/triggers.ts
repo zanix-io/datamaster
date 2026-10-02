@@ -5,11 +5,22 @@ import type { HttpMethod } from '@zanix/server'
  * @interface SingleCondition
  */
 export interface SingleCondition {
-  /** The name of the field to evaluate. */
+  /**
+   * The name of the field to evaluate. A plain name (e.g. `'status'`) resolves a top-level
+   * property, exactly as before. A dot-separated path (e.g. `'address.city'`, or `'_old.status'`
+   * against a `post`-updated trigger's `_old` snapshot — see
+   * [Conditions](../../../../docs/triggers.md#conditions)) resolves a nested property instead,
+   * short-circuiting to `undefined` as soon as an intermediate segment is missing. A MongoDB field
+   * name can never itself contain a literal `.`, so this is unambiguous.
+   */
   field: string
   /** The operator to apply. */
   op: '<' | '>' | '=' | '<=' | '>=' | 'includes' | '!='
-  /** The value to compare against. */
+  /**
+   * The value to compare against. A `$`-prefixed string (e.g. `'$otherField'`) compares against
+   * another field on the same data instead of a literal, and supports the same dot-path nesting
+   * as `field` (e.g. `'$_old.status'`).
+   */
   value: string | boolean | number | '!$undefined'
 }
 

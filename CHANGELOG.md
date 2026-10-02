@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.0] - 2026-10-01
 
 ### Added
 
@@ -13,6 +13,14 @@ adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
   default derived from the project's `deno.json` `name`. The `config.dbName` option wins over it. It
   makes two deployments of the same project keep separate data, and a test run use a disposable
   database, without a code change.
+- **Dot-path support for a trigger `Condition`'s `field` and its `$`-prefixed cross-field `value`**
+  (`database` — `conditions.ts`) — `field: 'address.city'` now resolves `data.address?.city`, and
+  `value: '$_old.status'` resolves `data._old?.status`, short-circuiting to `undefined` on a missing
+  intermediate segment. Combined with the existing `and`/`or`/`not` combinators, this makes a
+  transition check ("field X is now Y, but wasn't Y before") expressible declaratively against a
+  `post`-updated trigger's own `_old` snapshot. A plain, non-dotted field name resolves exactly as
+  before — this is purely additive. See
+  [Dot-path fields](./docs/triggers.md#dot-path-fields-fieldthe--prefixed-cross-field-value).
 
 ## [1.11.0] - 2026-09-12
 

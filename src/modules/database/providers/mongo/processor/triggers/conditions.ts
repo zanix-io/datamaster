@@ -56,17 +56,34 @@ const evaluateCondition = (condition: Condition, data: any): boolean => {
 }
 
 /**
+ * Resolves `path` against `data`, supporting a dot-separated nested path (e.g. `'address.city'`
+ * resolves `data.address?.city`) in addition to a plain, single-level key (e.g. `'status'`
+ * resolves `data.status`, exactly as a flat `data?.[path]` lookup would). Short-circuits to
+ * `undefined` as soon as an intermediate segment is `null`/`undefined`, rather than throwing.
+ *
+ * A MongoDB field name can never contain a literal `.` character, so splitting `path` on `.` is
+ * always safe here — there's no real document field whose own name is itself dotted, so a dot in
+ * `path` is unambiguously a nesting separator, never a literal key to look up as-is.
+ */
+const getNestedValue = (data: any, path: string): any => {
+  if (!path.includes('.')) return data?.[path]
+  return path.split('.').reduce((value, key) => value?.[key], data)
+}
+
+/**
  * Resolves a condition's `value` against `data`:
  * - The literal sentinel `'!$undefined'` resolves to `undefined` itself (compare a field against
  *   "not set").
  * - A string starting with `$` resolves to another field on `data` (e.g. `'$endDate'` compares
- *   against `data.endDate`), letting a condition compare two fields on the same document.
+ *   against `data.endDate`), letting a condition compare two fields on the same document. The
+ *   referenced field name supports the same dot-path nesting as `SingleCondition.field` (e.g.
+ *   `'$_old.endDate'` compares against `data._old?.endDate`).
  * - Any other value is used as-is.
  */
 const resolveValue = (value: SingleCondition['value'], data: any): any => {
   if (value === '!$undefined') return undefined
   if (typeof value === 'string' && value.startsWith('$')) {
-    return data?.[value.slice(1)]
+    return getNestedValue(data, value.slice(1))
   }
   return value
 }
@@ -77,7 +94,7 @@ const evaluateSingleCondition = (
 ): boolean => {
   const { field, op, value } = condition
 
-  const fieldValue = data?.[field]
+  const fieldValue = getNestedValue(data, field)
   const opValue = resolveValue(value, data)
 
   switch (op) {

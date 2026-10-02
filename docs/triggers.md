@@ -314,6 +314,43 @@ const notGroup = { not: [/* ... */] }
 - **A string starting with `$`** — compares against another field on the same data instead of a
   literal (e.g. `{ field: 'startDate', op: '<', value: '$endDate' }`).
 
+### Dot-path fields (`field`/the `$`-prefixed cross-field `value`)
+
+Both `field` and a `$`-prefixed cross-field `value` resolve against `data` with a **single-level**
+lookup by default — `field: 'status'` resolves `data.status`, nothing more. Before dot-path support,
+there was no way to write a condition reaching into a nested object's own field:
+`field:
+'_old.deliveryStatus'` resolved `data['_old.deliveryStatus']` — a literal, non-existent key
+— not `data._old?.deliveryStatus`.
+
+A dot-separated `field` (or cross-field `value`) now resolves a nested path instead,
+short-circuiting to `undefined` as soon as an intermediate segment is missing, rather than throwing:
+
+```ts
+const condition = { field: 'address.city', op: '=', value: 'Mexico City' }
+```
+
+This is what makes a **transition check** — "field X is now Y, but wasn't Y before" — expressible
+declaratively, combining dot-path resolution with the existing `and` combinator. A `post`-updated
+trigger's `data` carries the current document's fields at the top level plus the entire previous
+document under `_old` (see [Document- and query-level coverage](#document--and-query-level-coverage)
+below and `triggersMiddleware` in `mongo/processor/triggers/mod.ts`), so `_old.<field>` reaches the
+previous value directly:
+
+```ts
+const transitionedToPendingAddress = {
+  and: [
+    { field: 'deliveryStatus', op: '=', value: 'pending-address' },
+    { field: '_old.deliveryStatus', op: '!=', value: 'pending-address' },
+  ],
+}
+```
+
+A MongoDB field name can never itself contain a literal `.`, so splitting on `.` is unambiguous —
+there's no real document field whose name is itself dotted. **A plain, non-dotted field name
+resolves exactly as before** — dot-path resolution is purely additive, not a behavior change for any
+existing condition.
+
 ## Document- and query-level coverage
 
 Triggers hook into **both** the document level (`.save()`, for a hydrated instance) and the query
