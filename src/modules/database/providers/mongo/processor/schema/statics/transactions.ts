@@ -64,6 +64,13 @@ export const transactions = (schema: BaseCustomSchema): void => {
       return new this(doc).save(opts)
     }) as typeof originalCreate
 
+    // A transaction's own FIRST write implicitly creating a brand-new collection can race another
+    // operation doing the same, server-side ('Collection namespace ... is already in use' —
+    // TransientTransactionError, sometimes surfacing as the session's own transaction already
+    // aborted by the time commit runs). Creating it here, before the transaction starts, is a
+    // plain no-op when it already exists, and removes that race entirely.
+    await this.createCollection()
+
     // Start the transaction
     session.startTransaction()
 
