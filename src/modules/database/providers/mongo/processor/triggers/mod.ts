@@ -140,16 +140,23 @@ export const triggersMiddleware = (
       updateOptions,
       async function (this: any, next) {
         const preActions = current()?.pre?.[event]
-        if (!preActions?.length) return next()
+        const postActions = current()?.post?.[event]
+        // `_old` is captured here for BOTH hooks — the `post` one below has no pre-image fetch
+        // of its own, only `this._old` set here. A `post`-only trigger (no `pre` actions at all)
+        // still needs it whenever its own `conditions` dot-path into `_old` (e.g. "field X just
+        // became Y, but wasn't Y before").
+        if (!preActions?.length && !postActions?.length) return next()
 
         this._old = await forDispatch(
           await this.model.findOne(this.getQuery()),
         )
 
-        const { $set, $setOnInsert: _omit, ...rest } = this.getUpdate() ?? {}
-        const data = { ...rest, ...$set, _old: this._old }
+        if (preActions?.length) {
+          const { $set, $setOnInsert: _omit, ...rest } = this.getUpdate() ?? {}
+          const data = { ...rest, ...$set, _old: this._old }
 
-        await dispatchAll(preActions, data)
+          await dispatchAll(preActions, data)
+        }
         next()
       },
     )

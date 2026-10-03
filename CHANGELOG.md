@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-10-02
+
+### Fixed
+
+- **A `post`-only trigger's own `Condition` dot-path into `_old`** (`^1.12.0`'s own feature) never
+  actually worked for a query-level write (`updateOne`/`findOneAndUpdate`) — `_old` was captured
+  ONLY when a `pre` action for that same event also existed; a `post`-only trigger always saw `_old`
+  as `undefined`, so a "field X is now Y, but wasn't Y before" condition always read the "before"
+  side as missing and matched every time, not just on the real transition. Verified directly (a
+  `post`-only trigger against a real MongoDB, confirmed firing on every unrelated write instead of
+  only the genuine one). Fixed by capturing `_old` whenever EITHER a `pre` or a `post` action exists
+  for the event — document-level `save()` already captured it unconditionally for an update;
+  query-level writes now match that.
+
 ## [1.12.0] - 2026-10-01
 
 ### Added

@@ -1277,3 +1277,54 @@ Deno.test({
     assertEquals(await db.isHealthy(), false)
   },
 })
+
+Deno.test({
+  ...sanitize,
+  name: "a post-only trigger's own dot-path _old condition fires on a query-level update " +
+    '(findOneAndUpdate), and only on the real transition',
+  fn: async () => {
+    calls.length = 0
+
+    const targetModelName = 'test-connector-triggers-post-only-old-target'
+
+    // No `pre` entry at all — regression test for the real bug this fixed: `_old` used to be
+    // captured ONLY when a `pre` action for the same event also existed, so a post-only trigger's
+    // own dot-path into `_old` always saw it as `undefined` and matched every write, not just the
+    // genuine transition.
+    registerModel({
+      name: targetModelName,
+      definition: { status: String },
+      extensions: {
+        triggers: {
+          post: {
+            updated: [{
+              custom: {
+                name: 'post-only-old-job',
+                conditions: [
+                  { field: 'status', op: '=', value: 'failed' },
+                  { field: '_old.status', op: '!=', value: 'failed' },
+                ],
+              },
+            }],
+          },
+        },
+      },
+    })
+
+    const db = new ZanixMongoConnector({ seedModel: false })
+    await db.isReady
+
+    const Model = db.getModel<any>(targetModelName)
+    const doc = await Model.create({ status: 'ok' })
+
+    await Model.findOneAndUpdate({ _id: doc._id }, { status: 'failed' })
+    assertEquals(calls.map((c) => c.name), ['post-only-old-job'])
+
+    // Same value again, nothing really transitioned — must not fire a second time.
+    await Model.findOneAndUpdate({ _id: doc._id }, { status: 'failed' })
+    assertEquals(calls.map((c) => c.name), ['post-only-old-job'])
+
+    await DropCollection(Model, db)
+    await db['close']()
+  },
+})
