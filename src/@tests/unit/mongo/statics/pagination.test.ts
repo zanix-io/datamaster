@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
-import { assert, assertEquals } from '@std/assert'
+import { assert, assertEquals, assertRejects } from '@std/assert'
 import { paginate, paginateCursor } from 'mongo/processor/schema/statics/pagination.ts'
 
 function createMockModel(
@@ -262,4 +262,42 @@ Deno.test('paginateCursor: search combined with filter wraps both in $and', asyn
   assertEquals(captured[0], {
     $and: [{ $or: [{ name: { $regex: 'a' } }] }, { status: 'active' }],
   })
+})
+
+const sample = () => createMockModel([{ _id: 1 }, { _id: 2 }, { _id: 3 }])
+
+for (const limit of [0, -3, 2.5, NaN, Infinity]) {
+  Deno.test(`paginate: rejects limit ${limit} instead of reading every document`, async () => {
+    const error = await assertRejects(() => paginate.call(sample() as any, { limit })) as any
+    assertEquals(error.code, 'DATAMASTER_INVALID_PAGINATION')
+    assertEquals(error.status.value, 400)
+  })
+
+  Deno.test(`paginateCursor: rejects limit ${limit} instead of reading every document`, async () => {
+    const error = await assertRejects(() => paginateCursor.call(sample() as any, { limit })) as any
+    assertEquals(error.code, 'DATAMASTER_INVALID_PAGINATION')
+  })
+}
+
+for (const page of [0, -1, 1.5, NaN]) {
+  Deno.test(`paginate: rejects page ${page} before it reaches the query`, async () => {
+    const error = await assertRejects(() => paginate.call(sample() as any, { page })) as any
+    assertEquals(error.code, 'DATAMASTER_INVALID_PAGINATION')
+  })
+}
+
+Deno.test('paginate: accepts the lowest valid page and limit, and a limit above the RTO maximum', async () => {
+  const lowest = await paginate.call(sample() as any, { page: 1, limit: 1 })
+  assertEquals(lowest.docs.length, 1)
+
+  // The RTO owns the upper bound; a trusted direct caller may read a larger page.
+  const large = await paginate.call(sample() as any, { page: 1, limit: 100000 })
+  assertEquals(large.docs.length, 3)
+  assertEquals(large.totalPages, 1)
+})
+
+Deno.test('paginateCursor: accepts limit 1', async () => {
+  const result = await paginateCursor.call(sample() as any, { limit: 1 })
+  assertEquals(result.docs.length, 1)
+  assertEquals(result.hasNextPage, true)
 })

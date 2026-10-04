@@ -294,6 +294,31 @@ const cursorPage = await UsersModel.paginateCursor({
 // { docs, limit, nextCursor, hasNextPage }
 ```
 
+### Bounds on `page` and `limit`
+
+`SearchPaginationRTO` (`page`/`limit`/`sortBy`) and `ScrollPaginationRTO` (`cursor`/`limit`) are the
+validated entry point for a public endpoint's query string. `page` must be an integer >= 1 and
+`limit` an integer between 1 and `MAX_PAGE_LIMIT` (`100`); anything else (`0`, negative, decimal,
+non-numeric, above the maximum) fails the RTO validation with a 400 that names the field. Numeric
+text such as `?limit=20` is converted to a number before the check.
+
+A service that needs another maximum extends the RTO and redeclares the accessor:
+
+```ts
+import { PageLimit, SearchPaginationRTO } from '@zanix/datamaster'
+
+class BulkSearchRTO extends SearchPaginationRTO {
+  @PageLimit(500)
+  override accessor limit: number = 50
+}
+```
+
+`paginate`/`paginateCursor` also check their own input, so a call that skips the RTO is safe: a
+`page`/`limit` that is not an integer >= 1 throws a `BAD_REQUEST` `HttpError` (code
+`DATAMASTER_INVALID_PAGINATION`) instead of being clamped, because a clamp hides the caller's bug
+and `limit: 0` must never mean "no limit". The static does not enforce `MAX_PAGE_LIMIT`; that bound
+belongs to the RTO at the public edge.
+
 Both also accept `useDataPolicies: true`, protecting `filter`'s `mask`-strategy paths before the
 query runs — see
 [Data Protection: query-level protection](./data-protection.md#query-level-protection-usedatapolicies).

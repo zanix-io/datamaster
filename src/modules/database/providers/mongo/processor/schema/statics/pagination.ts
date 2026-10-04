@@ -1,5 +1,7 @@
 import type { SchemaStatics } from 'mongo/typings/statics.ts'
 
+import { assertPaginationParams } from 'database/utils/pagination.ts'
+
 /**
  * Combines a `buildSearchFilter` result with the caller's own `filter`, without ever merging their
  * top-level keys into one object — an `$or`/`$and`/`$nor` (or any other key) already present in
@@ -22,6 +24,9 @@ const combineFilters = (
 
 /**
  * Paginate documents using traditional skip/limit strategy.
+ *
+ * Throws a `BAD_REQUEST` `HttpError` when `page` or `limit` is not an integer greater than or
+ * equal to 1.
  */
 export const paginate: SchemaStatics['paginate'] = async function (
   options = {},
@@ -35,6 +40,7 @@ export const paginate: SchemaStatics['paginate'] = async function (
     useDataPolicies,
     search,
   } = options
+  assertPaginationParams({ page, limit })
   const filter = search
     ? combineFilters(
       this.buildSearchFilter(search.query, search.fields),
@@ -66,6 +72,8 @@ export const paginate: SchemaStatics['paginate'] = async function (
 
 /**
  * Paginate documents using cursor-based strategy (more efficient).
+ *
+ * Throws a `BAD_REQUEST` `HttpError` when `limit` is not an integer greater than or equal to 1.
  */
 export const paginateCursor: SchemaStatics['paginateCursor'] = async function (
   options = {},
@@ -78,6 +86,7 @@ export const paginateCursor: SchemaStatics['paginateCursor'] = async function (
     useDataPolicies,
     search,
   } = options
+  assertPaginationParams({ limit })
   const filter = search
     ? combineFilters(
       this.buildSearchFilter(search.query, search.fields),

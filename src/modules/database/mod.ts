@@ -31,11 +31,19 @@ export {
 
 // pagination RTOs
 export {
+  /** Decorator for a page-size `limit` accessor: an integer between 1 and a maximum (default `MAX_PAGE_LIMIT`). */
+  PageLimit,
+  /** Decorator for a 1-based `page` accessor: an integer greater than or equal to 1. */
+  PageNumber,
   /** Validates cursor-based pagination query params (`cursor`, `limit`) — matches `Model.paginateCursor`'s own shape. */
   ScrollPaginationRTO,
   /** Validates skip/limit pagination query params (`page`, `limit`, `sortBy`) — matches `Model.paginate`'s own shape. */
   SearchPaginationRTO,
 } from './rtos/pagination.ts'
+export {
+  /** Default upper bound for a paginated request's `limit`, enforced by the pagination RTOs. */
+  MAX_PAGE_LIMIT,
+} from './utils/pagination.ts'
 
 // accessors
 export {

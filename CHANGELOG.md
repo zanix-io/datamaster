@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 2026-10-04
+
+### Changed
+
+- **BEHAVIOR CHANGE: pagination `page`/`limit` are now bounded and validated.** Before, a `limit` or
+  `page` outside a sane range passed straight to MongoDB: `?limit=0` returned every document
+  (`limit(0)` means "no limit" there) with a non-finite `totalPages`, `?limit=100000` dumped the
+  collection, `?limit=-3` returned a negative `totalPages`, and `?page=0` failed with an HTTP 500
+  carrying MongoDB's raw `BSON field 'skip'` message. Now:
+  - `SearchPaginationRTO` accepts `page` as an integer >= 1 and `limit` as an integer between 1 and
+    `MAX_PAGE_LIMIT` (100); `ScrollPaginationRTO` applies the same `limit` rule. Anything else (`0`,
+    negative, decimal, non-numeric, above the maximum) fails the normal RTO validation with a 400
+    naming the field. Numeric query-string text (`'20'`) is still converted to a number first. A
+    client that sends `limit` above 100 now gets a 400 instead of a page.
+  - `Model.paginate` and `Model.paginateCursor` throw a `BAD_REQUEST` `HttpError` (code
+    `DATAMASTER_INVALID_PAGINATION`) when a given `page`/`limit` is not an integer >= 1, so a direct
+    call can no longer read the whole collection with `limit: 0` or send a negative `skip`. They do
+    not apply the 100 maximum: a direct caller is trusted code.
+  - Other statics keep `limit: 0` as "no limit" (`find`, `readDocuments`, `readBatch`, ...); that is
+    their documented contract, not pagination.
+
+### Added
+
+- `MAX_PAGE_LIMIT` (default `100`) and `PageNumber()`/`PageLimit(max?)` decorators. A service that
+  needs another bound extends the RTO and redeclares the accessor with
+  `@PageLimit(500) override accessor limit: number = 50`.
+
 ## [1.12.1] - 2026-10-02
 
 ### Fixed
