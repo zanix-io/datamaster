@@ -52,7 +52,7 @@ export const seederBaseWrapper = (
   const { avoidRun, onFinish } = process
 
   const success = (time: number, Model: unknown) => {
-    onFinish('success', { name, version, duration: Date.now() - time }, Model)
+    onFinish('success', { name, version, runningMode, duration: Date.now() - time }, Model)
     loggerIntercepted?.success(
       `Seeder operation [${name}] completed successfully.`,
     )
@@ -62,6 +62,7 @@ export const seederBaseWrapper = (
     onFinish('failed', {
       name,
       version,
+      runningMode,
       duration: Date.now() - time,
       error: error.message,
     }, Model)

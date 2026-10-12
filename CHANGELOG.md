@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project
 adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.12.3] - 2026-10-12
+
+### Fixed
+
+- **A seeder with `runningMode: 'always'` no longer logs a duplicate-key error on every start but
+  the first.** Such a seeder runs on every start and finishes with the same
+  `{name, version, status}` each time, and the tracking model (`zanix-seeders`) has a unique index
+  on exactly those three fields, so recording it again failed with `E11000` and logged
+  `Operation failed while registering
+  the seeder process`. The seeder itself ran fine; only its
+  tracking record failed. The record of an `'always'` seeder is now replaced in place (an upsert on
+  `{name, version, status}`, so its `duration` and date stay current). Any other record is still
+  inserted, so a real duplicate (the same seeder registered twice) is still reported.
+
 ## [1.12.2] - 2026-10-04
 
 ### Changed

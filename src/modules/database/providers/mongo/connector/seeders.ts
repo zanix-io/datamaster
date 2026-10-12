@@ -58,7 +58,26 @@ async function runAndSaveSeeders(this: ZanixMongoConnector, seeders: Seeders) {
         return
       }
 
-      await Model.insertMany(data).catch((e) => {
+      // A seeder in `runningMode: 'always'` records the same `{name, version, status}` on every start,
+      // which the tracking model's unique index would reject from the second start on: its record is
+      // replaced in place. Any other record is inserted, so a real duplicate (the same seeder
+      // registered twice) is still reported.
+      const records = data as Array<Record<string, unknown> & { replace?: true }>
+      const replaced = records.filter((record) => record.replace)
+      const inserted = records.filter((record) => !record.replace)
+
+      await Promise.all([
+        inserted.length ? Model.insertMany(inserted) : undefined,
+        replaced.length
+          ? Model.bulkWrite(replaced.map(({ replace: _, ...record }) => ({
+            updateOne: {
+              filter: { name: record.name, version: record.version, status: record.status },
+              update: { $set: record },
+              upsert: true,
+            },
+          })))
+          : undefined,
+      ]).catch((e) => {
         logger.error(
           `Operation failed while registering the seeder process for the '${this.name}' class.`,
           e,

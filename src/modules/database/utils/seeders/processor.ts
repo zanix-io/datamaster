@@ -34,9 +34,17 @@ export function seederProcessor(
       )
     },
     onFinish: (status, options, Model) => {
-      const { name, version, duration } = options
+      const { name, version, duration, runningMode } = options
       const { database, model } = getDbAndModel(modelName(Model))
-      const toSave = { name: getName(model, name), status, version, duration }
+      const toSave = {
+        name: getName(model, name),
+        status,
+        version,
+        duration,
+        // A seeder that runs on every start finishes with the same `{name, version, status}` every
+        // time: its record is replaced, not added again (see `runAndSaveSeeders`).
+        ...(runningMode === 'always' && { replace: true }),
+      }
 
       ProgramModule.seeders.addDataToQuery({
         data: toSave,
